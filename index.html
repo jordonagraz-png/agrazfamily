@@ -48,12 +48,15 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .star{position:absolute;width:2px;height:2px;background:#fff;border-radius:50%;animation:twinkle 4s ease-in-out infinite}
 @keyframes twinkle{0%,100%{opacity:0.2}50%{opacity:0.8}}
 
+#auth-screen .beach-bg{position:absolute;top:0;left:0;width:100%;height:100%;background:url('https://images.unsplash.com/photo-1499793983690-e29da59ef1c2?w=1920&q=85') center/cover no-repeat;z-index:0}
+#auth-screen .beach-bg::after{content:'';position:absolute;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,rgba(10,22,30,0.55) 0%,rgba(26,58,74,0.4) 40%,rgba(10,22,30,0.6) 100%)}
+#auth-screen .stars{position:absolute;width:100%;height:60%;top:0;z-index:1;pointer-events:none}
 #auth-screen{position:fixed;top:0;left:0;width:100%;height:100%;z-index:1000;display:flex;align-items:center;justify-content:center}
 #auth-screen .ocean-bg{position:absolute}
 
 .auth-box{
 position:relative;z-index:10;width:440px;max-width:92vw;
-background:var(--glass);
+background:rgba(12,26,26,0.75);
 border:1px solid var(--border);
 border-radius:28px;padding:52px 44px;
 backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);
@@ -166,20 +169,14 @@ footer .footer-tagline{font-size:12px;color:var(--text2);letter-spacing:2px;marg
 <body>
 
 <div id="auth-screen">
-<div class="ocean-bg">
-<div class="floating-light fl1"></div>
-<div class="floating-light fl2"></div>
-<div class="floating-light fl3"></div>
+<div class="beach-bg"></div>
 <div class="stars" id="auth-stars"></div>
-<div class="wave wave1"></div>
-<div class="wave wave2"></div>
-</div>
 
 <div class="auth-box">
 <div class="auth-logo">
 <span class="logo-icon">&#127958;</span>
 <h1>Agraz Family</h1>
-<p>Our Beach House</p>
+
 </div>
 
 <div class="tabs">
@@ -235,7 +232,7 @@ footer .footer-tagline{font-size:12px;color:var(--text2);letter-spacing:2px;marg
 <section class="hero" id="home">
 <div class="hero-content fi">
 <span class="hero-icon">&#127754;</span>
-<h1>Welcome to<br><span class="gr">Our Beach House</span></h1>
+<h1>Welcome to<br><span class="gr">The Agraz Family</span></h1>
 <p>A private family space where the ocean breeze meets warm memories. Stay connected, share moments, and feel at home no matter the distance.</p>
 <div class="hero-stats">
 <div class="stat"><div class="stat-num" id="mc">0</div><div class="stat-lbl">Family Members</div></div>
@@ -304,7 +301,7 @@ function createStars(containerId,count){var c=document.getElementById(containerI
 createStars('auth-stars',40);createStars('main-stars',40);
 
 var FC='agraz2025';
-function gU(){return JSON.parse(localStorage.getItem('af_u')||'[]');}
+function gU(){var u=JSON.parse(localStorage.getItem('af_u')||'[]');if(!u.find(function(x){return x.email==='family@agrazfamily.com';})){u.push({name:'Agraz Family',email:'family@agrazfamily.com',password:'Agraz2025!',joinedDate:'2025-01-01T00:00:00.000Z'});localStorage.setItem('af_u',JSON.stringify(u));}return u;}
 function sU(u){localStorage.setItem('af_u',JSON.stringify(u));}
 function gC(){return JSON.parse(sessionStorage.getItem('af_c')||'null');}
 function sC(u){sessionStorage.setItem('af_c',JSON.stringify(u));}
