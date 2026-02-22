@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Agraz Family</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+          *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+          :root {
+                  --bg-primary: #0a0a0f;
+                  --bg-secondary: #12121a;
+                  --bg-card: rgba(255,255,255,0.03);
+                  --accent: #00d4ff;
+                  --accent2: #7b2ff7;
+                  --accent3: #ff2d55;
+                  --text-primary: #e8e8f0;
+                  --text-secondary: #8888aa;
+                  --glass: rgba(255,255,255,0.05);
+                  --glass-border: rgba(255,255,255,0.08);
+                  --glow: 0 0 30px rgba(0,212,255,0.15);
+          }
+
+          body {
+                  font-family: 'Rajdhani', sans-serif;
+                  background: var(--bg-primary);
+                  color: var(--text-primary);
+                  min-height: 100vh;
+                  overflow-x: hidden;
+          }
+
+          /* Animated background */
+          .bg-grid {
+                  position: fixed; top:0; left:0; width:100%; height:100%;
+                  background-image:
+                            linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+                            linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+                  background-size: 60px 60px;
+                  z-index: 0;
+                  animation: gridMove 20s linear infinite;
+          }
+          @keyframes gridMove { to { transform: translate(-60px, -60px); } }
+
+          .bg-orbs {
+                  position: fixed; top:0; left:0; width:100%; height:100%; z-index:0; pointer-events:none;
+          }
+          .orb {
+                  position: absolute; border-radius: 50%; filter: blur(80px); opacity: 0.3;
+                  animation: orbFloat 15s ease-in-out infinite;
+          }
+          .orb1 { width:400px; height:400px; background:var(--accent); top:10%; left:10%; }
+          .orb2 { width:350px; height:350px; background:var(--accent2); top:60%; right:10%; animation-delay:-5s; }
+          .orb3 { width:300px; height:300px; background:var(--accent3); bottom:10%; left:40%; animation-delay:-10s; }
+          @keyframes orbFloat {
+                  0%,100% { transform: translate(0,0) scale(1); }
+                  33% { transform: translate(30px,-30px) scale(1.1); }
+                  66% { transform: translate(-20px,20px) scale(0.9); }
+          }
+
+          /* AUTH SCREEN */
+          #auth-screen {
+                  position: fixed; top:0; left:0; width:100%; height:100%; z-index:1000;
+                  display: flex; align-items:center; justify-content:center;
+                  background: var(--bg-primary);
+          }
+          #auth-screen .bg-grid, #auth-screen .bg-orbs { position:absolute; }
+
+          .auth-container {
+                  position: relative; z-index: 10;
+                  width: 420px; max-width: 90vw;
+                  background: var(--glass);
+                  border: 1px solid var(--glass-border);
+                  border-radius: 24px;
+                  padding: 48px 40px;
+                  backdrop-filter: blur(20px);
+                  box-shadow: var(--glow);
+          }
+
+          .auth-logo {
+                  text-align: center; margin-bottom: 32px;
+          }
+          .auth-logo h1 {
+                  font-family: 'Orbitron', sans-serif;
+                  font-size: 28px; font-weight: 900;
+                  background: linear-gradient(135deg, var(--accent), var(--accent2));
+                  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+                  background-clip: text;
+          }
+          .auth-logo p {
+                  color: var(--text-secondary); font-size: 14px; margin-top: 6px;
+                  font-family: 'Inter', sans-serif; letter-spacing: 2px; text-transform: uppercase;
+          }
+
+          .auth-tabs {
+                  display: flex; margin-bottom: 28px; border-radius: 12px;
+                  background: rgba(255,255,255,0.03); overflow: hidden;
+          }
+          .auth-tab {
+                  flex:1; padding: 12px; text-align:center; cursor:pointer;
+                  font-family: 'Rajdhani', sans-serif; font-weight:600; font-size:15px;
+                  color: var(--text-secondary); transition: all 0.3s; border:none; background:none;
+                  text-transform: uppercase; letter-spacing: 1px;
+          }
+          .auth-tab.active {
+                  background: linear-gradient(135deg, var(--accent), var(--accent2));
+                  color: #fff; border-radius: 10px;
+          }
+
+          .auth-form { display:none; }
+          .auth-form.active { display:block; }
+
+          .form-group { margin-bottom: 18px; }
+          .form-group label {
+                  display:block; font-size:12px; color:var(--text-secondary); margin-bottom:6px;
+                  font-family:'Inter',sans-serif; text-transform:uppercase; letter-spacing:1.5px;
+          }
+          .form-group input {
+                  width:100%; padding:14px 16px; background:rgba(255,255,255,0.05);
+                  border:1px solid var(--glass-border); border-radius:12px;
+                  color:var(--text-primary); font-family:'Rajdhani',sans-serif; font-size:16px;
+                  transition:all 0.3s; outline:none;
+          }
+          .form-group input:focus {
+                  border-color: var(--accent);
+                  box-shadow: 0 0 20px rgba(0,212,255,0.1);
+          }
+          .form-group input::placeholder { color:rgba(255,255,255,0.2); }
+
+          .auth-btn {
+                  width:100%; padding:16px; border:none; border-radius:12px; cursor:pointer;
+                  font-family:'Orbitron',sans-serif; font-size:14px; font-weight:700;
+                  background: linear-gradient(135deg, var(--accent), var(--accent2));
+                  color:#fff; text-transform:uppercase; letter-spacing:2px;
+                  transition:all 0.3s; margin-top:8px;
+          }
+          .auth-btn:hover { transform:translateY(-2px); box-shadow:0 8px 30px rgba(0,212,255,0.3); }
+
+          .auth-error {
+                  color:var(--accent3); font-size:13px; text-align:center; margin-top:12px;
+                  font-family:'Inter',sans-serif; min-height:20px;
+          }
+          .auth-success {
+                  color:#00ff88; font-size:13px; text-align:center; margin-top:12px;
+                  font-family:'Inter',sans-serif;
+          }
+
+          /* MAIN SITE (hidden until auth) */
+          #main-site { display:none; position:relative; z-index:1; }
+
+          /* NAV */
+          nav {
+                  position:fixed; top:0; left:0; width:100%; z-index:100;
+                  background: rgba(10,10,15,0.8); backdrop-filter:blur(20px);
+                  border-bottom:1px solid var(--glass-border);
+          }
+          .nav-inner {
+                  max-width:1200px; margin:0 auto; padding:0 24px;
+                  display:flex; align-items:center; justify-content:space-between; height:70px;
+          }
+          .nav-brand {
+                  font-family:'Orbitron',sans-serif; font-weight:900; font-size:20px;
+                  background:linear-gradient(135deg,var(--accent),var(--accent2));
+                  -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+          }
+          .nav-links { display:flex; gap:32px; align-items:center; }
+          .nav-links a {
+                  color:var(--text-secondary); text-decoration:none; font-weight:500; font-size:15px;
+                  transition:color 0.3s; text-transform:uppercase; letter-spacing:1px;
+          }
+          .nav-links a:hover { color:var(--accent); }
+          .nav-user {
+                  display:flex; align-items:center; gap:12px;
+          }
+          .nav-user span {
+                  font-size:14px; color:var(--accent);
+                  font-family:'Inter',sans-serif;
+          }
+          .logout-btn {
+                  padding:8px 20px; border:1px solid var(--glass-border); border-radius:8px;
+                  background:transparent; color:var(--text-secondary); cursor:pointer;
+                  font-family:'Rajdhani',sans-serif; font-size:14px; transition:all 0.3s;
+          }
+          .logout-btn:hover { border-color:var(--accent3); color:var(--accent3); }
+
+          /* HERO */
+          .hero {
+                  min-height:100vh; display:flex; align-items:center; justify-content:center;
+                  text-align:center; padding:120px 24px 80px;
+          }
+          .hero-content { max-width:800px; }
+          .hero h1 {
+                  font-family:'Orbitron',sans-serif; font-size:clamp(36px,6vw,72px);
+                  font-weight:900; line-height:1.1; margin-bottom:24px;
+          }
+          .hero h1 .gradient {
+                  background:linear-gradient(135deg,var(--accent),var(--accent2),var(--accent3));
+                  -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+          }
+          .hero p {
+                  font-family:'Inter',sans-serif; font-size:18px; color:var(--text-secondary);
+                  line-height:1.7; max-width:600px; margin:0 auto 40px;
+          }
+          .hero-stats {
+                  display:flex; justify-content:center; gap:48px; margin-top:48px;
+          }
+          .stat { text-align:center; }
+          .stat-number {
+                  font-family:'Orbitron',sans-serif; font-size:36px; font-weight:900;
+                  background:linear-gradient(135deg,var(--accent),var(--accent2));
+                  -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+          }
+          .stat-label {
+                  font-family:'Inter',sans-serif; font-size:12px; color:var(--text-secondary);
+                  text-transform:uppercase; letter-spacing:2px; margin-top:4px;
+          }
+
+          /* SECTIONS */
+          .section {
+                  padding:100px 24px; max-width:1200px; margin:0 auto;
+          }
+          .section-header {
+                  text-align:center; margin-bottom:64px;
+          }
+          .section-header h2 {
+                  font-family:'Orbitron',sans-serif; font-size:32px; font-weight:700;
+                  margin-bottom:16px;
+          }
+          .section-header p {
+                  font-family:'Inter',sans-serif; color:var(--text-secondary); font-size:16px;
+          }
+
+          /* CARDS GRID */
+          .cards-grid {
+                  display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:24px;
+          }
+          .card {
+                  background:var(--glass); border:1px solid var(--glass-border);
+                  border-radius:20px; padding:36px; transition:all 0.4s;
+                  position:relative; overflow:hidden;
+          }
+          .card::before {
+                  content:''; position:absolute; top:0; left:0; right:0; height:2px;
+                  background:linear-gradient(90deg,var(--accent),var(--accent2));
+                  opacity:0; transition:opacity 0.4s;
+          }
+          .card:hover { transform:translateY(-4px); box-shadow:var(--glow); }
+          .card:hover::before { opacity:1; }
+          .card-icon {
+                  width:48px; height:48px; border-radius:12px; display:flex;
+                  align-items:center; justify-content:center; margin-bottom:20px;
+                  background:linear-gradient(135deg,rgba(0,212,255,0.15),rgba(123,47,247,0.15));
+                  font-size:24px;
+          }
+          .card h3 {
+                  font-family:'Orbitron',sans-serif; font-size:18px; margin-bottom:12px;
+          }
+          .card p {
+                  font-family:'Inter',sans-serif; color:var(--text-secondary); font-size:14px;
+                  line-height:1.7;
+          }
+
+          /* FAMILY MEMBERS */
+          .members-grid {
+                  display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:24px;
+          }
+          .member-card {
+                  background:var(--glass); border:1px solid var(--glass-border);
+                  border-radius:20px; padding:32px; text-align:center; transition:all 0.4s;
+          }
+          .member-card:hover { transform:translateY(-4px); box-shadow:var(--glow); }
+          .member-avatar {
+                  width:80px; height:80px; border-radius:50%; margin:0 auto 16px;
+                  background:linear-gradient(135deg,var(--accent),var(--accent2));
+                  display:flex; align-items:center; justify-content:center;
+                  font-family:'Orbitron',sans-serif; font-size:28px; font-weight:700; color:#fff;
+          }
+          .member-card h3 { font-family:'Orbitron',sans-serif; font-size:16px; margin-bottom:6px; }
+          .member-card p { font-family:'Inter',sans-serif; color:var(--text-secondary); font-size:13px; }
+
+          /* TIMELINE */
+          .timeline { max-width:700px; margin:0 auto; position:relative; }
+          .timeline::before {
+                  content:''; position:absolute; left:24px; top:0; bottom:0; width:2px;
+                  background:linear-gradient(180deg,var(--accent),var(--accent2),var(--accent3));
+          }
+          .timeline-item {
+                  padding-left:64px; margin-bottom:40px; position:relative;
+          }
+          .timeline-dot {
+                  position:absolute; left:16px; top:4px; width:18px; height:18px;
+                  border-radius:50%; background:var(--accent); border:3px solid var(--bg-primary);
+                  box-shadow:0 0 15px rgba(0,212,255,0.4);
+          }
+          .timeline-year {
+                  font-family:'Orbitron',sans-serif; font-size:14px; color:var(--accent); margin-bottom:6px;
+          }
+          .timeline-item h3 {
+                  font-family:'Rajdhani',sans-serif; font-size:20px; font-weight:600; margin-bottom:6px;
+          }
+          .timeline-item p {
+                  font-family:'Inter',sans-serif; color:var(--text-secondary); font-size:14px; line-height:1.6;
+          }
+
+          /* FOOTER */
+          footer {
+                  border-top:1px solid var(--glass-border);
+                  padding:40px 24px; text-align:center;
+                  font-family:'Inter',sans-serif; color:var(--text-secondary); font-size:13px;
+          }
+          footer .footer-brand {
+                  font-family:'Orbitron',sans-serif; font-size:16px;
+                  background:linear-gradient(135deg,var(--accent),var(--accent2));
+                  -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+                  margin-bottom:12px;
+          }
+
+          /* Mobile */
+          @media(max-width:768px) {
+                  .nav-links { display:none; }
+                  .hero-stats { flex-direction:column; gap:24px; }
+                  .auth-container { padding:32px 24px; }
+          }
+
+          /* Scrollbar */
+          ::-webkit-scrollbar { width:8px; }
+          ::-webkit-scrollbar-track { background:var(--bg-primary); }
+          ::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.1); border-radius:4px; }
+
+          .hidden { display:none !important; }
+
+          /* Animations */
+          .fade-in { opacity:0; transform:translateY(20px); transition:all 0.6s ease-out; }
+          .fade-in.visible { opacity:1; transform:translateY(0); }
+        </style>
+  </head>
+  <body>
+
+      <!-- AUTH SCREEN -->
+      <div id="auth-screen">
+            <div class="bg-grid"></div>div>
+            <div class="bg-orbs">
+                    <div class="orb orb1"></div>div>
+                    <div class="orb orb2"></div>div>
+                    <div class="orb orb3"></div>div>
+            </div>div>
+
+            <div class="auth-container">
+                    <div class="auth-logo">
+                              <h1>AGRAZ FAMILY</h1>
+                            <p>Private Family Portal</p>
+                    </div>div>
+            
+                  <div class="auth-tabs">
+                          <button class="auth-tab active" onclick="switchTab('login')">Sign In</button>button>
+                          <button class="auth-tab" onclick="switchTab('register')">Create Account</button>button>
+                  </div>div>
+            
+                  <!-- Login Form -->
+                  <form id="login-form" class="auth-form active" onsubmit="handleLogin(event)">
+                          <div class="form-group">
+                                    <label>Email</label>
+                                    <input type="email" id="login-email" placeholder="Enter your email" required>
+                          </div>div>
+                          <div class="form-group">
+                                    <label>Password</label>
+                                    <input type="password" id="login-password" placeholder="Enter your password" required>
+                          </div>div>
+                          <button type="submit" class="auth-btn">Access Portal</button>button>
+                          <div id="login-error" class="auth-error"></div>div>
+                  </form>form>
+            
+                  <!-- Register Form -->
+                  <form id="register-form" class="auth-form" onsubmit="handleRegister(event)">
+                          <div class="form-group">
+                                    <label>Full Name</label>
+                                    <input type="text" id="reg-name" placeholder="Enter your name" required>
+                          </div>div>
+                          <div class="form-group">
+                                    <label>Email</label>
+                                    <input type="email" id="reg-email" placeholder="Enter your email" required>
+                          </div>div>
+                          <div class="form-group">
+                                    <label>Password</label>
+                                    <input type="password" id="reg-password" placeholder="Create a password" required minlength="6">
+                          </div>div>
+                          <div class="form-group">
+                                    <label>Family Code</label>
+                                    <input type="text" id="reg-code" placeholder="Enter family invite code" required>
+                          </div>div>
+                          <button type="submit" class="auth-btn">Create Account</button>button>
+                          <div id="reg-error" class="auth-error"></div>div>
+                          <div id="reg-success" class="auth-success"></div>div>
+                  </form>form>
+            </div>div>
+      </div>div>
+  
+    <!-- MAIN SITE -->
+    <div id="main-site">
+        <div class="bg-grid"></div>div>
+        <div class="bg-orbs">
+              <div class="orb orb1"></div>div>
+              <div class="orb orb2"></div>div>
+              <div class="orb orb3"></div>div>
+        </div>div>
+    
+        <nav>
+                <div class="nav-inner">
+                          <div class="nav-brand">AGRAZ FAMILY</div>div>
+                          <div class="nav-links">
+                                      <a href="#home">Home</a>a>
+                                      <a href="#about">About</a>a>
+                                      <a href="#members">Family</a>a>
+                                      <a href="#milestones">Milestones</a>a>
+                          </div>div>
+                          <div class="nav-user">
+                                      <span id="user-display"></span>span>
+                                      <button class="logout-btn" onclick="handleLogout()">Logout</button>button>
+                          </div>div>
+                </div>div>
+        </nav>
+
+          <!-- HERO -->
+          <section class="hero" id="home">
+                  <div class="hero-content fade-in">
+                            <h1>Welcome to the<br><span class="gradient">Agraz Family</span>span></h1>
+                            <p>Our private digital space to stay connected, share memories, and celebrate every moment together no matter the distance.</p>
+                          <div class="hero-stats">
+                                    <div class="stat">
+                                                <div class="stat-number" id="member-count">0</div>div>
+                                                <div class="stat-label">Family Members</div>div>
+                                    </div>div>
+                                    <div class="stat">
+                                                <div class="stat-number">&infin;</div>div>
+                                                <div class="stat-label">Memories</div>div>
+                                    </div>div>
+                                    <div class="stat">
+                                                <div class="stat-number">1</div>div>
+                                                <div class="stat-label">Family</div>div>
+                                    </div>div>
+                          </div>div>
+                  </div>div>
+          </section>section>
+    
+        <!-- ABOUT -->
+        <section class="section" id="about">
+              <div class="section-header fade-in">
+                      <h2>Our Family Hub</h2>
+                      <p>Everything that makes the Agraz family special, all in one place</p>
+              </div>div>
+              <div class="cards-grid">
+                      <div class="card fade-in">
+                                <div class="card-icon">&#128247;</div>div>
+                                <h3>Shared Memories</h3>
+                                <p>A place to upload and relive our favorite photos and videos from family gatherings, holidays, and everyday moments.</p>
+                      </div>div>
+                      <div class="card fade-in">
+                                <div class="card-icon">&#128197;</div>div>
+                                <h3>Family Events</h3>
+                                <p>Never miss a birthday, anniversary, or reunion. Our shared calendar keeps everyone in sync.</p>
+                      </div>div>
+                      <div class="card fade-in">
+                                <div class="card-icon">&#128172;</div>div>
+                                <h3>Stay Connected</h3>
+                                <p>Share updates, stories, recipes, and traditions. Keep our family bonds strong across any distance.</p>
+                      </div>div>
+              </div>div>
+        </section>section>
+    
+        <!-- MEMBERS -->
+        <section class="section" id="members">
+              <div class="section-header fade-in">
+                      <h2>Family Members</h2>
+                      <p>The amazing people who make up our family</p>
+              </div>div>
+              <div class="members-grid" id="members-grid">
+                      <!-- Members dynamically populated -->
+              </div>div>
+        </section>section>
+    
+        <!-- MILESTONES -->
+        <section class="section" id="milestones">
+              <div class="section-header fade-in">
+                      <h2>Family Milestones</h2>
+                      <p>The moments that define our journey together</p>
+              </div>div>
+              <div class="timeline fade-in">
+                      <div class="timeline-item">
+                                <div class="timeline-dot"></div>div>
+                                <div class="timeline-year">2024</div>div>
+                                <h3>Family Website Launched</h3>
+                                <p>We created our private digital space to bring the family closer together.</p>
+                      </div>div>
+                      <div class="timeline-item">
+                                <div class="timeline-dot"></div>div>
+                                <div class="timeline-year">2025</div>div>
+                                <h3>Growing Together</h3>
+                                <p>New beginnings, new memories, and a stronger bond than ever before.</p>
+                      </div>div>
+                      <div class="timeline-item">
+                                <div class="timeline-dot"></div>div>
+                                <div class="timeline-year">Forever</div>div>
+                                <h3>Our Legacy Continues</h3>
+                                <p>Building a lasting legacy for generations of the Agraz family to come.</p>
+                      </div>div>
+              </div>div>
+        </section>section>
+    
+        <footer>
+                <div class="footer-brand">AGRAZ FAMILY</div>div>
+                <p>&copy; 2025 Agraz Family Portal &mdash; Private & Secure</p>p>
+        </footer>
+    </div>div>
+
+      <script>
+            // FAMILY CODE - change this to your own secret code
+            const FAMILY_CODE = 'agraz2025';
+
+            // Auth functions
+            function getUsers() {
+                    return JSON.parse(localStorage.getItem('agraz_users') || '[]');
+            }
+            function saveUsers(users) {
+                    localStorage.setItem('agraz_users', JSON.stringify(users));
+            }
+            function getCurrentUser() {
+                    return JSON.parse(sessionStorage.getItem('agraz_current_user') || 'null');
+            }
+            function setCurrentUser(user) {
+                    sessionStorage.setItem('agraz_current_user', JSON.stringify(user));
+            }
+
+            function switchTab(tab) {
+                    document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+                    document.querySelectorAll('.auth-form').forEach(f => f.classList.remove('active'));
+                    if (tab === 'login') {
+                              document.querySelectorAll('.auth-tab')[0].classList.add('active');
+                              document.getElementById('login-form').classList.add('active');
+                    } else {
+                              document.querySelectorAll('.auth-tab')[1].classList.add('active');
+                              document.getElementById('register-form').classList.add('active');
+                    }
+                    // Clear errors
+                    document.getElementById('login-error').textContent = '';
+                    document.getElementById('reg-error').textContent = '';
+                    document.getElementById('reg-success').textContent = '';
+            }
+
+            function handleRegister(e) {
+                    e.preventDefault();
+                    const name = document.getElementById('reg-name').value.trim();
+                    const email = document.getElementById('reg-email').value.trim().toLowerCase();
+                    const password = document.getElementById('reg-password').value;
+                    const code = document.getElementById('reg-code').value.trim();
+
+                    document.getElementById('reg-error').textContent = '';
+                    document.getElementById('reg-success').textContent = '';
+
+                    if (code !== FAMILY_CODE) {
+                              document.getElementById('reg-error').textContent = 'Invalid family code. Ask a family member for the code.';
+                              return;
+                    }
+
+                    const users = getUsers();
+                    if (users.find(u => u.email === email)) {
+                              document.getElementById('reg-error').textContent = 'An account with this email already exists.';
+                              return;
+                    }
+
+                    users.push({ name, email, password, joinedDate: new Date().toISOString() });
+                    saveUsers(users);
+                    document.getElementById('reg-success').textContent = 'Account created! You can now sign in.';
+                    document.getElementById('register-form').reset();
+
+                    setTimeout(() => switchTab('login'), 1500);
+            }
+
+            function handleLogin(e) {
+                    e.preventDefault();
+                    const email = document.getElementById('login-email').value.trim().toLowerCase();
+                    const password = document.getElementById('login-password').value;
+
+                    document.getElementById('login-error').textContent = '';
+
+                    const users = getUsers();
+                    const user = users.find(u => u.email === email && u.password === password);
+
+                    if (!user) {
+                              document.getElementById('login-error').textContent = 'Invalid email or password.';
+                              return;
+                    }
+
+                    setCurrentUser(user);
+                    showMainSite(user);
+            }
+
+            function handleLogout() {
+                    sessionStorage.removeItem('agraz_current_user');
+                    document.getElementById('auth-screen').style.display = 'flex';
+                    document.getElementById('main-site').style.display = 'none';
+                    document.getElementById('login-form').reset();
+            }
+
+            function showMainSite(user) {
+                    document.getElementById('auth-screen').style.display = 'none';
+                    document.getElementById('main-site').style.display = 'block';
+                    document.getElementById('user-display').textContent = user.name;
+                    renderMembers();
+                    initScrollAnimations();
+            }
+
+            function renderMembers() {
+                    const users = getUsers();
+                    const grid = document.getElementById('members-grid');
+                    document.getElementById('member-count').textContent = users.length;
+
+                    grid.innerHTML = users.map(u => {
+                              const initials = u.name.split(' ').map(n => n[0]).join('').toUpperCase();
+                              return '<div class="member-card fade-in"><div class="member-avatar">' + initials + '</div><h3>' + u.name + '</h3><p>Joined ' + new Date(u.joinedDate).toLocaleDateString() + '</p></div>';
+                    }).join('');
+            }
+
+            function initScrollAnimations() {
+                    const observer = new IntersectionObserver((entries) => {
+                              entries.forEach(entry => {
+                                          if (entry.isIntersecting) {
+                                                        entry.target.classList.add('visible');
+                                          }
+                              });
+                    }, { threshold: 0.1 });
+                    document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+            }
+
+            // Smooth scroll for nav links
+            document.querySelectorAll('a[href^="#"]').forEach(a => {
+                    a.addEventListener('click', e => {
+                              e.preventDefault();
+                              document.querySelector(a.getAttribute('href')).scrollIntoView({ behavior: 'smooth' });
+                    });
+            });
+
+            // Auto-login if session exists
+            window.addEventListener('DOMContentLoaded', () => {
+                    const user = getCurrentUser();
+                    if (user) { showMainSite(user); }
+            });
+      </script>
+  </body>
+</html>html>
+      </script>
+        </footer></p></p>
+        </nav></label></label></p></h1>
+  </body>
+    </style></title>
+  </head>
