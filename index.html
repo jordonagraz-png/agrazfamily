@@ -164,6 +164,77 @@ footer .footer-tagline{font-size:12px;color:var(--text2);letter-spacing:2px;marg
 ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:rgba(95,184,160,0.2);border-radius:3px}::-webkit-scrollbar-thumb:hover{background:rgba(95,184,160,0.35)}
 
 .fi{opacity:0;transform:translateY(24px);transition:all 0.7s cubic-bezier(0.25,0.46,0.45,0.94)}.fi.v{opacity:1;transform:translateY(0)}
+
+.tile-page{display:none;padding:100px 24px 60px;max-width:1100px;margin:0 auto;min-height:100vh;position:relative;z-index:2}
+.tile-page.active{display:block}
+.tile-back{display:inline-flex;align-items:center;gap:8px;color:var(--seafoam-light);font-family:'Inter',sans-serif;font-size:14px;cursor:pointer;background:none;border:none;padding:8px 0;margin-bottom:24px;transition:color 0.3s}
+.tile-back:hover{color:var(--seafoam)}
+.tile-page h2{font-family:'Playfair Display',serif;font-size:32px;color:var(--sand-light);margin-bottom:32px}
+
+.upload-area{border:2px dashed var(--border);border-radius:18px;padding:32px;text-align:center;cursor:pointer;transition:all 0.3s;margin-bottom:20px;background:rgba(255,255,255,0.03)}
+.upload-area:hover{border-color:var(--seafoam);background:rgba(95,184,160,0.05)}
+.upload-area input{display:none}
+.upload-area p{color:var(--text2);font-family:'Inter',sans-serif;font-size:14px}
+
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:20px}
+.gallery-item{border-radius:16px;overflow:hidden;background:var(--glass);border:1px solid var(--border);transition:transform 0.3s}
+.gallery-item:hover{transform:translateY(-4px)}
+.gallery-item img{width:100%;aspect-ratio:1;object-fit:cover;display:block}
+.gallery-item .gi-info{padding:12px 16px}
+.gallery-item .gi-caption{color:var(--text);font-family:'Inter',sans-serif;font-size:13px;margin-bottom:4px}
+.gallery-item .gi-meta{color:var(--text2);font-family:'Inter',sans-serif;font-size:11px}
+.gallery-item .gi-del{background:none;border:none;color:var(--sunset);font-size:11px;cursor:pointer;padding:4px 0;font-family:'Inter',sans-serif}
+
+.cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
+.cal-nav h3{font-family:'Playfair Display',serif;font-size:22px;color:var(--sand-light)}
+.cal-nav button{background:rgba(255,255,255,0.06);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:8px 16px;cursor:pointer;font-family:'Inter',sans-serif;transition:all 0.3s}
+.cal-nav button:hover{border-color:var(--seafoam);color:var(--seafoam-light)}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:8px}
+.cal-day-hdr{text-align:center;font-family:'Inter',sans-serif;font-size:11px;color:var(--text2);padding:8px 0;text-transform:uppercase;letter-spacing:1px}
+.cal-day{min-height:70px;border-radius:10px;padding:8px;background:rgba(255,255,255,0.03);border:1px solid transparent;cursor:pointer;transition:all 0.3s}
+.cal-day:hover{border-color:var(--border);background:rgba(255,255,255,0.06)}
+.cal-day.today{border-color:var(--seafoam);background:rgba(95,184,160,0.08)}
+.cal-day.other{opacity:0.3}
+.cal-day .cd-num{font-family:'Inter',sans-serif;font-size:13px;color:var(--text);margin-bottom:4px}
+.cal-day .cd-event{font-family:'Inter',sans-serif;font-size:10px;color:var(--seafoam-light);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.event-form{background:var(--glass);border:1px solid var(--border);border-radius:18px;padding:28px;margin-bottom:32px;backdrop-filter:blur(10px)}
+.event-form h3{font-family:'Playfair Display',serif;font-size:18px;color:var(--sand-light);margin-bottom:16px}
+.ef-row{display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+.ef-row input,.ef-row textarea{flex:1;min-width:200px;padding:12px 14px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:10px;color:var(--text);font-family:'Inter',sans-serif;font-size:14px;outline:none;transition:border-color 0.3s}
+.ef-row input:focus,.ef-row textarea:focus{border-color:var(--seafoam)}
+.ef-row textarea{resize:vertical;min-height:60px}
+.ef-btn{padding:10px 24px;border:none;border-radius:10px;background:linear-gradient(135deg,var(--seafoam),var(--ocean-light));color:#fff;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.3s;letter-spacing:0.5px}
+.ef-btn:hover{transform:translateY(-2px);box-shadow:0 4px 15px rgba(95,184,160,0.3)}
+
+.events-list{display:flex;flex-direction:column;gap:12px}
+.event-item{background:var(--glass);border:1px solid var(--border);border-radius:14px;padding:18px 22px;display:flex;align-items:flex-start;gap:16px;backdrop-filter:blur(10px)}
+.event-date-badge{min-width:50px;text-align:center;background:rgba(95,184,160,0.12);border-radius:10px;padding:8px}
+.event-date-badge .edb-month{font-family:'Inter',sans-serif;font-size:10px;color:var(--seafoam-light);text-transform:uppercase;letter-spacing:1px}
+.event-date-badge .edb-day{font-family:'Playfair Display',serif;font-size:22px;color:var(--sand-light)}
+.event-details h4{font-family:'Inter',sans-serif;font-size:15px;color:var(--text);margin-bottom:4px}
+.event-details p{font-family:'Inter',sans-serif;font-size:13px;color:var(--text2);line-height:1.5}
+.event-details .ed-by{font-size:11px;color:var(--text2);margin-top:6px}
+.event-item .ei-del{background:none;border:none;color:var(--sunset);font-size:11px;cursor:pointer;padding:4px;margin-left:auto;font-family:'Inter',sans-serif}
+
+.post-form{display:flex;gap:12px;margin-bottom:32px;align-items:flex-start}
+.post-form textarea{flex:1;padding:14px 16px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:14px;color:var(--text);font-family:'Inter',sans-serif;font-size:14px;resize:vertical;min-height:80px;outline:none;transition:border-color 0.3s}
+.post-form textarea:focus{border-color:var(--seafoam)}
+.post-form .ef-btn{padding:14px 24px;border-radius:14px;white-space:nowrap;align-self:flex-end}
+
+.posts-feed{display:flex;flex-direction:column;gap:16px}
+.post-card{background:var(--glass);border:1px solid var(--border);border-radius:18px;padding:24px;backdrop-filter:blur(10px)}
+.post-card .pc-header{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.post-card .pc-avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--seafoam),var(--ocean-light));display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:14px;color:#fff;font-weight:700}
+.post-card .pc-name{font-family:'Inter',sans-serif;font-size:14px;color:var(--text);font-weight:500}
+.post-card .pc-time{font-family:'Inter',sans-serif;font-size:11px;color:var(--text2)}
+.post-card .pc-text{font-family:'Inter',sans-serif;font-size:14px;color:var(--text);line-height:1.7;white-space:pre-wrap}
+.post-card .pc-del{background:none;border:none;color:var(--sunset);font-size:11px;cursor:pointer;padding:4px 0;margin-top:8px;font-family:'Inter',sans-serif}
+
+.tile-loading{text-align:center;padding:40px;color:var(--text2);font-family:'Inter',sans-serif}
+.card.clickable{cursor:pointer}
+
+@media(max-width:768px){.gallery{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}.cal-day{min-height:50px;padding:4px}.cal-day .cd-num{font-size:11px}.ef-row{flex-direction:column}.post-form{flex-direction:column}}
 </style>
 </head>
 <body>
@@ -204,6 +275,7 @@ footer .footer-tagline{font-size:12px;color:var(--text2);letter-spacing:2px;marg
 </div>
 
 <div id="main-site">
+<div id="main-content">
 <div class="ocean-bg">
 <div class="floating-light fl1"></div>
 <div class="floating-light fl2"></div>
@@ -249,17 +321,17 @@ footer .footer-tagline{font-size:12px;color:var(--text2);letter-spacing:2px;marg
 <p>Everything that makes the Agraz family special, all in one place</p>
 </div>
 <div class="cards">
-<div class="card fi">
+<div class="card fi clickable" onclick="openTile('memories')">
 <span class="card-icon">&#128247;</span>
 <h3>Shared Memories</h3>
 <p>A place to upload and relive our favorite photos and videos from family gatherings, holidays, and everyday moments.</p>
 </div>
-<div class="card fi">
+<div class="card fi clickable" onclick="openTile('events')">
 <span class="card-icon">&#127749;</span>
 <h3>Family Events</h3>
 <p>Never miss a birthday, anniversary, or reunion. Our shared calendar keeps everyone in sync.</p>
 </div>
-<div class="card fi">
+<div class="card fi clickable" onclick="openTile('updates')">
 <span class="card-icon">&#128155;</span>
 <h3>Stay Connected</h3>
 <p>Share updates, stories, recipes, and traditions. Keep our family bonds strong across any distance.</p>
@@ -299,6 +371,52 @@ footer .footer-tagline{font-size:12px;color:var(--text2);letter-spacing:2px;marg
 <div class="footer-tagline">Where the ocean meets home</div>
 <p>&copy; 2025 Agraz Family Portal &mdash; Private &amp; Secure</p>
 </footer>
+</div>
+
+<div id="page-memories" class="tile-page">
+<button class="tile-back" onclick="closeTile()">&#8592; Back to Home</button>
+<h2>&#128247; Shared Memories</h2>
+<div class="upload-area" onclick="document.getElementById('mem-file').click()">
+<input type="file" id="mem-file" accept="image/*" multiple>
+<p>&#128206; Click here to upload photos</p>
+</div>
+<div id="mem-status" style="display:none;margin-bottom:20px">
+<p id="mem-count" style="color:var(--seafoam-light);font-family:Inter,sans-serif;font-size:13px;margin-bottom:8px"></p>
+<div class="ef-row"><input type="text" id="mem-caption" placeholder="Add a caption (optional)"></div>
+<button class="ef-btn" id="mem-submit-btn" onclick="submitMemory()">Upload</button>
+</div>
+<div id="memories-grid" class="gallery"></div>
+<div id="mem-loading" class="tile-loading" style="display:none">Loading memories...</div>
+</div>
+
+<div id="page-events" class="tile-page">
+<button class="tile-back" onclick="closeTile()">&#8592; Back to Home</button>
+<h2>&#127749; Family Events</h2>
+<div class="event-form">
+<h3>Add an Event</h3>
+<div class="ef-row"><input type="text" id="ev-title" placeholder="Event title"><input type="date" id="ev-date"></div>
+<div class="ef-row"><textarea id="ev-desc" placeholder="Description (optional)"></textarea></div>
+<button class="ef-btn" onclick="addEvent()">Add Event</button>
+</div>
+<div class="cal-nav"><button onclick="prevMonth()">&#8592;</button><h3 id="cal-title"></h3><button onclick="nextMonth()">&#8594;</button></div>
+<div class="cal-grid"><div class="cal-day-hdr">Sun</div><div class="cal-day-hdr">Mon</div><div class="cal-day-hdr">Tue</div><div class="cal-day-hdr">Wed</div><div class="cal-day-hdr">Thu</div><div class="cal-day-hdr">Fri</div><div class="cal-day-hdr">Sat</div></div>
+<div class="cal-grid" id="cal-cells"></div>
+<h3 style="font-family:'Playfair Display',serif;color:var(--sand-light);margin:32px 0 16px">Upcoming Events</h3>
+<div id="events-list" class="events-list"></div>
+<div id="ev-loading" class="tile-loading" style="display:none">Loading events...</div>
+</div>
+
+<div id="page-updates" class="tile-page">
+<button class="tile-back" onclick="closeTile()">&#8592; Back to Home</button>
+<h2>&#128155; Stay Connected</h2>
+<div class="post-form">
+<textarea id="post-text" placeholder="Share something with the family..."></textarea>
+<button class="ef-btn" onclick="addPost()">Post</button>
+</div>
+<div id="posts-feed" class="posts-feed"></div>
+<div id="post-loading" class="tile-loading" style="display:none">Loading posts...</div>
+</div>
+
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -380,6 +498,142 @@ if(registering)return;
 if(user){showMain(user);}
 else{document.getElementById('auth-screen').style.display='flex';document.getElementById('main-site').style.display='none';}
 });
+
+// Tile navigation
+var currentTile=null;
+function openTile(name){
+currentTile=name;
+document.getElementById('main-content').style.display='none';
+document.getElementById('page-'+name).style.display='block';
+window.scrollTo(0,0);
+if(name==='memories')loadMemories();
+else if(name==='events')loadEvents();
+else if(name==='updates')loadPosts();
+}
+function closeTile(){
+if(currentTile)document.getElementById('page-'+currentTile).style.display='none';
+document.getElementById('main-content').style.display='block';
+currentTile=null;
+}
+
+// === Shared Memories ===
+var pendingFiles=[];
+document.getElementById('mem-file').addEventListener('change',function(){
+var files=this.files;
+if(files.length>0){pendingFiles=Array.from(files);document.getElementById('mem-count').textContent=files.length+' photo(s) selected';document.getElementById('mem-status').style.display='block';}
+});
+function compressImg(file,maxW,q){return new Promise(function(res){
+var r=new FileReader();r.onload=function(e){
+if(!file.type.startsWith('image/')){res(null);return;}
+var img=new Image();img.onload=function(){
+var c=document.createElement('canvas');var ratio=Math.min(maxW/img.width,1);
+c.width=img.width*ratio;c.height=img.height*ratio;
+c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+res(c.toDataURL('image/jpeg',q));
+};img.src=e.target.result;
+};r.readAsDataURL(file);
+});}
+function submitMemory(){
+var caption=document.getElementById('mem-caption').value.trim();
+var user=auth.currentUser;if(!user||pendingFiles.length===0)return;
+var btn=document.getElementById('mem-submit-btn');btn.textContent='Uploading...';btn.disabled=true;
+var promises=pendingFiles.map(function(f){return compressImg(f,1200,0.7).then(function(data){
+if(!data)return null;
+return db.collection('memories').add({imageData:data,caption:caption,uploadedBy:user.displayName||user.email,createdAt:new Date().toISOString()});
+});});
+Promise.all(promises).then(function(){
+pendingFiles=[];document.getElementById('mem-caption').value='';document.getElementById('mem-status').style.display='none';document.getElementById('mem-file').value='';
+btn.textContent='Upload';btn.disabled=false;loadMemories();
+}).catch(function(){btn.textContent='Upload';btn.disabled=false;alert('Upload failed. Image may be too large.');});
+}
+function loadMemories(){
+document.getElementById('mem-loading').style.display='block';document.getElementById('memories-grid').innerHTML='';
+db.collection('memories').orderBy('createdAt','desc').get().then(function(snap){
+document.getElementById('mem-loading').style.display='none';var html='';
+snap.forEach(function(doc){var m=doc.data();var id=doc.id;
+html+='<div class="gallery-item"><img src="'+m.imageData+'" alt="memory" loading="lazy"><div class="gi-info">';
+if(m.caption)html+='<div class="gi-caption">'+esc(m.caption)+'</div>';
+html+='<div class="gi-meta">'+esc(m.uploadedBy)+' &middot; '+new Date(m.createdAt).toLocaleDateString()+'</div>';
+html+='<button class="gi-del" onclick="delMemory(\''+id+'\')">Delete</button></div></div>';
+});
+document.getElementById('memories-grid').innerHTML=html||'<p style="color:var(--text2);font-family:Inter,sans-serif;text-align:center;grid-column:1/-1;padding:40px">No memories yet. Upload the first photo!</p>';
+});
+}
+function delMemory(id){if(confirm('Delete this memory?'))db.collection('memories').doc(id).delete().then(loadMemories);}
+
+// === Family Events ===
+var calMonth=new Date().getMonth(),calYear=new Date().getFullYear(),calEvents=[];
+function loadEvents(){
+document.getElementById('ev-loading').style.display='block';
+db.collection('events').orderBy('date','asc').get().then(function(snap){
+document.getElementById('ev-loading').style.display='none';
+calEvents=[];var listHtml='';var today=new Date().toISOString().split('T')[0];
+var months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+snap.forEach(function(doc){var e=doc.data();e.id=doc.id;calEvents.push(e);
+if(e.date>=today){var d=new Date(e.date+'T12:00:00');
+listHtml+='<div class="event-item"><div class="event-date-badge"><div class="edb-month">'+months[d.getMonth()]+'</div><div class="edb-day">'+d.getDate()+'</div></div><div class="event-details"><h4>'+esc(e.title)+'</h4>';
+if(e.description)listHtml+='<p>'+esc(e.description)+'</p>';
+listHtml+='<div class="ed-by">Added by '+esc(e.createdBy)+'</div></div><button class="ei-del" onclick="delEvent(\''+e.id+'\')">Delete</button></div>';}
+});
+document.getElementById('events-list').innerHTML=listHtml||'<p style="color:var(--text2);font-family:Inter,sans-serif">No upcoming events. Add one above!</p>';
+renderCal();
+});
+}
+function addEvent(){
+var t=document.getElementById('ev-title').value.trim();var d=document.getElementById('ev-date').value;
+var desc=document.getElementById('ev-desc').value.trim();var user=auth.currentUser;
+if(!t||!d||!user){alert('Please enter a title and date.');return;}
+db.collection('events').add({title:t,date:d,description:desc,createdBy:user.displayName||user.email,createdAt:new Date().toISOString()}).then(function(){
+document.getElementById('ev-title').value='';document.getElementById('ev-date').value='';document.getElementById('ev-desc').value='';loadEvents();});
+}
+function delEvent(id){if(confirm('Delete this event?'))db.collection('events').doc(id).delete().then(loadEvents);}
+function prevMonth(){calMonth--;if(calMonth<0){calMonth=11;calYear--;}renderCal();}
+function nextMonth(){calMonth++;if(calMonth>11){calMonth=0;calYear++;}renderCal();}
+function renderCal(){
+var mNames=['January','February','March','April','May','June','July','August','September','October','November','December'];
+document.getElementById('cal-title').textContent=mNames[calMonth]+' '+calYear;
+var daysInMonth=new Date(calYear,calMonth+1,0).getDate();var startDay=new Date(calYear,calMonth,1).getDay();
+var grid=document.getElementById('cal-cells');grid.innerHTML='';var today=new Date();
+var prevLast=new Date(calYear,calMonth,0).getDate();
+for(var i=startDay-1;i>=0;i--){var c=document.createElement('div');c.className='cal-day other';c.innerHTML='<div class="cd-num">'+(prevLast-i)+'</div>';grid.appendChild(c);}
+for(var day=1;day<=daysInMonth;day++){
+var c=document.createElement('div');var ds=calYear+'-'+String(calMonth+1).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+var isToday=today.getFullYear()===calYear&&today.getMonth()===calMonth&&today.getDate()===day;
+c.className='cal-day'+(isToday?' today':'');
+var evs=calEvents.filter(function(e){return e.date===ds;});var dots='';
+evs.forEach(function(e){dots+='<div class="cd-event">'+esc(e.title)+'</div>';});
+c.innerHTML='<div class="cd-num">'+day+'</div>'+dots;
+c.onclick=(function(d){return function(){document.getElementById('ev-date').value=d;window.scrollTo({top:0,behavior:'smooth'});};})(ds);
+grid.appendChild(c);
+}
+var total=startDay+daysInMonth;var rem=7-(total%7);
+if(rem<7){for(var i=1;i<=rem;i++){var c=document.createElement('div');c.className='cal-day other';c.innerHTML='<div class="cd-num">'+i+'</div>';grid.appendChild(c);}}
+}
+
+// === Stay Connected ===
+function loadPosts(){
+document.getElementById('post-loading').style.display='block';document.getElementById('posts-feed').innerHTML='';
+db.collection('updates').orderBy('createdAt','desc').get().then(function(snap){
+document.getElementById('post-loading').style.display='none';var html='';
+snap.forEach(function(doc){var p=doc.data();var id=doc.id;
+var ini=esc(p.author).split(' ').map(function(w){return w[0];}).join('').toUpperCase();
+var ts=timeSince(new Date(p.createdAt));
+html+='<div class="post-card"><div class="pc-header"><div class="pc-avatar">'+ini+'</div><div><div class="pc-name">'+esc(p.author)+'</div><div class="pc-time">'+ts+'</div></div></div><div class="pc-text">'+esc(p.text)+'</div><button class="pc-del" onclick="delPost(\''+id+'\')">Delete</button></div>';
+});
+document.getElementById('posts-feed').innerHTML=html||'<p style="color:var(--text2);font-family:Inter,sans-serif;text-align:center;padding:40px">No posts yet. Be the first to share!</p>';
+});
+}
+function addPost(){
+var t=document.getElementById('post-text').value.trim();var user=auth.currentUser;
+if(!t||!user)return;
+db.collection('updates').add({text:t,author:user.displayName||user.email,createdAt:new Date().toISOString()}).then(function(){
+document.getElementById('post-text').value='';loadPosts();});
+}
+function delPost(id){if(confirm('Delete this post?'))db.collection('updates').doc(id).delete().then(loadPosts);}
+function timeSince(date){var s=Math.floor((new Date()-date)/1000);
+if(s<60)return 'just now';var m=Math.floor(s/60);if(m<60)return m+'m ago';
+var h=Math.floor(m/60);if(h<24)return h+'h ago';var d=Math.floor(h/24);
+if(d<30)return d+'d ago';return date.toLocaleDateString();}
 </script>
 </body>
 </html>
