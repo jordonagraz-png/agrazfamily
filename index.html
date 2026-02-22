@@ -90,21 +90,6 @@ box-shadow:0 4px 20px rgba(95,184,160,0.25);
 }
 .auth-btn:hover{transform:translateY(-2px);box-shadow:0 8px 35px rgba(95,184,160,0.35)}
 
-.family-quick-btn{
-width:100%;padding:18px;border:2px solid var(--seafoam);border-radius:16px;cursor:pointer;
-background:linear-gradient(135deg,rgba(95,184,160,0.12),rgba(42,90,106,0.12));
-display:flex;flex-direction:column;align-items:center;gap:4px;
-transition:all 0.4s;margin-bottom:20px;
-}
-.family-quick-btn:hover{background:linear-gradient(135deg,rgba(95,184,160,0.22),rgba(42,90,106,0.22));transform:translateY(-2px);box-shadow:0 8px 30px rgba(95,184,160,0.2)}
-.fq-icon{font-size:28px;display:block}
-.fq-text{font-family:'Inter',sans-serif;font-size:15px;font-weight:600;color:var(--seafoam-light);letter-spacing:0.5px}
-.fq-sub{font-family:'Inter',sans-serif;font-size:11px;color:var(--text2);font-weight:300}
-
-.divider{text-align:center;margin-bottom:20px;position:relative}
-.divider::before{content:'';position:absolute;top:50%;left:0;right:0;height:1px;background:rgba(255,255,255,0.08)}
-.divider span{position:relative;background:rgba(12,26,26,0.75);padding:0 14px;font-family:'Inter',sans-serif;font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:1.5px;font-weight:300}
-
 .err{color:var(--sunset);font-size:13px;text-align:center;margin-top:14px;font-family:'Inter',sans-serif;min-height:20px}
 .ok{color:var(--seafoam-light);font-size:13px;text-align:center;margin-top:14px;font-family:'Inter',sans-serif}
 
@@ -316,33 +301,85 @@ footer .footer-tagline{font-size:12px;color:var(--text2);letter-spacing:2px;marg
 </footer>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script>
-function createStars(containerId,count){var c=document.getElementById(containerId);if(!c)return;for(var i=0;i<count;i++){var s=document.createElement('div');s.className='star';s.style.left=Math.random()*100+'%';s.style.top=Math.random()*100+'%';s.style.animationDelay=Math.random()*4+'s';s.style.animationDuration=(3+Math.random()*3)+'s';c.appendChild(s);}}
+function createStars(id,n){var c=document.getElementById(id);if(!c)return;for(var i=0;i<n;i++){var s=document.createElement('div');s.className='star';s.style.left=Math.random()*100+'%';s.style.top=Math.random()*100+'%';s.style.animationDelay=Math.random()*4+'s';s.style.animationDuration=(3+Math.random()*3)+'s';c.appendChild(s);}}
 createStars('auth-stars',40);createStars('main-stars',40);
 
+firebase.initializeApp({apiKey:"AIzaSyDXmJkA5_ZJf0tIj983JfbY9WgNy_gzV8o",authDomain:"agrazfamily.firebaseapp.com",projectId:"agrazfamily",storageBucket:"agrazfamily.firebasestorage.app",messagingSenderId:"50763592692",appId:"1:50763592692:web:d8e1cad550d2b1ff1b3fa1"});
+var auth=firebase.auth();
+var db=firebase.firestore();
 var FC='agraz2025';
-function gU(){var u=JSON.parse(localStorage.getItem('af_u')||'[]');if(!u.find(function(x){return x.email==='family@agrazfamily.com';})){u.push({name:'Agraz Family',email:'family@agrazfamily.com',password:'Agraz2025!',joinedDate:'2025-01-01T00:00:00.000Z'});localStorage.setItem('af_u',JSON.stringify(u));}return u;}
-function sU(u){localStorage.setItem('af_u',JSON.stringify(u));}
-function gC(){return JSON.parse(sessionStorage.getItem('af_c')||'null');}
-function sC(u){sessionStorage.setItem('af_c',JSON.stringify(u));}
+var registering=false;
+
+function esc(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML;}
 
 function switchTab(t){document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('active');});document.querySelectorAll('.auth-form').forEach(function(x){x.classList.remove('active');});if(t==='login'){document.querySelectorAll('.tab')[0].classList.add('active');document.getElementById('login-form').classList.add('active');}else{document.querySelectorAll('.tab')[1].classList.add('active');document.getElementById('register-form').classList.add('active');}document.getElementById('lerr').textContent='';document.getElementById('rerr').textContent='';document.getElementById('rok').textContent='';}
 
-function handleRegister(e){e.preventDefault();var n=document.getElementById('rn').value.trim(),em=document.getElementById('re').value.trim().toLowerCase(),pw=document.getElementById('rp').value,co=document.getElementById('rc').value.trim();document.getElementById('rerr').textContent='';document.getElementById('rok').textContent='';if(co!==FC){document.getElementById('rerr').textContent='Invalid family code. Ask a family member for the code.';return;}var us=gU();if(us.find(function(u){return u.email===em;})){document.getElementById('rerr').textContent='An account with this email already exists.';return;}us.push({name:n,email:em,password:pw,joinedDate:new Date().toISOString()});sU(us);document.getElementById('rok').textContent='Welcome to the family! You can now sign in.';document.getElementById('register-form').reset();setTimeout(function(){switchTab('login');},1500);}
+function handleRegister(e){
+e.preventDefault();
+var n=document.getElementById('rn').value.trim(),em=document.getElementById('re').value.trim().toLowerCase(),pw=document.getElementById('rp').value,co=document.getElementById('rc').value.trim();
+document.getElementById('rerr').textContent='';document.getElementById('rok').textContent='';
+if(co!==FC){document.getElementById('rerr').textContent='Invalid family code. Ask a family member for the code.';return;}
+registering=true;
+auth.createUserWithEmailAndPassword(em,pw).then(function(cred){
+return cred.user.updateProfile({displayName:n}).then(function(){
+return db.collection('users').doc(cred.user.uid).set({name:n,email:em,joinedDate:new Date().toISOString()});
+});
+}).then(function(){
+registering=false;
+document.getElementById('rok').textContent='Welcome to the family!';
+document.getElementById('register-form').reset();
+setTimeout(function(){showMain(auth.currentUser);},1000);
+}).catch(function(err){
+registering=false;
+var msg='Registration failed.';
+if(err.code==='auth/email-already-in-use')msg='An account with this email already exists.';
+else if(err.code==='auth/weak-password')msg='Password should be at least 6 characters.';
+else if(err.code==='auth/invalid-email')msg='Invalid email address.';
+document.getElementById('rerr').textContent=msg;
+});
+}
 
-function handleLogin(e){e.preventDefault();var em=document.getElementById('le').value.trim().toLowerCase(),pw=document.getElementById('lp').value;document.getElementById('lerr').textContent='';var us=gU(),u=us.find(function(x){return x.email===em&&x.password===pw;});if(!u){document.getElementById('lerr').textContent='Invalid email or password.';return;}sC(u);showMain(u);}
+function handleLogin(e){
+e.preventDefault();
+var em=document.getElementById('le').value.trim().toLowerCase(),pw=document.getElementById('lp').value;
+document.getElementById('lerr').textContent='';
+auth.signInWithEmailAndPassword(em,pw).catch(function(){
+document.getElementById('lerr').textContent='Invalid email or password.';
+});
+}
 
-function handleLogout(){sessionStorage.removeItem('af_c');document.getElementById('auth-screen').style.display='flex';document.getElementById('main-site').style.display='none';document.getElementById('login-form').reset();}
+function handleLogout(){auth.signOut();}
 
-function showMain(u){document.getElementById('auth-screen').style.display='none';document.getElementById('main-site').style.display='block';document.getElementById('ud').textContent=u.name;renderM();initAnim();}
+function showMain(u){document.getElementById('auth-screen').style.display='none';document.getElementById('main-site').style.display='block';document.getElementById('ud').textContent=u.displayName||u.email;renderM();initAnim();}
 
-function renderM(){var us=gU(),g=document.getElementById('mg');document.getElementById('mc').textContent=us.length;g.innerHTML=us.map(function(u){var i=u.name.split(' ').map(function(n){return n[0];}).join('').toUpperCase();return '<div class="mc fi"><div class="ma">'+i+'</div><h3>'+u.name+'</h3><p>Joined '+new Date(u.joinedDate).toLocaleDateString()+'</p></div>';}).join('');}
+function renderM(){
+db.collection('users').get().then(function(snap){
+var g=document.getElementById('mg');
+document.getElementById('mc').textContent=snap.size;
+var html='';
+snap.forEach(function(doc){
+var u=doc.data();
+var ini=esc(u.name).split(' ').map(function(w){return w[0];}).join('').toUpperCase();
+html+='<div class="mc fi"><div class="ma">'+ini+'</div><h3>'+esc(u.name)+'</h3><p>Joined '+new Date(u.joinedDate).toLocaleDateString()+'</p></div>';
+});
+g.innerHTML=html;
+initAnim();
+});
+}
 
 function initAnim(){var o=new IntersectionObserver(function(entries){entries.forEach(function(entry){if(entry.isIntersecting)entry.target.classList.add('v');});},{threshold:0.1});document.querySelectorAll('.fi').forEach(function(el){o.observe(el);});}
 
 document.querySelectorAll('a[href^="#"]').forEach(function(a){a.addEventListener('click',function(e){e.preventDefault();document.querySelector(a.getAttribute('href')).scrollIntoView({behavior:'smooth'});});});
 
-window.addEventListener('DOMContentLoaded',function(){var u=gC();if(u)showMain(u);});
+auth.onAuthStateChanged(function(user){
+if(registering)return;
+if(user){showMain(user);}
+else{document.getElementById('auth-screen').style.display='flex';document.getElementById('main-site').style.display='none';}
+});
 </script>
 </body>
 </html>
