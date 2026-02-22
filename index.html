@@ -90,6 +90,21 @@ box-shadow:0 4px 20px rgba(95,184,160,0.25);
 }
 .auth-btn:hover{transform:translateY(-2px);box-shadow:0 8px 35px rgba(95,184,160,0.35)}
 
+.family-quick-btn{
+width:100%;padding:18px;border:2px solid var(--seafoam);border-radius:16px;cursor:pointer;
+background:linear-gradient(135deg,rgba(95,184,160,0.12),rgba(42,90,106,0.12));
+display:flex;flex-direction:column;align-items:center;gap:4px;
+transition:all 0.4s;margin-bottom:20px;
+}
+.family-quick-btn:hover{background:linear-gradient(135deg,rgba(95,184,160,0.22),rgba(42,90,106,0.22));transform:translateY(-2px);box-shadow:0 8px 30px rgba(95,184,160,0.2)}
+.fq-icon{font-size:28px;display:block}
+.fq-text{font-family:'Inter',sans-serif;font-size:15px;font-weight:600;color:var(--seafoam-light);letter-spacing:0.5px}
+.fq-sub{font-family:'Inter',sans-serif;font-size:11px;color:var(--text2);font-weight:300}
+
+.divider{text-align:center;margin-bottom:20px;position:relative}
+.divider::before{content:'';position:absolute;top:50%;left:0;right:0;height:1px;background:rgba(255,255,255,0.08)}
+.divider span{position:relative;background:rgba(12,26,26,0.75);padding:0 14px;font-family:'Inter',sans-serif;font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:1.5px;font-weight:300}
+
 .err{color:var(--sunset);font-size:13px;text-align:center;margin-top:14px;font-family:'Inter',sans-serif;min-height:20px}
 .ok{color:var(--seafoam-light);font-size:13px;text-align:center;margin-top:14px;font-family:'Inter',sans-serif}
 
@@ -179,8 +194,16 @@ footer .footer-tagline{font-size:12px;color:var(--text2);letter-spacing:2px;marg
 
 </div>
 
+<button class="family-quick-btn" onclick="familyQuickLogin()">
+<span class="fq-icon">&#127968;</span>
+<span class="fq-text">Family Quick Access</span>
+<span class="fq-sub">Tap to enter as Agraz Family</span>
+</button>
+
+<div class="divider"><span>or sign in with your account</span></div>
+
 <div class="tabs">
-<button class="tab active" onclick="switchTab('login')">Welcome Back</button>
+<button class="tab active" onclick="switchTab('login')">Sign In</button>
 <button class="tab" onclick="switchTab('register')">Join Family</button>
 </div>
 
@@ -309,6 +332,8 @@ function sC(u){sessionStorage.setItem('af_c',JSON.stringify(u));}
 function switchTab(t){document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('active');});document.querySelectorAll('.auth-form').forEach(function(x){x.classList.remove('active');});if(t==='login'){document.querySelectorAll('.tab')[0].classList.add('active');document.getElementById('login-form').classList.add('active');}else{document.querySelectorAll('.tab')[1].classList.add('active');document.getElementById('register-form').classList.add('active');}document.getElementById('lerr').textContent='';document.getElementById('rerr').textContent='';document.getElementById('rok').textContent='';}
 
 function handleRegister(e){e.preventDefault();var n=document.getElementById('rn').value.trim(),em=document.getElementById('re').value.trim().toLowerCase(),pw=document.getElementById('rp').value,co=document.getElementById('rc').value.trim();document.getElementById('rerr').textContent='';document.getElementById('rok').textContent='';if(co!==FC){document.getElementById('rerr').textContent='Invalid family code. Ask a family member for the code.';return;}var us=gU();if(us.find(function(u){return u.email===em;})){document.getElementById('rerr').textContent='An account with this email already exists.';return;}us.push({name:n,email:em,password:pw,joinedDate:new Date().toISOString()});sU(us);document.getElementById('rok').textContent='Welcome to the family! You can now sign in.';document.getElementById('register-form').reset();setTimeout(function(){switchTab('login');},1500);}
+
+function familyQuickLogin(){var us=gU(),u=us.find(function(x){return x.email==='family@agrazfamily.com';});if(u){sC(u);showMain(u);}}
 
 function handleLogin(e){e.preventDefault();var em=document.getElementById('le').value.trim().toLowerCase(),pw=document.getElementById('lp').value;document.getElementById('lerr').textContent='';var us=gU(),u=us.find(function(x){return x.email===em&&x.password===pw;});if(!u){document.getElementById('lerr').textContent='Invalid email or password.';return;}sC(u);showMain(u);}
 
