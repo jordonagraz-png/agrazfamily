@@ -1,0 +1,14 @@
+{
+  "name": "Agraz Family",
+  "short_name": "Agraz",
+  "description": "A private space for the Agraz family — shared memories, events, and staying connected.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0c1a1a",
+  "theme_color": "#0c1a1a",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

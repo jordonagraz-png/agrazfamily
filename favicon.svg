@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Agraz Family">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0d2630"/>
+      <stop offset=".55" stop-color="#1a3a4a"/>
+      <stop offset="1" stop-color="#2a5a6a"/>
+    </linearGradient>
+    <linearGradient id="sun" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e8c49a"/>
+      <stop offset="1" stop-color="#d4856a"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#sky)"/>
+  <circle cx="32" cy="29" r="11" fill="url(#sun)"/>
+  <path d="M0 43 q8 -6 16 0 t16 0 t16 0 t16 0 v21 H0 Z" fill="#5fb8a0" opacity=".92"/>
+  <path d="M0 50 q8 -5 16 0 t16 0 t16 0 t16 0 v14 H0 Z" fill="#e8dcc8" opacity=".85"/>
+</svg>

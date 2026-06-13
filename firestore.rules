@@ -1,0 +1,67 @@
+rules_version = '2';
+
+// ============================================================================
+//  Agraz Family — Firestore Security Rules
+//  PUBLISH THESE in the Firebase console (Firestore → Rules) or via the CLI:
+//      firebase deploy --only firestore:rules
+//
+//  WHY THIS MATTERS: the website's invite code ("agraz2025") is a UX gate only —
+//  it lives in the browser and protects nothing. The ONLY thing that actually
+//  keeps family data private is these server-side rules. Without them (e.g. in
+//  "test mode"), every collection is readable/writable by anyone on the internet.
+//
+//  Model: any signed-in account = a family member (registration is gated by the
+//  invite code in the UI). Tighten further with an allowlist or Cloud Function
+//  if you want registration itself enforced server-side.
+// ============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+
+    // Member profiles — anyone signed in can see the family; you manage only your own.
+    match /users/{uid} {
+      allow read:   if signedIn();
+      allow create: if signedIn() && request.auth.uid == uid;
+      allow update: if signedIn() && request.auth.uid == uid;
+      allow delete: if signedIn() && request.auth.uid == uid;
+    }
+
+    // Photos — must be a real image data URL (blocks stored-XSS payloads at write time),
+    // capped below Firestore's 1 MB/doc limit, and stamped with the uploader's own uid.
+    match /memories/{id} {
+      allow read:   if signedIn();
+      allow create: if signedIn()
+                    && request.resource.data.uid == request.auth.uid
+                    && request.resource.data.imageData is string
+                    && request.resource.data.imageData.size() < 950000
+                    && request.resource.data.imageData.matches('data:image/(png|jpe?g|gif|webp);base64,.*')
+                    && request.resource.data.caption.size() < 2000;
+      // Shared family album: any member may remove a photo.
+      // To restrict to the uploader only, use:
+      //   allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+      allow delete: if signedIn();
+    }
+
+    match /events/{id} {
+      allow read:   if signedIn();
+      allow create: if signedIn()
+                    && request.resource.data.uid == request.auth.uid
+                    && request.resource.data.title.size() < 200
+                    && request.resource.data.description.size() < 5000;
+      allow delete: if signedIn();
+    }
+
+    match /updates/{id} {
+      allow read:   if signedIn();
+      allow create: if signedIn()
+                    && request.resource.data.uid == request.auth.uid
+                    && request.resource.data.text.size() < 5000;
+      allow delete: if signedIn();
+    }
+
+    // Deny everything else by default.
+    match /{document=**} { allow read, write: if false; }
+  }
+}
