@@ -295,6 +295,20 @@ footer .tagline{font-family:var(--font-script);font-style:italic;font-size:17px;
 .empty h4{font-family:var(--font-serif);font-size:19px;color:var(--sand-light);margin-bottom:6px}
 .empty p{font-size:var(--fs-sm);color:var(--text3)}
 
+/* in memory */
+.mem-hero{display:grid;grid-template-columns:minmax(0,300px) 1fr;gap:var(--s6);align-items:center;margin-bottom:var(--s7);background:var(--glass);border:1px solid var(--border);border-radius:var(--r-lg);padding:var(--s6);backdrop-filter:blur(14px);box-shadow:var(--sh-sm),var(--hi)}
+.mem-portrait{aspect-ratio:4/5;border-radius:var(--r-md);overflow:hidden;background:var(--ocean-deep);box-shadow:var(--sh-md);display:flex;align-items:center;justify-content:center}
+.mem-portrait img{width:100%;height:100%;object-fit:cover;display:block}
+.mem-eyebrow{font-family:var(--font-script);font-style:italic;font-size:clamp(18px,2.4vw,24px);color:var(--warm-light);margin-bottom:4px}
+.mem-name{font-family:var(--font-serif);font-size:clamp(30px,5vw,46px);font-weight:700;color:var(--sand-light);margin-bottom:14px;letter-spacing:-.5px}
+.mem-tribute{color:var(--text2);font-size:var(--fs-body);line-height:1.85;font-weight:300;max-width:60ch}
+.mem-upload{margin-top:var(--s7);border-top:1px solid var(--border);padding-top:var(--s6)}
+.lightbox{position:fixed;inset:0;z-index:1400;background:rgba(5,12,12,.92);display:none;align-items:center;justify-content:center;padding:24px;cursor:zoom-out;backdrop-filter:blur(6px)}
+.lightbox.open{display:flex;animation:fadeUp .25s var(--ease)}
+.lightbox img{max-width:96vw;max-height:92vh;border-radius:var(--r-md);box-shadow:var(--sh-lg)}
+.gallery-item img{cursor:zoom-in}
+@media(max-width:700px){.mem-hero{grid-template-columns:1fr;text-align:center}.mem-portrait{max-width:240px;margin:0 auto}.mem-tribute{margin:0 auto}}
+
 /* toast */
 .toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,140%);background:var(--glass2);border:1px solid var(--border2);color:var(--text);padding:13px 22px;border-radius:var(--r-pill);font-size:var(--fs-sm);z-index:1500;backdrop-filter:blur(20px);box-shadow:var(--sh-md);transition:transform .4s var(--spring);max-width:90vw}
 .toast.show{transform:translate(-50%,0)}
@@ -385,6 +399,7 @@ Agraz Family
 <a href="#about">Our Space</a>
 <a href="#members">Family</a>
 <a href="#milestones">Memories</a>
+<button onclick="openTile('memorial')">In&nbsp;Memory</button>
 <button class="nav-jarvis" onclick="openJarvis()"><span class="dot"></span>JARVIS</button>
 </div>
 <div class="nav-user">
@@ -542,8 +557,37 @@ Agraz Family
 <div id="post-loading" class="tile-loading" style="display:none">Loading posts…</div>
 </div>
 
+<!-- ===== Tile: In Memory ===== -->
+<div id="page-memorial" class="tile-page">
+<div class="tile-top">
+<button class="tile-back" onclick="closeTile()"><svg class="ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg> Back to Home</button>
+</div>
+<div class="mem-hero">
+<div class="mem-portrait" id="mem-cover"><svg viewBox="0 0 64 64" fill="none" aria-hidden="true" style="width:60px;height:60px;color:var(--seafoam-light);opacity:.45"><circle cx="32" cy="26" r="11" fill="currentColor" opacity=".9"/><path d="M2 44q8-6 16 0t16 0 16 0 16 0" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></div>
+<div class="mem-words">
+<p class="mem-eyebrow">In Loving Memory</p>
+<h2 class="mem-name">Hector Agraz</h2>
+<p class="mem-tribute">Beloved father and grandfather, and the heart of our family. The warmth he gave lives on in all of us — in every gathering, every story, and every memory we hold close. He is gone from our sight, but never from our hearts.</p>
+</div>
+</div>
+<div id="memorial-grid" class="gallery"></div>
+<div id="memorial-loading" class="tile-loading" style="display:none">Loading…</div>
+<div class="mem-upload">
+<label class="upload-area" for="memorial-file">
+<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4m0 0L7 9m5-5 5 5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+<span>Add photos of Hector — you can select many at once</span>
+<input type="file" id="memorial-file" accept="image/*" multiple hidden>
+</label>
+<div id="memorial-status" style="display:none;margin-top:14px">
+<p id="memorial-count" style="color:var(--seafoam-light);font-size:var(--fs-sm);margin-bottom:8px"></p>
+<button class="btn-soft" id="memorial-submit-btn" onclick="submitMemorial()">Upload</button>
+</div>
+</div>
 </div>
 
+</div>
+
+<div class="lightbox" id="lightbox" onclick="closeLightbox()"><img id="lightbox-img" alt="Photo of Hector Agraz" src=""></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js" defer></script>
@@ -630,7 +674,7 @@ document.getElementById('main-site').style.display='block';
 document.getElementById('ud').textContent=u.displayName||u.email;
 renderM();countEvents();initAnim();
 var h=location.hash.replace('#','');
-if(['memories','events','updates'].indexOf(h)!==-1)openTile(h,true);
+if(['memories','events','updates','memorial'].indexOf(h)!==-1)openTile(h,true);
 }
 
 function renderM(){
@@ -660,7 +704,7 @@ document.getElementById('main-content').style.display='none';
 document.getElementById('page-'+name).style.display='block';
 window.scrollTo(0,0);
 if(!fromPop)history.pushState({tile:name},'','#'+name);
-if(name==='memories')loadMemories();else if(name==='events')loadEvents();else if(name==='updates')loadPosts();
+if(name==='memories')loadMemories();else if(name==='events')loadEvents();else if(name==='updates')loadPosts();else if(name==='memorial')loadMemorial();
 }
 function closeTile(fromPop){
 if(currentTile)document.getElementById('page-'+currentTile).style.display='none';
@@ -670,7 +714,7 @@ if(!fromPop&&location.hash)history.pushState({},'',location.pathname+location.se
 }
 window.addEventListener('popstate',function(){
 var h=location.hash.replace('#','');
-if(['memories','events','updates'].indexOf(h)!==-1)openTile(h,true);
+if(['memories','events','updates','memorial'].indexOf(h)!==-1)openTile(h,true);
 else closeTile(true);
 });
 
@@ -792,6 +836,38 @@ if(isNaN(s))return '';if(s<60)return 'just now';var m=Math.floor(s/60);if(m<60)r
 var h=Math.floor(m/60);if(h<24)return h+'h ago';var d=Math.floor(h/24);
 if(d<30)return d+'d ago';return date.toLocaleDateString();}
 
+/* ===== In Memory (Hector Agraz) — private, family-only photos in the 'memorial' collection ===== */
+var pendingMemorial=[];
+function loadMemorial(){
+document.getElementById('memorial-loading').style.display='block';document.getElementById('memorial-grid').innerHTML='';
+db.collection('memorial').orderBy('order','asc').get().then(function(snap){
+document.getElementById('memorial-loading').style.display='none';var html='';var cover=null;
+snap.forEach(function(doc){var m=doc.data();var id=doc.id;
+if(typeof m.imageData!=='string'||!/^data:image\/(png|jpe?g|gif|webp);base64,/.test(m.imageData))return;
+if(!cover)cover=m.imageData;
+html+='<div class="gallery-item"><img src="'+m.imageData+'" alt="Photo of Hector Agraz" loading="lazy" decoding="async" onclick="lightbox(this.src)"><div class="gi-info"><button class="gi-del" aria-label="Remove this photo" onclick="delMemorial(\''+id+'\')">Remove</button></div></div>';
+});
+if(cover)document.getElementById('mem-cover').innerHTML='<img src="'+cover+'" alt="Hector Agraz">';
+document.getElementById('memorial-grid').innerHTML=html||'<div class="empty"><h4>No photos yet</h4><p>Add photos below and they’ll appear here for the family.</p></div>';
+}).catch(function(){document.getElementById('memorial-loading').style.display='none';document.getElementById('memorial-grid').innerHTML='<div class="empty"><h4>Couldn’t load photos</h4><p>Please try again.</p></div>';});
+}
+function submitMemorial(){
+var user=auth.currentUser;if(!user||pendingMemorial.length===0)return;
+var btn=document.getElementById('memorial-submit-btn');btn.disabled=true;
+var base=Date.now(),done=0,total=pendingMemorial.length;btn.textContent='Uploading 0/'+total+'…';
+var tasks=pendingMemorial.map(function(f,i){return compressImg(f,1500,0.82).then(function(data){
+if(!data)return null;
+return db.collection('memorial').add({imageData:data,uploadedBy:user.displayName||user.email,uid:user.uid,order:base+i,createdAt:new Date().toISOString()}).then(function(){done++;btn.textContent='Uploading '+done+'/'+total+'…';});
+});});
+Promise.all(tasks).then(function(){
+pendingMemorial=[];document.getElementById('memorial-file').value='';document.getElementById('memorial-status').style.display='none';
+btn.disabled=false;btn.textContent='Upload';toast('Photos added to the memorial');loadMemorial();
+}).catch(function(){btn.disabled=false;btn.textContent='Upload';toast('Some photos failed — please retry.','err');loadMemorial();});
+}
+function delMemorial(id){if(confirm('Remove this photo from the memorial?'))db.collection('memorial').doc(id).delete().then(function(){toast('Photo removed');loadMemorial();}).catch(function(){toast('Couldn’t remove.','err');});}
+function lightbox(src){document.getElementById('lightbox-img').src=src;document.getElementById('lightbox').classList.add('open');}
+function closeLightbox(){document.getElementById('lightbox').classList.remove('open');document.getElementById('lightbox-img').src='';}
+
 /* ===== Init (after deferred Firebase SDKs load) ===== */
 window.addEventListener('DOMContentLoaded',function(){
 createStars('auth-stars',REDUCED?0:34);createStars('main-stars',REDUCED?0:34);
@@ -804,6 +880,13 @@ document.getElementById('mem-file').addEventListener('change',function(){
 var files=this.files;
 if(files.length>0){pendingFiles=Array.from(files);document.getElementById('mem-count').textContent=files.length+' photo(s) selected';document.getElementById('mem-status').style.display='block';}
 });
+
+var memFile=document.getElementById('memorial-file');
+if(memFile)memFile.addEventListener('change',function(){
+var files=this.files;
+if(files.length>0){pendingMemorial=Array.from(files);document.getElementById('memorial-count').textContent=files.length+' photo(s) selected';document.getElementById('memorial-status').style.display='block';}
+});
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeLightbox();});
 
 document.querySelectorAll('a[href^="#"]').forEach(function(a){a.addEventListener('click',function(e){
 var sel=a.getAttribute('href');if(sel==='#'||sel==='#main')return;

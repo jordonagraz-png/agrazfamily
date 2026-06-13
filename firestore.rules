@@ -61,6 +61,17 @@ service cloud.firestore {
       allow delete: if signedIn();
     }
 
+    // In Memory of Hector Agraz — private family photos (same shape as memories).
+    match /memorial/{id} {
+      allow read:   if signedIn();
+      allow create: if signedIn()
+                    && request.resource.data.uid == request.auth.uid
+                    && request.resource.data.imageData is string
+                    && request.resource.data.imageData.size() < 950000
+                    && request.resource.data.imageData.matches('data:image/(png|jpe?g|gif|webp);base64,.*');
+      allow delete: if signedIn();
+    }
+
     // Deny everything else by default.
     match /{document=**} { allow read, write: if false; }
   }
