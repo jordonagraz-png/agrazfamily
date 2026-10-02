@@ -144,6 +144,14 @@ service cloud.firestore {
                     && request.resource.data.get('email', '') == resource.data.get('email', '')
                     && request.resource.data.get('approved', true) == resource.data.get('approved', true)
                     && request.resource.data.get('role', '') == resource.data.get('role', '');
+      // "This is me" in the family tree, and your spot on the Family Globe, change only that one
+      // field — so they work even for a profile saved by an older version of the site.
+      allow update: if signedIn() && request.auth.uid == uid
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['treeId'])
+                    && (request.resource.data.treeId == null || (request.resource.data.treeId is string && request.resource.data.treeId.matches('[A-Za-z0-9_-]{1,40}')));
+      allow update: if signedIn() && request.auth.uid == uid
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['place'])
+                    && (request.resource.data.place == null || validPlace(request.resource.data.place));
       // The one-time owner claim (see config/owner above): your own role → owner.
       allow update: if signedIn() && request.auth.uid == uid
                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role'])

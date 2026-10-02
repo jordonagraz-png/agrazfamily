@@ -370,6 +370,10 @@ try {
     await p.press('#custom-code', 'Enter');
     await p.waitForTimeout(SLOW * 500);
     ok(await store(p, () => window.__store.config.invite.code) === 'agraz-sunday-dinner', 'choose your own invite code');
+    ok((await p.textContent('#rules-card')).includes('Up to date') && !!(await p.$('#rules-card [data-action=copy-rules]')), 'the Invite page always shows whether the security rules are current, with one tap to copy them');
+    await p.click('#rules-card [data-action=copy-rules]');
+    await p.waitForTimeout(SLOW * 400);
+    ok((await p.evaluate(() => navigator.clipboard.readText())).startsWith('rules_version'), 'Copy the rules puts the whole rules file on the clipboard');
     await go(p, 'directory');
     ok(await p.isVisible('#view-directory a[href="#invite"]'), 'Directory has an "Invite family" button');
     await done(p, 'invite (admin)');
@@ -828,10 +832,26 @@ try {
     ok(!!(await old.$('.rules-needed [data-action=copy-rules]')), 'without the latest rules, admins are shown how to publish them');
     await done(old, 'family tree (rules not published)');
 
+    // The rules fall behind after the tree is in (e.g. a newer hub): every "needs the rules" message
+    // comes with the copy button, so an admin can fix it on the spot.
+    const stale = await open('/family/#tree', { signedIn: true, role: 'owner', treeDocs }, { permissions: ['clipboard-read', 'clipboard-write'] });
+    await stale.waitForTimeout(SLOW * 1200);
+    await stale.evaluate(() => { window.__MOCK.oldRules = true; });
+    await stale.click('.tree-me [data-action=tree-me]');
+    await stale.waitForTimeout(SLOW * 500);
+    ok((await stale.textContent('#toast')).includes('aren’t published yet') && !!(await stale.$('#toast [data-action=copy-rules]')), 'when a save needs newer rules, the message itself offers to copy them');
+    await stale.click('#toast [data-action=copy-rules]');
+    await stale.waitForTimeout(SLOW * 400);
+    ok((await stale.evaluate(() => navigator.clipboard.readText())).startsWith('rules_version'), '…and the copy works');
+    await done(stale, 'family tree (rules fell behind)');
+
     // One-tap import: the tree and its research ship locked, and a private link holds the key.
     const { lockTree } = await import('../tools/lock-tree.mjs');
+    const TOWN = 'data:image/jpeg;base64,' + Buffer.from('town photo'.repeat(40)).toString('base64');
     const locked = lockTree({ kind: 'agraz-tree', v: 1, tree: model, research: { kind: 'agraz-research', v: 1, people: {
-      I1: { rel: [{ r: 'father', n: 'Tomas Agraz', of: 'Mateo Agraz', c: 'l' }] }, I11: { note: 'living — must be dropped' } } } });
+      I1: { rel: [{ r: 'father', n: 'Tomas Agraz', of: 'Mateo Agraz', c: 'l' }], pl: [{ p: 'place-tampa', n: 'Tampa, Florida', y: 'Lived here 1930', c: 'Photo: A. Photographer · Public domain', u: 'https://commons.wikimedia.org/wiki/File:Tampa.jpg' }] },
+      I11: { note: 'living — must be dropped', pl: [{ p: 'place-tampa', n: 'Miami' }] } } },
+      places: { 'place-tampa': { img: TOWN }, 'bad id!': { img: TOWN } } });
     const tap = await open(`/family/#tree?key=${locked.key}`, { signedIn: true, role: 'owner' }, { lockedTree: locked.bin });
     await tap.waitForTimeout(SLOW * 1500);
     ok(await tap.evaluate(() => location.hash) === '#tree', 'the key is wiped from the address bar on arrival');
@@ -839,6 +859,13 @@ try {
     ok(got.meta && got.meta.people === 16 && got.research && got.research.count === 1 && !got.research.people.I11, 'one tap brings in the whole tree and its research — never research on living relatives');
     ok(got.research && got.research.people.I1.rel[0].of === 'Mateo Agraz', 'possible ancestors remember whose parent they’d be');
     ok((await tap.textContent('.tcard.is-focus')).includes('Hector Agraz') && !(await tap.$('#tree-file')), 'the tree opens straight away — no file to choose');
+    const towns = await store(tap, () => ({ ids: Object.keys(window.__store.treePhotos), pl: window.__store.tree.research.people.I1.pl }));
+    ok(towns.ids.join() === 'place-tampa' && towns.pl && towns.pl[0].p === 'place-tampa', 'it brings photos of the towns in the family’s story (and refuses odd names)');
+    await tap.fill('#tree-search', 'mateo');
+    await tap.waitForTimeout(SLOW * 200);
+    await tap.click('#tree-results [data-pid="I1"]');
+    await tap.waitForTimeout(SLOW * 500);
+    ok((await tap.textContent('#tree-panel .tp-places')).includes('Tampa, Florida') && (await tap.textContent('#tree-panel .tp-places')).includes('Public domain') && !!(await tap.$('#tree-story .lt-cover img')), 'profiles show the places in their life, with credit — and their life & times opens with one');
     await done(tap, 'family tree (one-tap link)');
 
     // An older saved reading of the tree is replaced by the fuller one; research stays.

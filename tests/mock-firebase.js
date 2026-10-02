@@ -247,6 +247,7 @@
           },
           update(data) {
             if (!store[c][id]) return fail('not-found');
+            if (M.oldRules && c === 'users' && ('treeId' in data || 'place' in data)) return fail('permission-denied');
             Object.keys(data).forEach(k => {
               const parts = k.split('.');
               let o2 = store[c][id];

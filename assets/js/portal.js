@@ -33,7 +33,8 @@
   const FIRST_YEAR = 2024; // the hub's first photos
   const VAULT_IDLE_MS = 5 * 60e3; // vault relocks after this long without activity…
   const VAULT_AWAY_MS = 60e3; // …or after the tab has been in the background this long
-  const NEED_RULES = 'This needs the latest security rules — see README.';
+  const NEED_RULES = 'This needs the latest security rules.';
+  const RULES_EDITOR = 'https://console.firebase.google.com/project/agrazfamily/firestore/databases/-default-/rules';
 
   const VIEWS = ['home', 'photos', 'calendar', 'updates', 'tree', 'globe', 'games', 'stories', 'capsules', 'recipes', 'directory', 'invite', 'vault', 'memorial', 'profile'];
   const ALIASES = { memories: 'photos', events: 'calendar' };
@@ -127,10 +128,15 @@
   let toastTimer;
   function toast(msg, isErr) {
     const t = $('#toast');
-    t.textContent = msg;
-    t.className = 'toast show' + (isErr ? ' err' : '');
+    // "needs the latest rules" always comes with the way to fix it (for the people who can)
+    const rules = msg === NEED_RULES && isAdmin();
+    if (rules) {
+      loadRulesText();
+      t.innerHTML = `<span>The latest security rules aren’t published yet.</span><span class="toast-actions"><button class="toast-btn" type="button" data-action="copy-rules">${icon('copy')}Copy the rules</button><a class="toast-btn" href="${RULES_EDITOR}" target="_blank" rel="noopener noreferrer">${icon('external')}Rules editor</a></span>`;
+    } else t.textContent = msg === NEED_RULES ? 'This needs the latest security rules — ask a family admin to publish them.' : msg;
+    t.className = 'toast show' + (isErr ? ' err' : '') + (rules ? ' has-actions' : '');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { t.className = 'toast'; }, 3400);
+    toastTimer = setTimeout(() => { t.className = 'toast'; }, rules ? 12000 : 3400);
   }
   function busy(btn, on, label) {
     if (!btn) return;
@@ -863,6 +869,9 @@
     title.innerHTML = `<span aria-hidden="true"><span class="wd">${letters('Good')}</span> <span class="wd">${letters(part + ',')}</span> <em class="wd">${letters(name)}</em></span>`;
     $$('.ch', title).forEach((el, i) => el.style.setProperty('--i', i));
     liveHero();
+    startTaglines();
+    if (!$('#home-ribbon').children.length) $('#home-ribbon').innerHTML = RIBBON.concat(RIBBON).map(c => `<span class="wr-item">${icon('sparkle')}${esc(c)}</span>`).join('');
+    renderHomeMoments();
     $('#home-date').textContent = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
     $('#home-sub').textContent = 'Here’s what’s happening in the family.';
     renderHomeFamily();
@@ -907,7 +916,61 @@
       <a class="fam-invite" href="#invite">${icon('user-plus')}Invite family</a>
       ${missing.length ? `<div class="nudge">${icon('sparkle')}<span>Add your ${esc(missing.slice(0, 2).join(' and '))} so the family can reach — and celebrate — you. <a href="#profile">Update profile</a></span></div>` : ''}`;
   }
+  // ---- the welcome banner: the public site's words, and moments from the album ----
+  const TAGLINES = ['Where the ocean meets home', 'Home is wherever we’re together', 'Every path leads back to the shore', 'A name that’s still growing', 'Little moments, big love', 'Different branches, the same roots', 'Rooted in love and always growing'];
+  const RIBBON = ['Gather often', 'Golden hours', 'Remember well', 'The family table', 'Show up', 'Every birthday', 'Keep growing', 'Slow mornings', 'Salt air', 'Where the ocean meets home', 'Little moments, big love'];
+  const MOMENTS = [
+    ['1473116763249-2faaef81ccda', 'Golden hours'], ['1504674900247-0877df9cc836', 'The family table'], ['1530103862676-de8c9debad1d', 'Every birthday'],
+    ['1499793983690-e29da59ef1c2', 'Slow mornings'], ['1471922694854-ff1b63b20054', 'Salt air']
+  ].map(([id, caption]) => ({ imageData: `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=420&h=320&q=70`, caption }));
+  let tagTimer = 0, tagIdx = 0;
+  function startTaglines() {
+    const box = $('#home-tagline');
+    clearInterval(tagTimer);
+    const show = i => {
+      const old = box.querySelector('.tg.on'), el = document.createElement('span');
+      el.className = 'tg';
+      el.textContent = TAGLINES[i];
+      box.appendChild(el);
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        el.classList.add('on');
+        if (old) { old.classList.remove('on'); old.classList.add('off'); setTimeout(() => old.remove(), 1000); }
+      }));
+    };
+    box.textContent = '';
+    show(tagIdx);
+    if (MOTION) tagTimer = setInterval(() => { if (S.view === 'home' && !document.hidden) { tagIdx = (tagIdx + 1) % TAGLINES.length; show(tagIdx); } }, 4600);
+  }
+  // A little stack of snapshots that shuffles itself: the family's latest photos, or the public site's moments.
+  let momentTimer = 0;
+  function renderHomeMoments() {
+    const box = $('#home-moments');
+    const own = (S.recent || []).filter(m => okImg(m.imageData)).slice(0, 6);
+    const list = own.length >= 2 ? own : MOMENTS;
+    const key = list.map(m => m.imageData.length + (m.caption || '')).join('|');
+    if (box.dataset.key === key) return;
+    box.dataset.key = key;
+    box.innerHTML = list.map((m, i) => `<figure class="snap s${i % 4}"><img src="${esc(m.imageData)}" alt="" decoding="async"><figcaption>${esc(m.caption || (m.uploadedBy ? `From ${firstName(m.uploadedBy)}` : 'Family'))}</figcaption></figure>`).join('');
+    const snaps = $$('.snap', box);
+    snaps.forEach((el, i) => el.style.setProperty('--z', String(snaps.length - i)));
+    clearInterval(momentTimer);
+    if (MOTION && snaps.length > 1) {
+      let top = 0;
+      momentTimer = setInterval(() => {
+        if (S.view !== 'home' || document.hidden || !box.isConnected) return;
+        const el = snaps[top];
+        el.classList.add('fly');
+        setTimeout(() => {
+          el.classList.remove('fly');
+          snaps.forEach(s => s.style.setProperty('--z', String(Number(s.style.getPropertyValue('--z')) + 1)));
+          el.style.setProperty('--z', '1');
+        }, 700);
+        top = (top + 1) % snaps.length;
+      }, 5200);
+    }
+  }
   function renderHomePhotos() {
+    renderHomeMoments();
     if (S.view !== 'home') return;
     const el = $('#home-photos');
     const list = S.recent || [];
@@ -2452,8 +2515,10 @@
           <li><strong>${req ? 'You approve them' : 'They’re in'}</strong><span>${req ? 'Tap Approve here or in the Directory. They’ll get in right away.' : 'They see the family hub straight away.'}</span></li>
         </ol>
       </article>
+      ${rulesCardHTML()}
     </div>`;
     renderQr(link);
+    if (S.rulesOk === undefined) { S.rulesOk = 'checking'; checkRules().then(paintRulesCard); }
   }
   let qrLib;
   function loadQrLib() {
@@ -2507,6 +2572,21 @@
     if (!(await loadRulesText())) { toast('Couldn’t load the rules — copy them from firestore.rules on GitHub instead.', true); return; }
     copyText(rulesText, 'Rules copied — now paste them in the Firebase console and click Publish');
   }
+  // Always on the Invite page for admins: are the rules up to date, and one tap to copy them.
+  function rulesCardHTML() {
+    if (S.rulesOk === false) loadRulesText();
+    return `<article class="card rules-card" id="rules-card">
+      <header class="card-head"><h2 class="card-title">${icon('shield')}Security rules</h2><span id="rules-card-status">${rulesStatusHTML()}</span></header>
+      <p class="muted">The rules in Firebase are what keep the family’s things private. Each time the hub gets something new, publish the latest ones: copy them, open the rules editor, select everything, paste and click <b>Publish</b>.</p>
+      <div class="rules-actions">
+        <button class="btn btn-sm" type="button" data-action="copy-rules">${icon('copy')}Copy the rules</button>
+        <a class="btn btn-sm btn-ghost" href="${RULES_EDITOR}" target="_blank" rel="noopener noreferrer">${icon('external')}Open the rules editor</a>
+        <button class="link-btn" type="button" data-action="check-rules">Check again</button>
+      </div>
+    </article>`;
+  }
+  const rulesStatusHTML = () => (S.rulesOk === true ? `<span class="setup-ok">${icon('check')}Up to date</span>` : S.rulesOk === false ? '<span class="setup-warn">Needs publishing</span>' : S.rulesOk === null ? '<span class="muted">Couldn’t check</span>' : '<span class="muted">Checking…</span>');
+  function paintRulesCard() { const el = $('#rules-card-status'); if (el) el.innerHTML = rulesStatusHTML(); }
   function ownerSetupHTML() {
     const r = S.rulesOk;
     const again = '<button class="link-btn" type="button" data-action="check-rules">Check again</button>';
@@ -3795,7 +3875,7 @@
     const vt = used && !used.has(pid) ? (used.add(pid), vtName(pid)) : '';
     return `<button type="button" class="tcard ${size}${pid === t.focus ? ' is-focus' : ''} sx-${(p.x || 'u').toLowerCase()}${p.L ? ' is-living' : ''}" data-action="tree-focus" data-pid="${esc(pid)}" data-slot="${slot}"${vt ? ` data-vt="${vt}"` : ''} aria-label="${esc(p.n)}${T().lifespan(p) ? `, ${esc(T().lifespan(p))}` : ''}${rel ? `, ${esc(rel)}` : ''}">
       <span class="tc-photo">${photo ? `<img src="${photo}" alt="">` : `<span class="tc-mono">${esc(initials(p.n))}</span>`}</span>
-      ${t.research && t.research[pid] ? `<span class="tc-badge" title="Records found">${icon('book')}</span>` : ''}
+      ${hasArchive(pid) ? `<span class="tc-badge" title="Records found">${icon('book')}</span>` : ''}
       <span class="tc-name">${esc(p.n)}</span>
       <span class="tc-years">${esc(T().lifespan(p)) || '&nbsp;'}</span>
       ${rel ? `<span class="tc-rel">${esc(rel)}</span>` : ''}
@@ -3877,7 +3957,9 @@
       const age = it.y - by;
       return `<li class="lt-${it.kind}"><b>${it.y}</b><div><p>${esc(it.what)}</p>${it.kind === 'world' && age >= 0 ? `<small>${esc(first)} was ${age}</small>` : it.kind !== 'world' && age > 0 ? `<small>age ${age}</small>` : ''}</div></li>`;
     }).join('');
-    return `<section class="story-card"><h3>${icon('sunrise')}Life &amp; times<span>${esc(lifeOf(p) || '')}</span></h3><ol class="lt">${rows}</ol></section>`;
+    const r = S.tree.research && S.tree.research[p.id], pl = r && r.pl ? r.pl.find(x => S.tree.photos[x.p]) : null;
+    const cover = pl ? `<figure class="lt-cover"><img src="${S.tree.photos[pl.p].img}" alt="" loading="lazy" decoding="async"><figcaption>${esc(pl.n)}${pl.c ? `<small>${pl.u ? extLink(pl.u, pl.c) : esc(pl.c)}</small>` : ''}</figcaption></figure>` : '';
+    return `<section class="story-card">${cover}<h3>${icon('sunrise')}Life &amp; times<span>${esc(lifeOf(p) || '')}</span></h3><ol class="lt">${rows}</ol></section>`;
   }
   // The shortest line of parents and children between two people (through a shared ancestor if need be).
   function lineBetween(a, b) {
@@ -4087,6 +4169,7 @@
         <p class="tp-years">${esc(T().lifespan(p) || (p.L ? 'Living' : ''))}${age != null ? ` · ${age} years` : ''}</p>
         ${rel ? `<p class="tp-rel">${icon(rel === 'This is you' ? 'user' : 'heart')}${esc(rel)}</p>` : ''}
         <dl class="tp-facts">${fact('cake', p.L ? 'Born' : 'Born', p.L ? (p.b ? p.b.d : '') : ev(p.b))}${fact('candle', 'Died', ev(p.d) + (p.d && p.d.c ? ` — ${p.d.c}` : ''))}${fact('pin', 'Resting place', p.bu)}${p.r ? fact('home', 'Lived in', p.r.map(r => r.p + (r.y ? ` (${r.y})` : '')).join(' · ')) : ''}</dl>
+        ${placesHTML(pid)}
         ${group('Parents', ix.parents(pid))}
         ${group(unions.length > 1 ? 'Partners' : 'Partner', unions.map(u => u.spouse), marriage)}
         ${group('Children', ix.children(pid))}
@@ -4159,9 +4242,19 @@
   // https only — and never Ancestry (the family asked for no links out to it).
   const safeUrl = u => (/^https:\/\/[^\s"'<>]+$/.test(String(u || '')) && !/^https:\/\/([^/]+\.)?ancestry\.[a-z.]+(\/|$)/i.test(String(u)) ? String(u) : '');
   const extLink = (u, text) => (safeUrl(u) ? `<a href="${esc(safeUrl(u))}" target="_blank" rel="noopener noreferrer">${esc(text || 'Source')}</a>` : esc(text || ''));
+  // Photos of the towns in someone's life (public-domain or openly licensed, credited).
+  function placesHTML(pid) {
+    const r = S.tree.research && S.tree.research[pid], t = S.tree;
+    const list = (r && r.pl ? r.pl : []).filter(x => t.photos[x.p]);
+    if (!list.length) return '';
+    return `<section class="tp-group tp-places"><h3>${icon('pin')}Places in their life<span>${list.length}</span></h3>
+      <div class="pl-strip">${list.map(x => `<figure class="pl-card"><img src="${t.photos[x.p].img}" alt="${esc(x.n)}" loading="lazy" decoding="async"><figcaption><b>${esc(x.n)}</b>${x.y ? `<small>${esc(x.y)}</small>` : ''}${x.c ? `<small class="pl-credit">${x.u ? extLink(x.u, x.c) : esc(x.c)}</small>` : ''}</figcaption></figure>`).join('')}</div>
+    </section>`;
+  }
+  const hasArchive = pid => { const r = S.tree.research && S.tree.research[pid]; return !!(r && (r.doc || r.f || r.rel || r.sv || r.note)); };
   function researchHTML(pid) {
     const r = S.tree.research && S.tree.research[pid];
-    if (!r) return '';
+    if (!hasArchive(pid)) return '';
     const conf = c => { const k = CONF[c] || CONF.l; return `<span class="conf ${k[0]}">${k[1]}</span>`; };
     const docs = (r.doc || []).map(d => { const k = KIND[d.k] || KIND.other; return `<li class="rdoc">${icon(k[0])}<div>${extLink(d.u, d.t || k[1])}<small>${esc(k[1])}${d.l ? ` · ${esc(d.l)}` : ''}${d.n ? ` · ${esc(d.n)}` : ''}</small></div></li>`; }).join('');
     const facts = (r.f || []).map(f => `<li class="rfact"><span class="rlabel">${esc(FACT[f.t] || 'Note')}</span><div><p>${esc(f.v)} ${conf(f.c)}${f.d ? ' <span class="conf x">Differs from the tree</span>' : ''}</p><small>${extLink(f.u, f.s)}</small></div></li>`).join('');
@@ -4187,6 +4280,9 @@
       const doc = (r.doc || []).filter(x => x && safeUrl(x.u)).slice(0, 30).map(x => ({ k: cut(x.k, 20), t: cut(x.t, 200), u: safeUrl(x.u), l: cut(x.l, 80), n: cut(x.n, 200) }));
       const rel = (r.rel || []).filter(x => x && x.n).slice(0, 12).map(x => Object.assign({ r: cut(x.r, 20), n: cut(x.n, 120), b: cut(x.b, 40), d: cut(x.d, 40), s: cut(x.s, 160), u: safeUrl(x.u), c: ['h', 'm', 'l'].includes(x.c) ? x.c : 'l', w: cut(x.w, 300) }, x.of ? { of: cut(x.of, 120) } : {}));
       const sv = (r.sv || []).slice(0, 30).map(x => cut(x, 120)).filter(Boolean);
+      // places in their life, each with a photo of the town (stored as treePhotos/place-…)
+      const pl = (r.pl || []).filter(x => x && /^place-[a-z0-9-]{1,32}$/.test(x.p || '')).slice(0, 8).map(x => ({ p: x.p, n: cut(x.n, 80), y: cut(x.y, 40), c: cut(x.c, 160), u: safeUrl(x.u) }));
+      if (pl.length) out.pl = pl;
       if (f.length) out.f = f; if (doc.length) out.doc = doc; if (rel.length) out.rel = rel; if (sv.length) out.sv = sv;
       if (r.note) out.note = cut(r.note, 600);
       if (Object.keys(out).length) people[pid] = out;
@@ -4350,13 +4446,24 @@
       // A newer reading of the export (more of it harvested) replaces the saved tree; photos,
       // research and everyone's “This is me” stay as they are.
       const newer = t.status !== 'ready' || (t.meta.v || 1) < (data.tree.v || 1);
+      const places = data.places && typeof data.places === 'object' ? Object.entries(data.places).filter(([id, x]) => /^place-[a-z0-9-]{1,32}$/.test(id) && x && okImg(x.img) && x.img.length <= 90000) : [];
+      const missingPlaces = places.filter(([id]) => !(S.tree && S.tree.photos && S.tree.photos[id]));
       const hadResearch = t.research && Object.keys(t.research).length;
-      if (!newer && (hadResearch || !data.research)) { toast('The family tree is already up to date'); return; }
+      if (!newer && (hadResearch || !data.research) && !missingPlaces.length) { toast('The family tree is already up to date'); return; }
       if (newer) { say(`Saving ${data.tree.people.length.toLocaleString()} relatives privately for the family…`); await saveTree(data.tree); }
+      if (missingPlaces.length) {
+        say(`Adding photos of ${missingPlaces.length} places in the family’s story…`);
+        for (let i = 0; i < missingPlaces.length; i += 10) {
+          const b = db.batch();
+          missingPlaces.slice(i, i + 10).forEach(([id, x]) => b.set(col('treePhotos').doc(id), { img: x.img, uid: S.user.uid, by: myName().slice(0, 80), createdAt: nowIso() }));
+          await b.commit();
+        }
+        missingPlaces.forEach(([id, x]) => { S.tree.photos[id] = { img: x.img, uid: S.user.uid }; });
+      }
       let found = 0;
       if (data.research) { say('Adding what was found in the archives…'); found = await saveResearch(data.research); }
       const n = S.tree.model.people.length.toLocaleString();
-      toast(newer ? `The family tree is in — ${n} relatives${found ? `, with research for ${found}` : ''}` : `Research added for ${found} ${found === 1 ? 'person' : 'people'} — look for “From the archives”`);
+      toast(newer ? `The family tree is in — ${n} relatives${found ? `, with research for ${found}` : ''}` : missingPlaces.length ? `Added photos of ${missingPlaces.length} places — look for “Places in their life”` : `Research added for ${found} ${found === 1 ? 'person' : 'people'} — look for “From the archives”`);
     } catch (e) {
       const why = denied(e) ? NEED_RULES
         : e.message === 'key' ? 'That link didn’t unlock the tree — check you opened the whole link.'
@@ -4405,10 +4512,22 @@
     none: 'No match yet — who is this?',
     bad: 'This photo can’t be read here (try a JPEG or PNG)'
   };
+  // Which photos the family's Ancestry tree has that the hub doesn't yet — a checklist to work through.
+  function renderPhotoTodo() {
+    const box = $('#match-todo'), t = S.tree;
+    const want = t.model.people.filter(p => p.ph && p.ph.length && !t.photos[p.id]);
+    const done = t.model.people.filter(p => p.ph && p.ph.length && t.photos[p.id]).length;
+    box.hidden = !want.length && !done;
+    if (box.hidden) return;
+    const rel = p => relShort(relOf(p.id));
+    box.innerHTML = `<summary>${icon('image')}<span><b>${want.length ? `${want.length.toLocaleString()} photos to bring in from Ancestry` : 'Every Ancestry photo is in the hub'}</b><small>${done.toLocaleString()} of ${(done + want.length).toLocaleString()} people done · on Ancestry, open the person → Gallery → open the photo → Download</small></span>${icon('chev-d')}</summary>
+      <ol class="todo-list">${want.sort((a, b) => a.n.localeCompare(b.n)).map(p => `<li><b>${esc(p.n)}</b><span>${esc([T().lifespan(p), rel(p)].filter(Boolean).join(' · '))}</span><small>${p.ph.map(f => `“${esc(f.t || 'untitled')}”${f.w && f.h ? ` · ${f.w}×${f.h}` : ''}`).join('<br>')}</small></li>`).join('')}</ol>`;
+  }
   function openMatcher() {
     if (!S.tree || !S.tree.model) return;
     matcher.rows = [];
     matcher.fn = T().photoMatcher(S.tree.model);
+    renderPhotoTodo();
     renderMatcher();
     $('#match-dialog').showModal();
   }

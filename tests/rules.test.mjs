@@ -3,7 +3,7 @@
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { doc, getDoc, setDoc, updateDoc, addDoc, collection, getDocs, deleteDoc, query, where, writeBatch, Bytes } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, addDoc, collection, getDocs, deleteDoc, query, where, writeBatch, Bytes, deleteField } from 'firebase/firestore';
 
 // The real owner key is never in the repo; tests swap in the fingerprint of a throwaway key.
 const TEST_OWNER_KEY = 'test-owner-key-for-ci-only';
@@ -278,6 +278,15 @@ await t('tree pieces hold only people and families', setDoc(doc(alice, 'tree/par
 await t('members can’t change the tree', setDoc(doc(bob, 'tree/part0'), part), false);
 await t('link yourself to your place in the tree', updateDoc(doc(bob, 'users/bob'), { treeId: 'I182483266401' }), true);
 await t('tree link must be a tree id', updateDoc(doc(bob, 'users/bob'), { treeId: 'not a/valid id' }), false);
+// A profile saved by an older version of the site (with fields the rules no longer list) can still
+// link itself in the tree and move its globe pin — but nothing else rides along.
+await env.withSecurityRulesDisabled(c => updateDoc(doc(c.firestore(), 'users/bob'), { lastLogin: 'legacy field' }));
+await t('an older profile can still say "this is me" in the tree', updateDoc(doc(bob, 'users/bob'), { treeId: 'I1' }), true);
+await t('…and can still move its globe pin', updateDoc(doc(bob, 'users/bob'), { place: { lat: 25.8, lng: -80.2, label: 'Miami, FL', tz: 'America/New_York' } }), true);
+await t('…but a bad pin is still refused', updateDoc(doc(bob, 'users/bob'), { place: { lat: 999, lng: 0, label: 'Nowhere' } }), false);
+await t('…and nothing else rides along with the tree link', updateDoc(doc(bob, 'users/bob'), { treeId: 'I2', role: 'admin' }), false);
+await t('…nor can it link someone else', updateDoc(doc(dan, 'users/bob'), { treeId: 'I3' }), false);
+await env.withSecurityRulesDisabled(c => updateDoc(doc(c.firestore(), 'users/bob'), { lastLogin: deleteField() }));
 await t('members add a photo to someone in the tree', setDoc(doc(bob, 'treePhotos/I1'), { img: IMG, uid: 'bob', by: 'Bob Agraz', createdAt: 'x' }), true);
 await t('tree photos must be images', setDoc(doc(bob, 'treePhotos/I2'), { img: 'javascript:alert(1)', uid: 'bob', by: 'Bob Agraz', createdAt: 'x' }), false);
 await t('tree photos stay small', setDoc(doc(bob, 'treePhotos/I2'), { img: 'data:image/jpeg;base64,' + 'A'.repeat(90000), uid: 'bob', by: 'Bob Agraz', createdAt: 'x' }), false);

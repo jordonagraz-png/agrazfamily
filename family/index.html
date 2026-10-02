@@ -198,13 +198,16 @@
           <div class="welcome-text">
             <p class="welcome-date" id="home-date"></p>
             <h1 class="welcome-title" id="home-title">Welcome home</h1>
+            <p class="welcome-tagline" id="home-tagline" aria-live="off"></p>
             <p class="welcome-sub" id="home-sub"></p>
           </div>
+          <div class="welcome-moments" id="home-moments" aria-hidden="true"></div>
           <div class="welcome-actions">
             <button class="btn btn-light" type="button" data-action="new-event"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610022058#plus"/></svg>New event</button>
             <a class="btn btn-outline-light" href="#photos"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610022058#upload"/></svg>Add photos</a>
             <a class="btn btn-outline-light" href="#updates"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610022058#chat"/></svg>Post an update</a>
           </div>
+          <div class="welcome-ribbon" aria-hidden="true"><div class="wr-track" id="home-ribbon"></div></div>
         </div>
         <div id="home-bday" hidden></div>
         <div id="home-capsule" hidden></div>
@@ -792,6 +795,7 @@
       <svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610022058#upload"/></svg><strong>Choose photos</strong><span>or drag them here — as many as you like</span>
     </label>
     <input type="file" id="match-input" accept="image/*" multiple class="sr-only">
+    <details class="match-todo" id="match-todo" hidden></details>
     <div class="match-list" id="match-list"></div>
     <footer class="modal-foot match-foot"><p class="muted" id="match-summary"></p><button class="btn btn-ghost" type="button" data-close>Cancel</button><button class="btn btn-accent" type="button" data-action="match-save" id="match-save" disabled><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610022058#check"/></svg>Save photos</button></footer>
   </div>
