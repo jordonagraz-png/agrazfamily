@@ -4463,7 +4463,7 @@
       let found = 0;
       if (data.research) { say('Adding what was found in the archives…'); found = await saveResearch(data.research); }
       const n = S.tree.model.people.length.toLocaleString();
-      toast(newer ? `The family tree is in — ${n} relatives${found ? `, with research for ${found}` : ''}` : missingPlaces.length ? `Added photos of ${missingPlaces.length} places — look for “Places in their life”` : `Research added for ${found} ${found === 1 ? 'person' : 'people'} — look for “From the archives”`);
+      toast(newer ? `The family tree is in — ${n} relatives${found ? `, with research for ${found}` : ''}` : missingPlaces.length ? `Added ${missingPlaces.length === 1 ? 'a photo of one place' : `photos of ${missingPlaces.length} places`} — look for “Places in their life”` : `Research added for ${found} ${found === 1 ? 'person' : 'people'} — look for “From the archives”`);
     } catch (e) {
       const why = denied(e) ? NEED_RULES
         : e.message === 'key' ? 'That link didn’t unlock the tree — check you opened the whole link.'

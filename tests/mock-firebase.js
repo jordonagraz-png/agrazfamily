@@ -4,7 +4,8 @@
    role ('admin' | 'owner'), requireApproval, noInvite, placed (you're on the Family Globe),
    oldRules (the latest firestore.rules aren't published: new collections and the owner claim are refused),
    treeDocs ({ meta, part0, … } — an imported family tree), treeId (your place in the tree),
-   memberTreeIds ({ uid: treeId } for other members), scores ({ 'uid_game': { uid, game, best, name, at } }).
+   memberTreeIds ({ uid: treeId } for other members), scores ({ 'uid_game': { uid, game, best, name, at } }),
+   treePhotos ({ pid: { img, uid } } — photos already on the tree).
    The test owner key is 'test-owner-key'.
    Optional window.__IMG = { photos: [...dataUrls], memorial: [...], av1 } to use real photos. */
 (function () {
@@ -143,7 +144,7 @@
   if (M.placed) store.users.u1.place = { lat: 25.8, lng: -80.2, label: 'Miami, FL', tz: 'America/New_York' };
   store.capsuleLetters.k2.photo = IMG.photos[4];
   store.tree = M.treeDocs ? JSON.parse(JSON.stringify(M.treeDocs)) : {};
-  store.treePhotos = {};
+  store.treePhotos = M.treePhotos ? JSON.parse(JSON.stringify(M.treePhotos)) : {};
   store.scores = M.scores ? JSON.parse(JSON.stringify(M.scores)) : {};
   if (M.treeId) store.users.u1.treeId = M.treeId;
   Object.entries(M.memberTreeIds || {}).forEach(([uid, pid]) => { if (store.users[uid]) store.users[uid].treeId = pid; });

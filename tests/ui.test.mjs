@@ -877,7 +877,7 @@ try {
     const up = await store(upg, () => ({ v: window.__store.tree.meta.v, res: window.__store.tree.research }));
     ok(up.v === 2 && up.res && up.res.people.I1 && (await upg.textContent('#toast')).includes('The family tree is in') && (await upg.textContent('.tree-stats')).includes('records'), 'the link upgrades an older saved tree to the full harvest', up);
     await done(upg, 'family tree (link upgrades the tree)');
-    const same = await open(`/family/#tree?key=${locked.key}`, { signedIn: true, role: 'owner', treeDocs: Object.assign(JSON.parse(JSON.stringify(treeDocs)), { research: { people: { I1: { note: 'x' } }, count: 1 } }) }, { lockedTree: locked.bin });
+    const same = await open(`/family/#tree?key=${locked.key}`, { signedIn: true, role: 'owner', treeDocs: Object.assign(JSON.parse(JSON.stringify(treeDocs)), { research: { people: { I1: { note: 'x' } }, count: 1 } }), treePhotos: { 'place-tampa': { img: TOWN, uid: 'u1' } } }, { lockedTree: locked.bin });
     await same.waitForTimeout(SLOW * 1300);
     ok((await same.textContent('#toast')).includes('already up to date'), 'opening it again changes nothing');
     await done(same, 'family tree (link, already up to date)');
