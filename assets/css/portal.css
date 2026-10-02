@@ -687,6 +687,19 @@ dialog::backdrop { background: rgba(7, 17, 20, .55); backdrop-filter: blur(4px);
 .fam-invite { display: inline-flex; align-items: center; gap: 8px; margin-top: 16px; font-size: var(--fs-sm); font-weight: 600; color: var(--sea); }
 .fam-invite .i { width: 17px; height: 17px; }
 
+/* ---------- roles + member management ---------- */
+.role-pill { display: inline-flex; align-items: center; font-family: var(--font-sans); font-size: .62rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; padding: 3px 9px; border-radius: var(--r-pill); background: var(--sea-soft); color: var(--sea); }
+.role-pill.owner { background: var(--gold-soft); color: var(--gold); }
+.view-head .role-pill { font-size: .7rem; padding: 6px 12px; align-self: center; }
+.person-head { position: relative; }
+.person-manage { margin-left: auto; align-self: flex-start; color: var(--ink-3); flex: none; }
+.person-manage:hover { color: var(--ink); }
+.md-who { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.md-who h2 { font-size: 1.4rem; }
+.md-who p { font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.md-admin { padding: 14px 16px; border-radius: var(--r-md); background: var(--surface-2); border: 1px solid var(--line); }
+.md-foot { align-items: center; flex-wrap: wrap; }
+
 /* print just the open recipe */
 @media print {
   body.printing-recipe > *:not(#recipe-dialog) { display: none !important; }

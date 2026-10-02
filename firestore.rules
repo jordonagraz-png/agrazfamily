@@ -18,8 +18,11 @@ rules_version = '2';
 //    the correct invite code, which is checked HERE against config/invite
 //    (a doc only family admins can read — from the hub's Invite page).
 //  • If config/invite has requireApproval: true, new members start with
-//    approved: false and an admin (users/{uid}.role == "admin", set in the
-//    console) approves them in the Directory.
+//    approved: false and an admin approves them on the Invite page.
+//  • Roles live on users/{uid}.role: "owner" (claimed once with the owner key,
+//    can't be demoted or removed by anyone else) > "admin" (made by the owner)
+//    > member. Admins manage members, invites and approvals and can remove any
+//    post or comment.
 //  • To remove someone: delete their users/{uid} doc (admins can do this from
 //    the site too) and disable their account under Authentication → Users.
 // ============================================================================
@@ -35,9 +38,13 @@ service cloud.firestore {
       return signedIn() && exists(myUserPath()) && get(myUserPath()).data.get('approved', true) == true;
     }
 
-    function isAdmin() {
-      return isMember() && get(myUserPath()).data.get('role', '') == 'admin';
-    }
+    // Roles: owner (one per family, can't be demoted by anyone) > admin > member.
+    function myRole() { return get(myUserPath()).data.get('role', ''); }
+    function isAdmin() { return isMember() && myRole() in ['admin', 'owner']; }
+    function isOwner() { return isMember() && myRole() == 'owner'; }
+
+    // SHA-256 of the one-time owner key (the key itself is never stored in this code).
+    function ownerKeyHash() { return 'adeb865cf6c841622fccb13fbe6e1f3e816281586bacf453a5de0c0f3b4a4103'; }
 
     function approvalRequired() {
       return get(/databases/$(database)/documents/config/invite).data.get('requireApproval', false) == true;
@@ -75,6 +82,14 @@ service cloud.firestore {
                     && str(request.resource.data.code, 6, 64)
                     && request.resource.data.code.matches('[A-Za-z0-9-]+')
                     && request.resource.data.get('requireApproval', false) is bool;
+      // One-time owner claim (README → "Owner"): whoever holds the owner key can make their
+      // own account the owner, once. Must be in the same batch that sets their role.
+      allow create: if doc == 'owner' && isMember()
+                    && request.resource.data.keys().hasOnly(['uid', 'key', 'claimedAt'])
+                    && request.resource.data.uid == request.auth.uid
+                    && request.resource.data.key is string
+                    && hashing.sha256(request.resource.data.key.toUtf8()).toHexString().lower() == ownerKeyHash()
+                    && getAfter(myUserPath()).data.get('role', '') == 'owner';
       allow list, delete: if false;
     }
 
@@ -98,7 +113,9 @@ service cloud.firestore {
           && optStr(d, 'email', 254) && optStr(d, 'joinedDate', 40)
           && optStr(d, 'phone', 40) && optStr(d, 'birthday', 10)
           && optStr(d, 'address', 300) && optStr(d, 'bio', 280)
-          && (!('avatar' in d) || d.avatar == '' || isImage(d.avatar, 150000));
+          && (!('avatar' in d) || d.avatar == '' || isImage(d.avatar, 150000))
+          && (!('approved' in d) || d.approved is bool)
+          && (!('role' in d) || d.role in ['', 'admin', 'owner']);
       }
       // Members see the whole family; anyone signed in may read their own doc
       // (that's how the site knows to ask for the code or show "waiting").
@@ -116,11 +133,24 @@ service cloud.firestore {
                     && request.resource.data.get('email', '') == resource.data.get('email', '')
                     && request.resource.data.get('approved', true) == resource.data.get('approved', true)
                     && request.resource.data.get('role', '') == resource.data.get('role', '');
-      // Admins: approve (or un-approve) someone.
+      // The one-time owner claim (see config/owner above): your own role → owner.
+      allow update: if signedIn() && request.auth.uid == uid
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role'])
+                    && request.resource.data.role == 'owner'
+                    && !exists(/databases/$(database)/documents/config/owner)
+                    && getAfter(/databases/$(database)/documents/config/owner).data.uid == uid;
+      // Admins look after other members (never the owner): approve, edit details.
+      // Only the owner can make someone an admin or take it away.
       allow update: if isAdmin() && request.auth.uid != uid
-                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['approved'])
-                    && request.resource.data.approved is bool;
-      allow delete: if signedIn() && (request.auth.uid == uid || isAdmin());
+                    && resource.data.get('role', '') != 'owner'
+                    && validProfile(request.resource.data)
+                    && request.resource.data.get('email', '') == resource.data.get('email', '')
+                    && (request.resource.data.get('role', '') == resource.data.get('role', '')
+                        || (isOwner() && request.resource.data.get('role', '') in ['', 'admin']));
+      // Leave yourself; admins remove members; the owner can remove anyone but themselves.
+      allow delete: if signedIn() && (request.auth.uid == uid
+                    || (isAdmin() && resource.data.get('role', '') == '')
+                    || (isOwner() && resource.data.get('role', '') != 'owner'));
     }
 
     // ---- Shared photo album (+ hearts) ----
@@ -175,7 +205,7 @@ service cloud.firestore {
                     && str(request.resource.data.text, 1, 2000)
                     && request.resource.data.parent is string
                     && request.resource.data.parent.matches('(updates|memories)/[A-Za-z0-9_-]{1,64}');
-      allow delete: if isMember() && resource.data.uid == request.auth.uid;
+      allow delete: if isMember() && (resource.data.uid == request.auth.uid || isAdmin());
     }
 
     // ---- Family Vault: shared notes (emergency contacts, doctors, household info) ----
@@ -234,7 +264,7 @@ service cloud.firestore {
                     && request.resource.data.keys().hasOnly(['text', 'uid', 'author', 'createdAt'])
                     && request.resource.data.uid == request.auth.uid
                     && str(request.resource.data.text, 1, 4000);
-      allow delete: if isMember() && resource.data.uid == request.auth.uid;
+      allow delete: if isMember() && (resource.data.uid == request.auth.uid || isAdmin());
     }
 
     // ---- Memorial candles: one per person ----
@@ -243,7 +273,7 @@ service cloud.firestore {
       allow create: if isMember() && request.auth.uid == uid
                     && request.resource.data.keys().hasOnly(['name', 'litAt'])
                     && str(request.resource.data.name, 1, 80);
-      allow delete: if isMember() && request.auth.uid == uid;
+      allow delete: if isMember() && (request.auth.uid == uid || isAdmin());
     }
 
     // Everything else is closed.

@@ -23,8 +23,12 @@ invite code check onto the server, so two quick steps are needed in the
 1. **Publish the rules.** Firestore Database → **Rules** → paste the contents
    of [`firestore.rules`](firestore.rules) → **Publish**.
    *(or `firebase deploy --only firestore:rules`)*
-2. **Make yourself an admin (once).** Firestore Database → **Data** → `users`
-   → your document → **Add field** `role` (string) = `admin`.
+2. **Make yourself the owner (once).** Sign in to the hub as yourself, then
+   open the one-time **owner link** you were given
+   (`agrazfamily.com/family/#claim?key=…`). It works exactly once — after
+   that the family has an owner and the link is useless. *(Lost it? In the
+   console, add the field `role` (string) = `owner` to your document in
+   `users`.)*
 3. **Open the hub → Invite family** and tap **Create invite code**. From then
    on, invites, codes and approvals are all managed on that page.
 
@@ -62,11 +66,27 @@ Everything lives in the hub under **Invite family** (sidebar, the phone's
   they get in**. New people wait on a "You're almost in" screen; you approve
   them right on the Invite page or in the Directory (a badge shows how many
   are waiting).
-- **More admins:** add `role` = `admin` to their `users` document in the
-  console. Only admins can see or change the invite code.
 - **Remove someone:** admins can decline/remove from the site, or delete their
   document in the `users` collection. To block them for good, also disable
   their account under Authentication → Users.
+
+### Owner and admins
+
+| | Owner | Admin | Member |
+|---|:-:|:-:|:-:|
+| Use the whole hub, edit their own profile | ✓ | ✓ | ✓ |
+| Invite code, invite links, approvals | ✓ | ✓ | |
+| Edit anyone's directory details | ✓ | ✓ | |
+| Delete any update, comment or guestbook entry | ✓ | ✓ | |
+| Remove members | ✓ | ✓ | |
+| Make or un-make admins, remove admins | ✓ | | |
+| Be demoted or removed by someone else | never | by the owner | by admins |
+
+- **Manage someone:** Directory → the settings icon on their card. Edit their details,
+  turn **Family admin** on or off (owner only), or **Remove from family**.
+- There's only ever **one owner**, claimed once with the owner link. Nobody —
+  not even an admin — can change or remove the owner from the site.
+- Only admins and the owner can see or change the invite code.
 
 ## What's in the Family Hub
 
@@ -146,11 +166,12 @@ npm run serve        # http://127.0.0.1:8080/
 
 Every push runs two test suites on GitHub (see *Actions → Tests*):
 
-- **Security rules** (`tests/rules.test.mjs`) — ~90 checks against the
+- **Security rules** (`tests/rules.test.mjs`) — ~125 checks against the
   Firestore emulator: outsiders and wrong invite codes are locked out, the code
   can't be read, pending members see nothing, nobody can heart/RSVP/comment as
-  someone else, removed members lose access.
-- **UI** (`tests/ui.test.mjs`) — ~100 end-to-end checks in a real browser with
+  someone else, removed members lose access, only the owner can make admins
+  and nobody can demote the owner.
+- **UI** (`tests/ui.test.mjs`) — ~160 end-to-end checks in a real browser with
   a fake Firebase: sign-in, joining and approval, RSVPs and calendar invites,
   hearts and comments, recipes and printing, candles and guestbook, vault
   locking, birthday banner, follows-the-sun, and that private content is
@@ -166,6 +187,7 @@ for the emulator). To publish rules from the command line: `npm run deploy:rules
 | Everyone gets "That invite code isn't right" | Rules not published, or `config/invite` missing — see setup above |
 | "Needs the latest security rules" / "isn't set up yet" | Publish the latest `firestore.rules` |
 | A new member is stuck on "You're almost in" | Approve them on the **Invite family** page (or in the Directory) |
-| The Invite page says "ask a family admin" | Add `role: "admin"` to your own `users` doc (one time) |
+| The Invite page says "ask a family admin" | Open your one-time owner link while signed in (or add `role: "owner"` to your `users` doc) |
+| "That owner link didn't work" | Publish the latest rules, sign in first, and use the link only once — the family may already have an owner |
 | JARVIS opens the wrong address | My Profile → Preferences → JARVIS address (saved per device) |
 | Forgot password | "Forgot password?" on the sign-in screen emails a reset link |

@@ -2,7 +2,7 @@
    Same-origin files: network-first (updates always show), cached copy when offline.
    Google Fonts: cache-first. Everything else (Firebase, Firestore, photos) goes
    straight to the network untouched — private data is never cached here. */
-const CACHE = 'agraz-v4';
+const CACHE = 'agraz-v5';
 const SHELL = [
   '/', '/family/', '/404.html',
   '/assets/css/base.css', '/assets/css/public.css', '/assets/css/portal.css',

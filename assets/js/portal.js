@@ -475,6 +475,8 @@
 
   function route() {
     if (!S.me) return;
+    const ownerKey = (location.hash.match(/^#claim\?(?:.*&)?key=([^&]+)/) || [])[1];
+    if (ownerKey) claimOwner(decodeURIComponent(ownerKey)); // swaps the hash for #home right away
     let v = location.hash.slice(1);
     v = ALIASES[v] || v;
     if (!VIEWS.includes(v)) v = 'home';
@@ -1079,7 +1081,7 @@
           ${avatarHTML(person, 44)}
           <div class="post-main">
             <div class="post-head"><strong>${esc(person.name || p.author || 'Family member')}</strong><time datetime="${esc(p.createdAt)}">${esc(timeAgo(p.createdAt))}</time>
-              ${mine ? `<span class="post-actions"><button class="icon-btn" type="button" data-action="delete-update" data-id="${esc(p.id)}" aria-label="Delete your update">${icon('trash')}</button></span>` : ''}
+              ${mine || isAdmin() ? `<span class="post-actions"><button class="icon-btn" type="button" data-action="delete-update" data-id="${esc(p.id)}" aria-label="${mine ? 'Delete your update' : `Delete ${esc(firstName(person.name || p.author))}’s update`}">${icon('trash')}</button></span>` : ''}
             </div>
             <p class="post-text">${esc(p.text)}</p>
             <div class="post-foot">${heartBtn('updates', p)}<button type="button" class="react" data-action="toggle-thread" data-parent="${esc(parent)}" aria-expanded="${open}">${icon('chat')}<span>${esc(commentLabel(parent))}</span></button></div>
@@ -1113,7 +1115,8 @@
     }
   });
   async function deleteUpdate(id) {
-    if (!(await confirmBox('Delete your update?', 'This can’t be undone.'))) return;
+    const own = (S.updates || []).some(x => x.id === id && S.user && x.uid === S.user.uid);
+    if (!(await confirmBox(own ? 'Delete your update?' : 'Delete this update?', own ? 'This can’t be undone.' : 'You’re removing it as an admin. This can’t be undone.'))) return;
     try {
       await col('updates').doc(id).delete();
       toast('Update deleted');
@@ -1143,9 +1146,9 @@
       if (rows.length < 2 && isMe) rows.push(`<a href="#profile" class="missing">${icon('pencil')}Add your phone, birthday and address</a>`);
       return `<article class="card person">
         <div class="person-head">${avatarHTML(m, 64)}<div>
-          <h2 class="person-name">${esc(m.name || 'Family member')}${isMe ? '<span class="you">You</span>' : ''}</h2>
+          <h2 class="person-name">${esc(m.name || 'Family member')}${isMe ? '<span class="you">You</span>' : ''}${roleBadge(m)}</h2>
           ${m.bio ? `<p class="person-bio">${esc(m.bio)}</p>` : `<p class="person-bio">Joined ${esc(fmtDate(m.joinedDate) || 'the hub')}</p>`}
-        </div></div>
+        </div>${canManage(m) ? `<button class="icon-btn person-manage" type="button" data-action="manage-member" data-uid="${esc(m.uid)}" aria-label="Manage ${esc(m.name || 'member')}">${icon('settings')}</button>` : ''}</div>
         <div class="contact">${rows.join('')}</div>
       </article>`;
     }).join('');
@@ -1306,6 +1309,10 @@
     S.avatarDraft = undefined;
     paintAvatar($('#profile-avatar'), m);
     $('#avatar-remove').hidden = !okImg(m.avatar);
+    const pill = $('#profile-role');
+    pill.hidden = !isAdmin();
+    pill.className = `role-pill${isOwner() ? ' owner' : ''}`;
+    pill.textContent = isOwner() ? 'Owner · full access' : 'Admin';
     paintThemeSeg();
     let saved = '';
     try { saved = localStorage.getItem('jarvisUrl') || ''; } catch (e) {}
@@ -1371,7 +1378,12 @@
   });
 
   /* ===================== Approvals (admins) ===================== */
-  const isAdmin = () => !!(S.me && S.me.role === 'admin');
+  const isAdmin = () => !!(S.me && (S.me.role === 'admin' || S.me.role === 'owner'));
+  const isOwner = () => !!(S.me && S.me.role === 'owner');
+  const roleBadge = m => m.role === 'owner' ? '<span class="role-pill owner">Owner</span>' : m.role === 'admin' ? '<span class="role-pill">Admin</span>' : '';
+  // Admins look after other members (never the owner); only the owner can remove admins.
+  const canManage = m => isAdmin() && S.user && m.uid !== S.user.uid && m.role !== 'owner';
+  const canRemove = m => canManage(m) && (isOwner() || !m.role);
   function showPending(name) {
     setScreen('auth');
     authMode('pending');
@@ -1575,7 +1587,7 @@
   function commentHTML(c) {
     const p = S.byUid[c.uid] || { name: c.author, uid: c.uid };
     const mine = S.user && c.uid === S.user.uid;
-    return `<div class="comment">${avatarHTML(p, 28)}<div class="comment-bubble"><div class="comment-head"><strong>${esc(p.name || c.author || 'Family member')}</strong><time>${esc(timeAgo(c.createdAt))}</time></div><p>${esc(c.text)}</p></div>${mine ? `<button class="icon-btn comment-del" type="button" data-action="delete-comment" data-id="${esc(c.id)}" data-parent="${esc(c.parent)}" aria-label="Delete your comment">${icon('trash')}</button>` : ''}</div>`;
+    return `<div class="comment">${avatarHTML(p, 28)}<div class="comment-bubble"><div class="comment-head"><strong>${esc(p.name || c.author || 'Family member')}</strong><time>${esc(timeAgo(c.createdAt))}</time></div><p>${esc(c.text)}</p></div>${mine || isAdmin() ? `<button class="icon-btn comment-del" type="button" data-action="delete-comment" data-id="${esc(c.id)}" data-parent="${esc(c.parent)}" aria-label="${mine ? 'Delete your comment' : 'Delete this comment'}">${icon('trash')}</button>` : ''}</div>`;
   }
   function threadHTML(parent) {
     return (S.comments[parent] || []).map(commentHTML).join('')
@@ -1607,7 +1619,7 @@
     }
   }
   async function deleteComment(id, parent) {
-    if (!(await confirmBox('Delete your comment?', 'This can’t be undone.'))) return;
+    if (!(await confirmBox('Delete this comment?', 'This can’t be undone.'))) return;
     try {
       await col('comments').doc(id).delete();
       S.comments[parent] = (S.comments[parent] || []).filter(c => c.id !== id);
@@ -1921,7 +1933,7 @@
     $('#tributes').innerHTML = list.length ? list.map(t => {
       const p = S.byUid[t.uid] || { name: t.author, uid: t.uid };
       const mine = S.user && t.uid === S.user.uid;
-      return `<figure class="card tribute"><blockquote>${esc(t.text)}</blockquote><figcaption>${avatarHTML(p, 36)}<span class="tribute-who"><strong>${esc(p.name || t.author || 'Family member')}</strong><small>${esc(fmtDate(t.createdAt))}</small></span>${mine ? `<button class="icon-btn" type="button" data-action="delete-tribute" data-id="${esc(t.id)}" aria-label="Delete your memory">${icon('trash')}</button>` : ''}</figcaption></figure>`;
+      return `<figure class="card tribute"><blockquote>${esc(t.text)}</blockquote><figcaption>${avatarHTML(p, 36)}<span class="tribute-who"><strong>${esc(p.name || t.author || 'Family member')}</strong><small>${esc(fmtDate(t.createdAt))}</small></span>${mine || isAdmin() ? `<button class="icon-btn" type="button" data-action="delete-tribute" data-id="${esc(t.id)}" aria-label="${mine ? 'Delete your memory' : 'Remove this memory'}">${icon('trash')}</button>` : ''}</figcaption></figure>`;
     }).join('') : emptyHTML('heart', 'No memories shared yet', 'Be the first to share a story about Hector.');
   }
   $('#tribute-form').addEventListener('submit', async e => {
@@ -1944,7 +1956,7 @@
     }
   });
   async function deleteTribute(id) {
-    if (!(await confirmBox('Delete your memory?', 'It will be removed from the guestbook.'))) return;
+    if (!(await confirmBox('Remove this memory?', 'It will be removed from the guestbook.'))) return;
     try {
       await col('tributes').doc(id).delete();
       await loadTributes(true);
@@ -2053,7 +2065,7 @@
   function renderInvite() {
     const el = $('#invite-body');
     if (!isAdmin()) {
-      const admins = S.members.filter(m => m.role === 'admin');
+      const admins = S.members.filter(m => m.role === 'admin' || m.role === 'owner');
       el.innerHTML = `<article class="card invite-member">
         <span class="sc-icon sc-accent">${icon('user-plus')}</span>
         <h2 class="card-title">Know someone who should be here?</h2>
@@ -2160,6 +2172,83 @@
     let d = '';
     for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) d += `M${c} ${r}h1v1h-1z`;
     box.innerHTML = `<svg viewBox="-4 -4 ${n + 8} ${n + 8}" shape-rendering="crispEdges" aria-hidden="true"><rect x="-4" y="-4" width="${n + 8}" height="${n + 8}" fill="#fff"/><path d="${d}" fill="#10252b"/></svg>`;
+  }
+
+  /* ===================== Owner + member management ===================== */
+  async function claimOwner(key) {
+    history.replaceState(null, '', '#home'); // never leave the key in the address bar
+    if (isOwner()) { toast('You’re already the owner'); return; }
+    try {
+      const batch = db.batch();
+      batch.set(col('config').doc('owner'), { uid: S.user.uid, key, claimedAt: nowIso() });
+      batch.update(col('users').doc(S.user.uid), { role: 'owner' });
+      await batch.commit();
+      S.me.role = 'owner';
+      S.invite = undefined;
+      paintMe();
+      await loadMembers().catch(() => {});
+      if (S.view && RENDER[S.view]) RENDER[S.view]();
+      toast('You’re now the owner — full admin access to everything');
+    } catch (e) {
+      toast(denied(e) ? 'That owner link didn’t work. It may already have been used, or the latest security rules aren’t published yet.' : 'Couldn’t finish. Please try again.', true);
+    }
+  }
+  function openMemberDialog(uid) {
+    const m = S.byUid[uid];
+    if (!m || !canManage(m)) return;
+    S.managing = uid;
+    $('#member-form').reset();
+    paintAvatar($('#md-avatar'), m);
+    $('#md-title').textContent = m.name || 'Family member';
+    $('#md-email').textContent = m.email || '';
+    $('#md-name').value = m.name || '';
+    $('#md-phone').value = m.phone || '';
+    $('#md-birthday').value = DAY.test(m.birthday || '') ? m.birthday : '';
+    $('#md-address').value = m.address || '';
+    $('#md-bio').value = m.bio || '';
+    $('#md-admin-row').hidden = !isOwner();
+    $('#md-admin').checked = m.role === 'admin';
+    $('#md-remove').hidden = !canRemove(m);
+    $('#member-dialog').showModal();
+    if (canHover) $('#md-name').focus();
+  }
+  $('#member-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const m = S.byUid[S.managing];
+    if (!m) return;
+    const name = $('#md-name').value.trim().replace(/\s+/g, ' ');
+    if (!name) { toast('Please enter a name.', true); $('#md-name').focus(); return; }
+    const birthday = $('#md-birthday').value;
+    const data = { name, phone: $('#md-phone').value.trim(), birthday: DAY.test(birthday) ? birthday : '', address: $('#md-address').value.trim(), bio: $('#md-bio').value.trim() };
+    if (isOwner()) {
+      const wantAdmin = $('#md-admin').checked;
+      if (wantAdmin !== (m.role === 'admin')) data.role = wantAdmin ? 'admin' : '';
+    }
+    const btn = $('#md-save');
+    busy(btn, true, 'Saving…');
+    try {
+      await col('users').doc(m.uid).update(data);
+      $('#member-dialog').close();
+      toast(data.role === 'admin' ? `${firstName(name)} is now a family admin` : data.role === '' ? `${firstName(name)} is no longer an admin` : `${firstName(name)}’s details are saved`);
+      await loadMembers();
+    } catch (err) {
+      toast(denied(err) ? NEED_RULES : 'Couldn’t save. Please try again.', true);
+    } finally {
+      busy(btn, false);
+    }
+  });
+  async function removeMember() {
+    const m = S.byUid[S.managing];
+    if (!m || !canRemove(m)) return;
+    if (!(await confirmBox(`Remove ${m.name || 'this member'}?`, 'They’ll lose access to the family hub right away. To block them for good, also disable their account in the Firebase console (Authentication → Users).', 'Remove'))) return;
+    try {
+      await col('users').doc(m.uid).delete();
+      $('#member-dialog').close();
+      toast(`${firstName(m.name)} has been removed`);
+      await loadMembers();
+    } catch (e) {
+      toast(denied(e) ? NEED_RULES : 'Couldn’t remove them. Please try again.', true);
+    }
   }
 
   const RENDER = {
@@ -2278,6 +2367,8 @@
       case 'light-candle': lightCandle(t); break;
       case 'delete-tribute': deleteTribute(id); break;
       case 'lock-vault': lockVault('Vault locked'); break;
+      case 'manage-member': openMemberDialog(t.dataset.uid); break;
+      case 'remove-member': removeMember(); break;
       case 'copy-invite-link': copyText(inviteLink(), 'Invite link copied — paste it in a text or email'); break;
       case 'copy-invite-code': copyText(S.invite.code, 'Invite code copied'); break;
       case 'copy-invite-message': copyText(inviteMessage(), 'Invite message copied — paste it anywhere'); break;

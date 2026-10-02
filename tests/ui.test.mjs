@@ -388,6 +388,68 @@ try {
     await done(guest, 'invite link');
   }
 
+  console.log('— owner + admin powers');
+  {
+    const bad = await open('/family/#claim?key=wrong-key', { signedIn: true, admin: false });
+    await bad.waitForTimeout(SLOW * 900);
+    ok(await store(bad, () => !window.__store.users.u1.role && !window.__store.config.owner), 'a wrong owner key changes nothing');
+    ok(!bad.url().includes('key='), 'the key is wiped from the address bar either way');
+    await bad.context().close();
+
+    const p = await open('/family/#claim?key=test-owner-key', { signedIn: true, admin: false });
+    await p.waitForTimeout(SLOW * 1200);
+    ok(await store(p, () => window.__store.users.u1.role === 'owner' && window.__store.config.owner.uid === 'u1'), 'the one-time owner link makes your account the owner');
+    ok(!p.url().includes('key='), 'the owner key never stays in the address bar');
+    ok((await p.textContent('#toast')).includes('You’re now the owner'), 'confirms you’re the owner');
+    await go(p, 'profile');
+    ok((await p.textContent('#profile-role')).includes('Owner'), 'profile shows the Owner badge');
+    await go(p, 'invite');
+    ok(!!(await p.$('#invite-link')), 'the owner manages invites');
+    await go(p, 'directory');
+    ok((await p.textContent('#people')).includes('Owner'), 'directory shows who the owner is');
+    await p.click('[data-action=manage-member][data-uid=u3]');
+    await p.waitForTimeout(SLOW * 200);
+    ok(!(await p.isHidden('#md-admin-row')), 'owner can make someone an admin');
+    await p.fill('#md-phone', '(786) 555-0199');
+    await p.check('#md-admin');
+    await p.click('#md-save');
+    await p.waitForTimeout(SLOW * 600);
+    ok(await store(p, () => window.__store.users.u3.phone === '(786) 555-0199' && window.__store.users.u3.role === 'admin'), 'owner edits Daniel’s details and makes him an admin');
+    ok((await p.textContent('#people')).includes('Admin'), 'new admin gets an Admin badge');
+    await p.click('[data-action=manage-member][data-uid=u5]');
+    await p.click('#md-remove');
+    await p.click('#confirm-ok');
+    await p.waitForTimeout(SLOW * 600);
+    ok(await store(p, () => !window.__store.users.u5), 'owner removes a member');
+    ok(!(await p.textContent('#people')).includes('Elena Ruiz'), 'removed member leaves the directory');
+    await go(p, 'updates');
+    ok(await p.$$eval('#feed [data-action=delete-update]', e => e.length) === 4, 'owner can remove any update');
+    await done(p, 'owner');
+
+    const adm = await open('/family/#directory', { signedIn: true, role: 'admin' });
+    await adm.waitForTimeout(SLOW * 900);
+    await adm.click('[data-action=manage-member][data-uid=u3]');
+    await adm.waitForTimeout(SLOW * 200);
+    ok(await adm.isHidden('#md-admin-row'), 'admins can’t hand out admin (owner only)');
+    ok(!(await adm.isHidden('#md-remove')), 'admins can remove regular members');
+    await adm.keyboard.press('Escape');
+    await go(adm, 'updates');
+    await adm.click('#feed [data-action=delete-update][data-id=p4]');
+    await adm.click('#confirm-ok');
+    await adm.waitForTimeout(SLOW * 600);
+    ok(await store(adm, () => !window.__store.updates.p4), 'admin removes someone else’s update');
+    await adm.click('[data-action=toggle-thread][data-parent="updates/p1"]');
+    ok(await adm.$$eval('[data-thread="updates/p1"] [data-action=delete-comment]', e => e.length) === 2, 'admin can remove anyone’s comments');
+    await done(adm, 'admin');
+
+    const mem = await open('/family/#updates', { signedIn: true, admin: false });
+    await mem.waitForTimeout(SLOW * 900);
+    ok(await mem.$$eval('#feed [data-action=delete-update]', e => e.length) === 1, 'members only see delete on their own updates');
+    await go(mem, 'directory');
+    ok(await mem.$$eval('[data-action=manage-member]', e => e.length) === 0, 'members can’t manage other members');
+    await done(mem, 'member');
+  }
+
   console.log('— install prompt + sign out');
   {
     const ua = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';

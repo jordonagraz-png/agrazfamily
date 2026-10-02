@@ -1,6 +1,7 @@
 /* Test double for the Firebase compat SDK subset used by assets/js/portal.js.
    Loaded by tests/ui.test.mjs in place of https://www.gstatic.com/firebasejs/…/firebase-app-compat.js.
-   Options (set window.__MOCK before load): signedIn, newUser, empty, bdayToday, admin, requireApproval, noInvite.
+   Options (set window.__MOCK before load): signedIn, newUser, empty, bdayToday, admin (false = plain member),
+   role ('admin' | 'owner'), requireApproval, noInvite. The test owner key is 'test-owner-key'.
    Optional window.__IMG = { photos: [...dataUrls], memorial: [...], av1 } to use real photos. */
 (function () {
   const M = window.__MOCK || {};
@@ -34,7 +35,7 @@
     config: { invite: { code: 'seashell', requireApproval: !!M.requireApproval } },
     joins: {},
     users: {
-      u1: { uid: 'u1', name: 'Jordon Agraz', email: 'jordon@example.com', joinedDate: '2024-05-02T10:00:00Z', phone: '(305) 555-0142', birthday: '1990-10-14', address: '12 Seagrape Lane, Miami, FL 33139', bio: 'Keeper of the family website', role: M.admin === false ? undefined : 'admin' },
+      u1: { uid: 'u1', name: 'Jordon Agraz', email: 'jordon@example.com', joinedDate: '2024-05-02T10:00:00Z', phone: '(305) 555-0142', birthday: '1990-10-14', address: '12 Seagrape Lane, Miami, FL 33139', bio: 'Keeper of the family website', role: M.admin === false ? undefined : (M.role || 'admin') },
       u2: { uid: 'u2', name: 'Maria Agraz', email: 'maria@example.com', joinedDate: '2024-05-03T10:00:00Z', phone: '(305) 555-0199', birthday: M.bdayToday ? `1962-${md()}` : '1962-10-09', address: '48 Harbor View Dr, Key Biscayne, FL', bio: 'Grandma, head chef, family historian', avatar: IMG.av1 },
       u3: { uid: 'u3', name: 'Daniel Agraz', email: 'daniel@example.com', joinedDate: '2024-06-11T10:00:00Z', phone: '(786) 555-0110', birthday: '1988-12-02' },
       u4: { uid: 'u4', name: 'Sofia Agraz', email: 'sofia@example.com', joinedDate: '2025-01-20T10:00:00Z', birthday: '2012-10-25', bio: 'Midfielder · artist' },
@@ -139,7 +140,7 @@
     throw new Error('mock: unsupported op ' + w.op);
   };
   const member = () => current && store.users[current.uid] && store.users[current.uid].approved !== false;
-  const admin = () => member() && store.users[current.uid].role === 'admin';
+  const admin = () => member() && ['admin', 'owner'].includes(store.users[current.uid].role);
   const invite = () => store.config.invite || {};
   function Query(c, o = { wheres: [] }) {
     const next = patch => Query(c, Object.assign({}, o, patch));
@@ -175,7 +176,9 @@
               if (!store.joins[id]) return fail('permission-denied');
               if (data.approved !== false && invite().requireApproval) return fail('permission-denied');
             }
-            if (c === 'config' && !(admin() && id === 'invite' && /^[A-Za-z0-9-]{6,64}$/.test(data.code || ''))) return fail('permission-denied');
+            if (c === 'config' && id === 'owner') {
+              if (store.config.owner || !member() || data.uid !== current.uid || data.key !== 'test-owner-key') return fail('permission-denied');
+            } else if (c === 'config' && !(admin() && id === 'invite' && /^[A-Za-z0-9-]{6,64}$/.test(data.code || ''))) return fail('permission-denied');
             store[c][id] = clone(data);
             return delay();
           },
@@ -194,7 +197,19 @@
       }
     };
   }
-  const db = { collection: c => { store[c] = store[c] || {}; return Query(c); } };
+  const db = {
+    collection: c => { store[c] = store[c] || {}; return Query(c); },
+    batch() {
+      const ops = [];
+      const b = {
+        set: (ref, data) => { ops.push(() => ref.set(data)); return b; },
+        update: (ref, data) => { ops.push(() => ref.update(data)); return b; },
+        delete: ref => { ops.push(() => ref.delete()); return b; },
+        async commit() { const snap = clone(store); try { for (const op of ops) await op(); } catch (e) { Object.keys(snap).forEach(k => { store[k] = snap[k]; }); throw e; } }
+      };
+      return b;
+    }
+  };
   const authFn = () => auth;
   authFn.Auth = { Persistence: { LOCAL: 'local', SESSION: 'session' } };
   authFn.EmailAuthProvider = { credential: (email, password) => ({ email, password }) };

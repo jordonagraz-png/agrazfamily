@@ -2,12 +2,15 @@
 //   npm run test:rules
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
 import { readFileSync } from 'node:fs';
-import { doc, getDoc, setDoc, updateDoc, addDoc, collection, getDocs, deleteDoc, query, where } from 'firebase/firestore';
+import { createHash } from 'node:crypto';
+import { doc, getDoc, setDoc, updateDoc, addDoc, collection, getDocs, deleteDoc, query, where, writeBatch } from 'firebase/firestore';
 
-const env = await initializeTestEnvironment({
-  projectId: 'demo-agraz',
-  firestore: { rules: readFileSync(new URL('../firestore.rules', import.meta.url), 'utf8'), host: '127.0.0.1', port: 8085 }
-});
+// The real owner key is never in the repo; tests swap in the fingerprint of a throwaway key.
+const TEST_OWNER_KEY = 'test-owner-key-for-ci-only';
+const rules = readFileSync(new URL('../firestore.rules', import.meta.url), 'utf8')
+  .replace(/function ownerKeyHash\(\) \{ return '[0-9a-f]{64}'; \}/, `function ownerKeyHash() { return '${createHash('sha256').update(TEST_OWNER_KEY).digest('hex')}'; }`);
+if (!rules.includes(createHash('sha256').update(TEST_OWNER_KEY).digest('hex'))) throw new Error('could not swap the owner key hash');
+const env = await initializeTestEnvironment({ projectId: 'demo-agraz', firestore: { rules, host: '127.0.0.1', port: 8085 } });
 const IMG = 'data:image/jpeg;base64,' + Buffer.from('fakejpegbytes'.repeat(50)).toString('base64');
 
 async function seed(extra) {
@@ -151,11 +154,46 @@ await t('pending member cannot read family data', getDocs(collection(fay, 'memor
 await t('pending member cannot list members', getDocs(collection(fay, 'users')), false);
 await t('pending member cannot approve self', updateDoc(doc(fay, 'users/fay'), { approved: true }), false);
 await t('non-admin cannot approve', updateDoc(doc(bob, 'users/fay'), { approved: true }), false);
-await t('admin cannot change other fields while approving', updateDoc(doc(alice, 'users/fay'), { approved: true, name: 'X' }), false);
+await t('admin cannot change a member\'s email while approving', updateDoc(doc(alice, 'users/fay'), { approved: true, email: 'x@x.com' }), false);
 await t('admin approves', updateDoc(doc(alice, 'users/fay'), { approved: true }), true);
 await t('approved member reads family data', getDocs(collection(fay, 'memories')), true);
 await t('admin removes a member', deleteDoc(doc(alice, 'users/fay')), true);
 await t('removed member loses access', getDocs(collection(fay, 'memories')), false);
+
+console.log('— owner + admin powers');
+await seed();
+await env.withSecurityRulesDisabled(async c => {
+  const db = c.firestore();
+  for (const [uid, name] of [['owen', 'Owen'], ['mia', 'Mia']]) await setDoc(doc(db, `users/${uid}`), { name, email: `${uid}@x.com`, uid, joinedDate: 'x' });
+  await setDoc(doc(db, 'comments/c2'), { parent: 'updates/p1', text: 'spam', uid: 'bob', author: 'Bob', createdAt: 'x' });
+  await setDoc(doc(db, 'tributes/t2'), { text: 'by bob', uid: 'bob', author: 'Bob', createdAt: 'x' });
+});
+const owen = as('owen', 'owen@x.com'), mia = as('mia', 'mia@x.com');
+const claim = (db, uid, key) => { const b = writeBatch(db); b.set(doc(db, 'config/owner'), { uid, key, claimedAt: 'x' }); b.update(doc(db, `users/${uid}`), { role: 'owner' }); return b.commit(); };
+await t('cannot just set your own role to owner', updateDoc(doc(owen, 'users/owen'), { role: 'owner' }), false);
+await t('owner claim needs the right key', claim(owen, 'owen', 'guess-the-key'), false);
+await t('cannot claim on someone else\'s behalf', (() => { const b = writeBatch(owen); b.set(doc(owen, 'config/owner'), { uid: 'mia', key: TEST_OWNER_KEY, claimedAt: 'x' }); b.update(doc(owen, 'users/mia'), { role: 'owner' }); return b.commit(); })(), false);
+await t('claim ownership with the owner key', claim(owen, 'owen', TEST_OWNER_KEY), true);
+await t('the owner key works only once', claim(mia, 'mia', TEST_OWNER_KEY), false);
+await t('nobody can read the stored owner claim', getDoc(doc(owen, 'config/owner')), false);
+await t('owner reads the invite code', getDoc(doc(owen, 'config/invite')), true);
+await t('owner changes the invite code', setDoc(doc(owen, 'config/invite'), { code: 'owner-made-code', requireApproval: true }), true);
+await t('owner makes Bob an admin', updateDoc(doc(owen, 'users/bob'), { role: 'admin' }), true);
+await t('owner cannot create a second owner', updateDoc(doc(owen, 'users/mia'), { role: 'owner' }), false);
+await t('admins cannot make admins', updateDoc(doc(bob, 'users/mia'), { role: 'admin' }), false);
+await t('admin edits a member\'s details', updateDoc(doc(bob, 'users/mia'), { phone: '555-0100', bio: 'Updated by an admin' }), true);
+await t('admin cannot change a member\'s email', updateDoc(doc(bob, 'users/mia'), { email: 'mia2@x.com' }), false);
+await t('admin cannot edit the owner', updateDoc(doc(alice, 'users/owen'), { phone: '1' }), false);
+await t('admin cannot demote the owner', updateDoc(doc(alice, 'users/owen'), { role: '' }), false);
+await t('admin cannot remove the owner', deleteDoc(doc(alice, 'users/owen')), false);
+await t('admin cannot remove another admin', deleteDoc(doc(alice, 'users/bob')), false);
+await t('owner cannot demote themselves by accident', updateDoc(doc(owen, 'users/owen'), { role: 'admin' }), false);
+await t('owner takes admin away', updateDoc(doc(owen, 'users/bob'), { role: '' }), true);
+await t('admin deletes anyone\'s comment', deleteDoc(doc(alice, 'comments/c2')), true);
+await t('admin removes anyone\'s guestbook memory', deleteDoc(doc(alice, 'tributes/t2')), true);
+await t('members still cannot delete others\' memories', deleteDoc(doc(mia, 'tributes/t1')), false);
+await t('admin removes a member', deleteDoc(doc(alice, 'users/mia')), true);
+await t('owner removes an admin', deleteDoc(doc(owen, 'users/alice')), true);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 await env.cleanup();

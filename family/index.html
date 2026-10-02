@@ -446,6 +446,7 @@
       <section class="view view-narrow" id="view-profile" data-view="profile" aria-labelledby="profile-title" hidden>
         <header class="view-head">
           <div><p class="eyebrow plain">Your account</p><h1 class="view-title" id="profile-title">My Profile</h1></div>
+          <span class="role-pill" id="profile-role" hidden></span>
         </header>
         <form class="card form-card" id="profile-form" novalidate>
           <div class="avatar-edit">
@@ -624,6 +625,32 @@
       </div>
     </div>
     <footer class="modal-foot"><button class="btn btn-ghost" type="button" data-close>Cancel</button><button class="btn btn-accent" type="submit" id="rf-save">Save recipe</button></footer>
+  </form>
+</dialog>
+
+<dialog class="modal" id="member-dialog" aria-labelledby="md-title">
+  <form method="dialog" id="member-form" novalidate>
+    <header class="modal-head">
+      <div class="md-who"><span class="av av-44" id="md-avatar"></span><div><h2 id="md-title">Manage member</h2><p class="muted" id="md-email"></p></div></div>
+      <button class="icon-btn" type="button" data-close aria-label="Close"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#x"/></svg></button>
+    </header>
+    <div class="form-grid">
+      <div class="field span-full"><label class="label" for="md-name">Name</label><input class="input" id="md-name" maxlength="80" required></div>
+      <div class="field"><label class="label" for="md-phone">Phone <span class="opt">optional</span></label><input class="input" id="md-phone" type="tel" maxlength="40"></div>
+      <div class="field"><label class="label" for="md-birthday">Birthday <span class="opt">optional</span></label><input class="input" id="md-birthday" type="date"></div>
+      <div class="field span-full"><label class="label" for="md-address">Mailing address <span class="opt">optional</span></label><textarea class="textarea" id="md-address" rows="2" maxlength="300"></textarea></div>
+      <div class="field span-full"><label class="label" for="md-bio">About <span class="opt">optional</span></label><input class="input" id="md-bio" maxlength="280"></div>
+    </div>
+    <label class="switch-row md-admin" for="md-admin" id="md-admin-row" hidden>
+      <span><strong>Family admin</strong><small class="muted">Admins manage invites, approvals and members, and can remove any post or comment.</small></span>
+      <span class="switch"><input type="checkbox" id="md-admin" role="switch"><span class="switch-ui" aria-hidden="true"></span></span>
+    </label>
+    <footer class="modal-foot md-foot">
+      <button class="btn btn-danger" type="button" data-action="remove-member" id="md-remove">Remove from family</button>
+      <span class="spacer"></span>
+      <button class="btn btn-ghost" type="button" data-close>Cancel</button>
+      <button class="btn btn-accent" type="submit" id="md-save">Save</button>
+    </footer>
   </form>
 </dialog>
 
