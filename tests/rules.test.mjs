@@ -292,6 +292,22 @@ await t('members can’t change research notes', setDoc(doc(bob, 'tree/research'
 await t('research notes hold only what’s expected', setDoc(doc(alice, 'tree/research'), { ...research, secret: 'x' }), false);
 await t('admins can remove the tree', deleteDoc(doc(alice, 'tree/part0')), true);
 
+console.log('— game night');
+const score = (uid, game, best, over = {}) => ({ uid, game, best, name: 'Bob Agraz', at: 'x', ...over });
+await t('members save their best score', setDoc(doc(bob, 'scores/bob_gull'), score('bob', 'gull', 12)), true);
+await t('members see the family board', getDocs(collection(dan, 'scores')), true);
+await t('outsiders can’t see the board', getDocs(collection(eve, 'scores')), false);
+await t('a best only goes up', setDoc(doc(bob, 'scores/bob_gull'), score('bob', 'gull', 9)), false);
+await t('a new best replaces the old one', setDoc(doc(bob, 'scores/bob_gull'), score('bob', 'gull', 30)), true);
+await t('nobody posts a score for someone else', setDoc(doc(dan, 'scores/bob_neveria'), score('bob', 'neveria', 99)), false);
+await t('the score’s name must match its game', setDoc(doc(bob, 'scores/bob_gull'), score('bob', 'neveria', 40)), false);
+await t('only the hub’s games', setDoc(doc(bob, 'scores/bob_chess'), score('bob', 'chess', 5)), false);
+await t('scores are whole numbers', setDoc(doc(bob, 'scores/bob_neveria'), score('bob', 'neveria', 4.5)), false);
+await t('scores can’t be negative', setDoc(doc(bob, 'scores/bob_neveria'), score('bob', 'neveria', -1)), false);
+await t('scores hold only what’s expected', setDoc(doc(bob, 'scores/bob_neveria'), score('bob', 'neveria', 5, { cheat: true })), false);
+await t('members can’t delete someone else’s score', deleteDoc(doc(dan, 'scores/bob_gull')), false);
+await t('admins can clear a score', deleteDoc(doc(alice, 'scores/bob_gull')), true);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 await env.cleanup();
 process.exit(fail ? 1 : 0);

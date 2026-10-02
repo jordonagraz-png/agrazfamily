@@ -40,8 +40,8 @@ one the Invite page creates.
 Until steps 1–3 are done, existing members can still sign in, but **new people
 can't join** (they'll see "That invite code isn't right") and the newer
 features (Vault, profiles, recipes, RSVPs, hearts, comments, guestbook,
-candles, Family Globe, Voice Stories, Time Capsules, Family Tree) show "needs
-the latest security rules" — with a **Copy the rules** button and the steps.
+candles, Family Globe, Voice Stories, Time Capsules, Family Tree, the Game
+Night leaderboard) show "needs the latest security rules" — with a **Copy the rules** button and the steps.
 
 **Publishing the rules is what actually protects the family's data.** The
 site itself won't let anyone join without a server-checked code, but until the
@@ -111,6 +111,14 @@ Everything lives in the hub under **Invite family** (sidebar, the phone's
   you're related — "your 2nd great-grandmother", "your first cousin once
   removed", "husband of your aunt". Photos come from the tree itself, from
   members' profile photos, and Hector's from the In Memory page
+- **Game Night** — two games made for the family, playable on phones and
+  computers: **Gaviota**, a one-button flying game (guide a seagull between
+  pier pilings as the sun sets and night falls), and **La Nevería**, a
+  beach-side frozen-treat shop where you take orders, scoop the nieve, blend,
+  add toppings (chamoy and tajín included) and serve before customers lose
+  patience. Each game has a **family leaderboard** (`scores`, one best per
+  member per game, which can only go up). Until the rules are published,
+  scores are kept on the device
 - **Family Globe** — a live, spinning Earth showing where everyone lives,
   with the real day/night line (computed from the sun's position), everyone's
   local time, distances, and **Family clocks**: slide through the next 24
@@ -244,6 +252,7 @@ assets/js/public.js   Public site interactions
 assets/js/portal.js   Family Hub app (Firebase Auth + Firestore)
 assets/js/globe.js    Family Globe renderer (canvas, no libraries; loaded on demand)
 assets/js/tree.js     Family tree engine: reads Ancestry exports, works out relationships
+assets/js/games/      Game Night: gull.js (Gaviota), neveria.js (La Nevería), loaded on demand
 assets/data/land.bin  Land mask for the globe (5 KB, from Natural Earth — public domain)
 assets/icons.svg      Icon set + logo mark
 firestore.rules       Server-side security rules (publish in Firebase)
@@ -274,19 +283,20 @@ Every push runs two test suites on GitHub (see *Actions → Tests*):
   fictional family: reading the .zip, dates and places, living relatives
   trimmed, records, documents, life events and notes, the history around a
   life, relationship names, search, and matching photos to people.
-- **Security rules** (`tests/rules.test.mjs`) — ~185 checks against the
+- **Security rules** (`tests/rules.test.mjs`) — ~200 checks against the
   Firestore emulator: outsiders and wrong invite codes are locked out, the code
   can't be read, pending members see nothing, nobody can heart/RSVP/comment as
   someone else, removed members lose access, only the owner can make admins
   and nobody can demote the owner, a sealed time capsule can't be read (or
   swapped) before its day, voice recordings can't be faked or replaced, and
-  only admins can import or change the family tree.
-- **UI** (`tests/ui.test.mjs`) — ~295 end-to-end checks in a real browser with
+  only admins can import or change the family tree, and nobody can post a
+  game score for someone else or lower a best.
+- **UI** (`tests/ui.test.mjs`) — ~340 end-to-end checks in a real browser with
   a fake Firebase, a fake microphone and a virtual fingerprint sensor: sign-in,
   joining and approval, RSVPs and calendar invites, hearts and comments,
   recipes and printing, candles and guestbook, vault locking and quick unlock,
   the globe and family clocks, importing and exploring the family tree and
-  matching photos to people, recording and playing voice stories, sealing and
+  matching photos to people, playing both games and saving scores, recording and playing voice stories, sealing and
   opening time capsules, birthday banner, follows-the-sun, and that private
   content is cleared on sign-out.
 

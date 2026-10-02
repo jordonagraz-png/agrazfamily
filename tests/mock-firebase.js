@@ -4,7 +4,7 @@
    role ('admin' | 'owner'), requireApproval, noInvite, placed (you're on the Family Globe),
    oldRules (the latest firestore.rules aren't published: new collections and the owner claim are refused),
    treeDocs ({ meta, part0, … } — an imported family tree), treeId (your place in the tree),
-   memberTreeIds ({ uid: treeId } for other members).
+   memberTreeIds ({ uid: treeId } for other members), scores ({ 'uid_game': { uid, game, best, name, at } }).
    The test owner key is 'test-owner-key'.
    Optional window.__IMG = { photos: [...dataUrls], memorial: [...], av1 } to use real photos. */
 (function () {
@@ -144,6 +144,7 @@
   store.capsuleLetters.k2.photo = IMG.photos[4];
   store.tree = M.treeDocs ? JSON.parse(JSON.stringify(M.treeDocs)) : {};
   store.treePhotos = {};
+  store.scores = M.scores ? JSON.parse(JSON.stringify(M.scores)) : {};
   if (M.treeId) store.users.u1.treeId = M.treeId;
   Object.entries(M.memberTreeIds || {}).forEach(([uid, pid]) => { if (store.users[uid]) store.users[uid].treeId = pid; });
   if (M.empty) ['events', 'updates', 'memories', 'vault', 'memorial', 'recipes', 'tributes', 'candles', 'comments', 'capsules', 'capsuleLetters', 'stories', 'storyAudio'].forEach(k => { store[k] = {}; });
@@ -203,7 +204,7 @@
       startAfter: s => next({ after: s.id }),
       get() {
         if (!member() || c === 'capsuleLetters') return fail('permission-denied');
-        if (M.oldRules && ['capsules', 'stories', 'storyAudio', 'tree', 'treePhotos'].includes(c)) return fail('permission-denied');
+        if (M.oldRules && ['capsules', 'stories', 'storyAudio', 'tree', 'treePhotos', 'scores'].includes(c)) return fail('permission-denied');
         let ids = Object.keys(store[c]).filter(id => o.wheres.every(w => matches(store[c][id], w)));
         if (o.f) ids.sort((a, b) => { const x = store[c][a][o.f], y = store[c][b][o.f]; return (x > y ? 1 : x < y ? -1 : 0) * (o.dir === 'desc' ? -1 : 1); });
         if (o.after) ids = ids.slice(ids.indexOf(o.after) + 1);
@@ -222,7 +223,7 @@
             if (c === 'users' && id !== current.uid && !member()) return fail('permission-denied');
             if (c === 'config' && !(admin() && id === 'invite')) return fail('permission-denied');
             if (c !== 'users' && c !== 'joins' && !member()) return fail('permission-denied');
-            if (M.oldRules && ['tree', 'treePhotos', 'capsules', 'stories', 'storyAudio'].includes(c)) return fail('permission-denied');
+            if (M.oldRules && ['tree', 'treePhotos', 'capsules', 'stories', 'storyAudio', 'scores'].includes(c)) return fail('permission-denied');
             // like firestore.rules: a time capsule's letter stays sealed until its day
             if (c === 'capsuleLetters' && !(store.capsules[id] && store.capsules[id].openAt <= Date.now())) return fail('permission-denied');
             return delay(snapDoc(c, id));
@@ -238,6 +239,8 @@
             } else if (c === 'config' && !(admin() && id === 'invite' && /^[A-Za-z0-9-]{6,64}$/.test(data.code || ''))) return fail('permission-denied');
             if (c === 'capsules' && !(member() && typeof data.openAt === 'number' && data.openAt > Date.now() + 3600e3 && data.uid === current.uid)) return fail('permission-denied');
             if (c === 'tree' && !admin()) return fail('permission-denied');
+            // like firestore.rules: your own best per game, and only ever higher
+            if (c === 'scores' && (M.oldRules || !member() || id !== current.uid + '_' + data.game || data.uid !== current.uid || !['gull', 'neveria'].includes(data.game) || !Number.isInteger(data.best) || data.best < 0 || (store.scores[id] && data.best <= store.scores[id].best))) return fail('permission-denied');
             if (c === 'treePhotos' && !(member() && data.uid === current.uid && /^data:image\//.test(data.img || '') && (!store.treePhotos[id] || store.treePhotos[id].uid === current.uid || admin()))) return fail('permission-denied');
             store[c][id] = clone(data);
             return delay();

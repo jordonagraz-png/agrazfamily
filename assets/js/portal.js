@@ -33,10 +33,10 @@
   const VAULT_AWAY_MS = 60e3; // …or after the tab has been in the background this long
   const NEED_RULES = 'This needs the latest security rules — see README.';
 
-  const VIEWS = ['home', 'photos', 'calendar', 'updates', 'tree', 'globe', 'stories', 'capsules', 'recipes', 'directory', 'invite', 'vault', 'memorial', 'profile'];
+  const VIEWS = ['home', 'photos', 'calendar', 'updates', 'tree', 'globe', 'games', 'stories', 'capsules', 'recipes', 'directory', 'invite', 'vault', 'memorial', 'profile'];
   const ALIASES = { memories: 'photos', events: 'calendar' };
-  const TITLES = { home: 'Home', photos: 'Photos', calendar: 'Calendar', updates: 'Updates', tree: 'Family Tree', globe: 'Family Globe', stories: 'Voice Stories', capsules: 'Time Capsules', recipes: 'Recipes', directory: 'Directory', invite: 'Invite family', vault: 'Family Vault', memorial: 'In Memory', profile: 'My Profile' };
-  const SECONDARY = ['tree', 'globe', 'stories', 'capsules', 'recipes', 'directory', 'invite', 'vault', 'memorial', 'profile'];
+  const TITLES = { home: 'Home', photos: 'Photos', calendar: 'Calendar', updates: 'Updates', tree: 'Family Tree', globe: 'Family Globe', games: 'Games', stories: 'Voice Stories', capsules: 'Time Capsules', recipes: 'Recipes', directory: 'Directory', invite: 'Invite family', vault: 'Family Vault', memorial: 'In Memory', profile: 'My Profile' };
+  const SECONDARY = ['tree', 'globe', 'games', 'stories', 'capsules', 'recipes', 'directory', 'invite', 'vault', 'memorial', 'profile'];
   const RECIPE_CATS = { mains: 'Mains', sides: 'Sides', desserts: 'Desserts', breakfast: 'Breakfast', drinks: 'Drinks', other: 'Other' };
   const CATS = {
     emergency: { label: 'Emergency', icon: 'siren' },
@@ -211,7 +211,7 @@
     avatarDraft: undefined, pending: [],
     comments: {}, openThreads: new Set(), lbThread: false,
     recipes: null, recipeCat: 'all', openRecipe: null, editingRecipe: null, recipePhoto: undefined,
-    tributes: null, candles: null, otd: null, addcal: null, prefillPost: '', installEvt: null,
+    tributes: null, candles: null, otd: null, scores: null, game: null, addcal: null, prefillPost: '', installEvt: null,
     vaultOpen: false, lastActive: Date.now(), hiddenAt: 0, invite: undefined,
     globe: { api: null, offset: 0, draft: null, picking: false, active: new Set() },
     capsules: null, capPhoto: '', justSealed: null, stories: null, storyUrls: {}, rulesOk: undefined, tree: null, treeDraft: null
@@ -467,7 +467,7 @@
     Object.assign(S, {
       me: null, members: [], byUid: {}, view: null, events: null, updates: null, vault: null, memorial: null, recent: null,
       vaultCat: 'all', avatarDraft: undefined, pending: [], comments: {}, lbThread: false, recipes: null, recipeCat: 'all',
-      openRecipe: null, tributes: null, candles: null, otd: null, addcal: null, prefillPost: '', vaultOpen: false, invite: undefined,
+      openRecipe: null, tributes: null, candles: null, otd: null, scores: null, game: null, addcal: null, prefillPost: '', vaultOpen: false, invite: undefined,
       capsules: null, capPhoto: '', justSealed: null, stories: null, rulesOk: undefined, tree: null, treeDraft: null
     });
     matcher.rows = [];
@@ -498,7 +498,8 @@
     // Don't leave private content in the page after signing out.
     ['#home-upcoming', '#home-family', '#home-photos', '#home-updates', '#home-bday', '#home-otd-strip', '#photo-grid', '#cal-grid', '#cal-agenda', '#feed',
       '#people', '#pending-panel', '#notes', '#vault-filters', '#memorial-grid', '#tributes', '#candle-row', '#recipes', '#recipe-filters', '#lb-thread', '#invite-body',
-      '#globe-clocks', '#globe-strip', '#globe-best', '#globe-pins', '#capsules', '#home-capsule', '#co-text', '#stories', '#tree-body', '#tree-results', '#match-list'].forEach(s => { const el = $(s); if (el) el.innerHTML = ''; });
+      '#globe-clocks', '#globe-strip', '#globe-best', '#globe-pins', '#capsules', '#home-capsule', '#co-text', '#stories', '#tree-body', '#tree-results', '#match-list', '#games-lobby', '#game-board'].forEach(s => { const el = $(s); if (el) el.innerHTML = ''; });
+    stopGame();
     ['#home-bday', '#home-otd', '#pending-panel', '#home-capsule'].forEach(s => { $(s).hidden = true; });
     $('#co-photo').removeAttribute('src');
     paintPendingBadge();
@@ -538,6 +539,7 @@
     requestAnimationFrame(tagReveals);
     if (changed && S.view === 'globe') { stopPicking(); if (S.globe.api) S.globe.api.stop(); }
     if (changed && S.view === 'stories' && player.audio) player.audio.pause();
+    if (changed && S.view === 'games') stopGame();
     S.view = v;
     $$('.view').forEach(el => { el.hidden = el.dataset.view !== v; });
     $$('[data-nav]').forEach(a => {
@@ -2415,7 +2417,7 @@
   // claims ownership right there — and gets the family's invite code straight away.
   // The family tree is the newest part of the rules, so reading it is a quick "are the rules published?" check.
   async function checkRules() {
-    try { await col('tree').doc('meta').get(); S.rulesOk = true; }
+    try { await Promise.all([col('tree').doc('meta').get(), col('scores').limit(1).get()]); S.rulesOk = true; }
     catch (e) { S.rulesOk = denied(e) ? false : null; }
     if (S.view === 'invite' && !isAdmin()) renderInvite();
     return S.rulesOk;
@@ -4415,6 +4417,156 @@
   });
 
   // When the security rules are missing, explain exactly how to publish them.
+  /* ===================== Game Night ===================== */
+  // Two games, each in its own file, loaded when someone plays: Gaviota (games/gull.js) and
+  // La Nevería (games/neveria.js). Every member's best score per game goes on the family board.
+  const GAMES = [
+    { id: 'gull', title: 'Gaviota', kind: 'Tap to fly', blurb: 'Fly a seagull between the pier pilings as the sun sets over the water. One tap to flap — how far can you get?',
+      help: 'Tap, click or press Space to flap. P pauses.' },
+    { id: 'neveria', title: 'La Nevería', kind: 'Run the shop', money: true, blurb: 'Run the family’s beach-side nevería: take orders, scoop the nieve, blend, add toppings and serve before customers lose patience.',
+      help: 'Keys 1–4 switch stations, hold Space to blend, Enter serves. P pauses.' }
+  ];
+  const gameLib = {};
+  function loadGame(id) {
+    if (window.AgrazGames && window.AgrazGames[id]) return Promise.resolve();
+    if (!gameLib[id]) {
+      gameLib[id] = new Promise((resolve, reject) => {
+        const sc = document.createElement('script');
+        sc.src = `/assets/js/games/${id}.js${ASSET_V}`;
+        sc.onload = resolve;
+        sc.onerror = () => { gameLib[id] = null; reject(new Error('game')); };
+        document.head.appendChild(sc);
+      });
+    }
+    return gameLib[id];
+  }
+  const localBest = id => { try { return Number(localStorage.getItem('agraz-best-' + id)) || 0; } catch (e) { return 0; } };
+  const soundOn = () => { try { return localStorage.getItem('agraz-game-sound') !== 'off'; } catch (e) { return true; } };
+  const fmtScore = (g, n) => (g.money ? '$' : '') + Number(n || 0).toLocaleString();
+  const myScore = id => (S.scores && S.user ? S.scores.list.find(x => x.game === id && x.uid === S.user.uid) : null);
+  const myBest = id => Math.max((myScore(id) || {}).best || 0, localBest(id));
+  const boardOf = id => (S.scores ? S.scores.list.filter(x => x.game === id).sort((a, b) => b.best - a.best || String(a.at).localeCompare(String(b.at))) : []);
+  async function loadScores() {
+    try {
+      const snap = await col('scores').get();
+      S.scores = { list: snap.docs.map(d => d.data()), denied: false };
+    } catch (e) { S.scores = { list: [], denied: denied(e) }; }
+  }
+  async function openGames() {
+    if (S.game) { renderGameBoard(); return; }
+    $('#game-play').hidden = true;
+    $('#games-lobby').hidden = false;
+    $('#games-head').hidden = false;
+    renderLobby();
+    if (!S.scores) { await loadScores(); if (S.view === 'games' && !S.game) renderLobby(); }
+  }
+  function boardHTML(g, n) {
+    if (!S.scores) return skelRows(3);
+    const rows = boardOf(g.id).slice(0, n);
+    if (!rows.length) return S.scores.denied ? '' : '<p class="gb-empty">No scores yet — be the first on the board.</p>';
+    return `<ol class="gb-list">${rows.map((x, i) => {
+      const m = S.byUid[x.uid] || { name: x.name, uid: x.uid }, me = S.user && x.uid === S.user.uid;
+      return `<li class="${me ? 'me' : ''}${i === 0 ? ' top' : ''}"><span class="gb-rank">${i === 0 ? icon('trophy') : i + 1}</span>${avatarHTML(m, 28)}<span class="gb-name">${esc(firstName(m.name || x.name))}${me ? ' <small>you</small>' : ''}</span><b>${esc(fmtScore(g, x.best))}</b></li>`;
+    }).join('')}</ol>`;
+  }
+  const GAME_ART = {
+    gull: `<svg viewBox="0 0 320 180" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="ga-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4f6489"/><stop offset=".5" stop-color="#d99a93"/><stop offset=".78" stop-color="#ffcf9a"/><stop offset="1" stop-color="#fff0c2"/></linearGradient><linearGradient id="ga-sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#86aaa0"/><stop offset="1" stop-color="#1e5550"/></linearGradient><radialGradient id="ga-sun"><stop offset="0" stop-color="#fffbe8"/><stop offset=".55" stop-color="#ffe7b0"/><stop offset="1" stop-color="#ffe7b0" stop-opacity="0"/></radialGradient></defs>
+      <rect width="320" height="180" fill="url(#ga-sky)"/><circle cx="200" cy="118" r="48" fill="url(#ga-sun)"/><circle cx="200" cy="118" r="20" fill="#fffaf0"/>
+      <path d="M0 122 C60 114 110 118 160 121 S260 114 320 120 V180 H0Z" fill="#b48a8a" opacity=".55"/><rect y="124" width="320" height="56" fill="url(#ga-sea)"/>
+      <path class="ga-glint" d="M186 130h28M180 138h40M190 146h20M176 154h48" stroke="#fff6dc" stroke-width="2" stroke-linecap="round" opacity=".75"/>
+      <path d="M0 160 Q40 152 80 160 T160 160 T240 160 T320 160" fill="none" stroke="#e9f4ef" stroke-opacity=".55" stroke-width="2"/>
+      <g fill="#7b4f2e"><rect x="252" y="0" width="24" height="54" rx="3"/><rect x="252" y="104" width="24" height="76" rx="3"/></g><g fill="#5c3a21" opacity=".55"><rect x="252" y="40" width="24" height="5"/><rect x="252" y="114" width="24" height="5"/></g>
+      <g class="ga-gull" transform="translate(112 82)"><path d="M-30 4 C-14 -10 6 -10 18 -2 L30 0 L18 4 C4 12 -18 12 -30 4Z" fill="#fbfaf6"/><path class="ga-wing" d="M-12 -2 C-6 -22 8 -26 16 -24 C8 -14 4 -6 2 0Z" fill="#9aa4ab"/><path d="M-30 4 L-38 0 L-36 8Z" fill="#2c3338"/><circle cx="14" cy="-2" r="1.6" fill="#1b2226"/><path d="M28 -1 L36 1 L28 3Z" fill="#f4b23a"/></g></svg>`,
+    neveria: `<svg viewBox="0 0 320 180" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="gn-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd9b8"/><stop offset="1" stop-color="#f6b48d"/></linearGradient></defs>
+      <rect width="320" height="180" fill="url(#gn-bg)"/><rect y="132" width="320" height="48" fill="#2b6b66"/><rect y="128" width="320" height="8" fill="#f4ede2"/>
+      <path d="M0 14 Q160 34 320 14" fill="none" stroke="#7b4f2e" stroke-width="1.5"/>
+      <g class="gn-flags"><path d="M14 17 h26 l-13 22Z" fill="#e8557a"/><path d="M50 20 h26 l-13 22Z" fill="#f2a33a"/><path d="M86 23 h26 l-13 22Z" fill="#f2cf4a"/><path d="M122 24 h26 l-13 22Z" fill="#46b37b"/><path d="M158 24 h26 l-13 22Z" fill="#3e8ed0"/><path d="M194 24 h26 l-13 22Z" fill="#9b6ad6"/><path d="M230 23 h26 l-13 22Z" fill="#e8557a"/><path d="M266 20 h26 l-13 22Z" fill="#f2a33a"/><path d="M302 17 h26 l-13 22Z" fill="#46b37b"/></g>
+      <g transform="translate(160 0)"><path d="M-34 96 h68 l-8 56 h-52Z" fill="#fffaf2"/><path d="M-33 104 h66 l-1.6 12 h-62.8Z" fill="#2b6b66"/><path d="M-31 122 h62" stroke="#e58c63" stroke-width="4"/>
+        <circle cx="-14" cy="88" r="17" fill="#f6a5b8"/><circle cx="14" cy="88" r="17" fill="#ffc94d"/><circle cx="0" cy="72" r="17" fill="#7a4a2e"/>
+        <path d="M-16 62 C-14 50 -4 46 0 38 C4 46 14 50 16 62 C8 66 -8 66 -16 62Z" fill="#fffdf8"/><circle cx="0" cy="34" r="6" fill="#d8273a"/><path d="M0 28 C2 22 6 19 10 18" stroke="#3d7a3a" stroke-width="2" fill="none"/>
+        <rect x="18" y="40" width="7" height="44" rx="3" fill="#e7b46a" transform="rotate(18 21 62)"/></g>
+      <g fill="#ffffff" opacity=".7"><circle cx="48" cy="80" r="2"/><circle cx="270" cy="70" r="2.5"/><circle cx="250" cy="100" r="1.6"/><circle cx="70" cy="110" r="1.8"/></g></svg>`
+  };
+  function renderLobby() {
+    $('#games-lobby').innerHTML = GAMES.map(g => {
+      const best = myBest(g.id), top = boardOf(g.id)[0];
+      return `<article class="game-card card gc-${g.id}">
+        <button class="gc-art" type="button" data-action="game-play" data-game="${g.id}" aria-label="Play ${esc(g.title)}">${GAME_ART[g.id]}<span class="gc-play">${icon('play')}</span></button>
+        <div class="gc-body">
+          <p class="gc-kind">${esc(g.kind)}</p>
+          <h2 class="gc-title">${esc(g.title)}</h2>
+          <p class="gc-blurb">${esc(g.blurb)}</p>
+          <div class="gc-foot">
+            <button class="btn btn-accent" type="button" data-action="game-play" data-game="${g.id}">${icon('play')}Play</button>
+            <span class="gc-best">${best ? `Your best <b>${esc(fmtScore(g, best))}</b>` : 'Not played yet'}${top && S.user && top.uid !== S.user.uid ? ` · ${esc(firstName((S.byUid[top.uid] || top).name || top.name))} leads with ${esc(fmtScore(g, top.best))}` : ''}</span>
+          </div>
+          <section class="gc-board"><h3>${icon('trophy')}Family leaderboard</h3>${boardHTML(g, 5)}</section>
+        </div>
+      </article>`;
+    }).join('') + (S.scores && S.scores.denied && isAdmin() ? rulesNeededHTML('The family leaderboard') : '');
+  }
+  function renderGameBoard(g) {
+    g = g || (S.game && GAMES.find(x => x.id === S.game.id));
+    const box = $('#game-board');
+    if (!box || !g) return;
+    const best = myBest(g.id);
+    box.innerHTML = `<h3>${icon('trophy')}Family leaderboard</h3>${boardHTML(g, 8)}
+      <p class="gb-you">${best ? `Your best: <b>${esc(fmtScore(g, best))}</b>` : 'Your first game — good luck!'}</p>
+      <p class="gb-help">${icon('sparkle')}<span>${esc(g.help)}</span></p>
+      ${S.scores && S.scores.denied ? `<p class="gb-help">${icon('shield')}<span>Scores stay on this device until the family leaderboard is switched on${isAdmin() ? ' — it needs the latest security rules (see Game Night).' : '.'}</span></p>` : ''}`;
+  }
+  function paintSoundBtn() {
+    const on = soundOn(), b = $('#game-sound');
+    b.setAttribute('aria-pressed', String(on));
+    b.setAttribute('aria-label', on ? 'Sound on' : 'Sound off');
+    b.innerHTML = icon(on ? 'volume' : 'volume-x');
+  }
+  async function playGame(id) {
+    const g = GAMES.find(x => x.id === id);
+    if (!g) return;
+    stopGame();
+    $('#games-lobby').hidden = true;
+    $('#games-head').hidden = true;
+    $('#game-play').hidden = false;
+    $('#game-name').textContent = g.title;
+    paintSoundBtn();
+    renderGameBoard(g);
+    const host = $('#game-host');
+    host.innerHTML = '<div class="skel game-skel"></div>';
+    window.scrollTo(0, 0);
+    try { await loadGame(id); } catch (e) { host.innerHTML = errorHTML('the game'); return; }
+    if (S.view !== 'games' || $('#game-play').hidden || $('#game-name').textContent !== g.title) return;
+    host.innerHTML = '';
+    const api = window.AgrazGames[id].mount(host, { best: myBest(id), reduced: REDUCED, sound: soundOn(), onOver: score => saveScore(g, score) });
+    S.game = { id, api };
+    host.gameApi = api; // lets automated tests drive the game
+  }
+  function stopGame() {
+    if (S.game) { try { S.game.api.destroy(); } catch (e) {} S.game = null; }
+    const host = $('#game-host');
+    if (host) { host.gameApi = null; host.innerHTML = ''; }
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  }
+  async function saveScore(g, score) {
+    score = Math.max(0, Math.floor(Number(score) || 0));
+    const before = myBest(g.id), had = myScore(g.id), leader = boardOf(g.id)[0];
+    if (score > localBest(g.id)) { try { localStorage.setItem('agraz-best-' + g.id, String(score)); } catch (e) {} }
+    if (!had || score > had.best) {
+      const rec = { uid: S.user.uid, game: g.id, best: score, name: myName().slice(0, 80), at: nowIso() };
+      try {
+        await col('scores').doc(`${S.user.uid}_${g.id}`).set(rec);
+        if (!S.scores) S.scores = { list: [], denied: false };
+        S.scores.list = S.scores.list.filter(x => !(x.uid === rec.uid && x.game === rec.game)).concat(rec);
+      } catch (e) { if (denied(e)) S.scores = Object.assign(S.scores || { list: [] }, { denied: true }); }
+    }
+    if (score > before && before > 0) {
+      const lead = leader && leader.uid !== S.user.uid && score > leader.best;
+      toast(lead ? `Top of the family board — ${fmtScore(g, score)}!` : `New personal best: ${fmtScore(g, score)}!`);
+      celebrate($('#game-board'));
+    }
+    if (S.game && S.game.id === g.id) renderGameBoard(g);
+  }
+
   function rulesNeededHTML(what) {
     if (S.rulesOk === undefined && !rulesText) loadRulesText();
     return `<div class="card rules-needed">
@@ -4434,7 +4586,7 @@
     home: renderHome, photos: openPhotos, calendar: openCalendar, updates: openUpdates,
     directory: () => { renderDirectory(); if (!S.members.length) loadMembers().catch(() => { $('#people').innerHTML = errorHTML('the directory'); }); },
     recipes: openRecipes, invite: openInvite, vault: openVault, memorial: openMemorial, profile: renderProfile,
-    globe: openGlobe, stories: openStories, capsules: openCapsules, tree: openTree
+    globe: openGlobe, stories: openStories, capsules: openCapsules, tree: openTree, games: openGames
   };
 
   /* ===================== Events (delegated) ===================== */
@@ -4552,7 +4704,22 @@
       case 'vault-bio-off': disableBio(); break;
       case 'manage-member': openMemberDialog(t.dataset.uid); break;
       case 'check-rules': S.rulesOk = undefined; renderInvite(); break;
-      case 'tree-retry': S.tree = null; S.rulesOk = undefined; openTree(); break;
+      case 'tree-retry': S.rulesOk = undefined; if (S.view === 'games') { S.scores = null; openGames(); } else { S.tree = null; openTree(); } break;
+      case 'game-play': playGame(t.dataset.game); break;
+      case 'game-exit': stopGame(); openGames(); break;
+      case 'game-sound': {
+        const on = !soundOn();
+        try { localStorage.setItem('agraz-game-sound', on ? 'on' : 'off'); } catch (e) {}
+        if (S.game) S.game.api.setSound(on);
+        paintSoundBtn();
+        break;
+      }
+      case 'game-full': {
+        const el = $('#game-host');
+        if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+        else if (el.requestFullscreen) el.requestFullscreen().then(() => el.focus()).catch(() => {});
+        break;
+      }
       case 'tree-focus': treeFocus(t.dataset.pid); $('#tree-search').value = ''; break;
       case 'tree-view': if (S.tree) { S.tree.view = t.dataset.v; $$('.tree-seg button').forEach(b => b.setAttribute('aria-selected', String(b === t))); paintTree(true); } break;
       case 'tree-back': if (S.tree && S.tree.history.length) { S.tree.focus = S.tree.history.pop(); paintTree(true); } break;

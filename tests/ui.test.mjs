@@ -865,6 +865,52 @@ try {
     await done(notAdmin, 'family tree (link, not an admin)');
   }
 
+  console.log('— game night');
+  {
+    const g = await open('/family/#games', { signedIn: true, scores: { u2_gull: { uid: 'u2', game: 'gull', best: 23, name: 'Maria Agraz', at: '2026-09-01' } } });
+    await g.waitForTimeout(SLOW * 1200);
+    const lobby = await g.textContent('#games-lobby');
+    ok((await g.$$('.game-card')).length === 2 && lobby.includes('Gaviota') && lobby.includes('La Nevería'), 'Game Night has Gaviota and La Nevería');
+    ok((await g.textContent('.gc-gull .gc-board')).includes('Maria') && (await g.textContent('.gc-gull .gc-board')).includes('23'), 'each game shows the family leaderboard');
+    await g.click('.gc-gull .btn-accent');
+    await g.waitForTimeout(SLOW * 1200);
+    const phase = () => g.evaluate(() => document.getElementById('game-host').gameApi.state().phase);
+    ok(await g.evaluate(() => !!document.querySelector('#game-host canvas')) && (await phase()) === 'ready', 'Gaviota opens, ready to fly');
+    await g.keyboard.press('Space');
+    await g.waitForTimeout(SLOW * 300);
+    ok((await phase()) === 'playing', 'Space (or a tap) takes off');
+    await g.waitForTimeout(SLOW * 2500);
+    const saved = await store(g, () => window.__store.scores.u1_gull);
+    ok((await phase()) === 'over' && saved && saved.best === 0 && saved.uid === 'u1' && saved.name === 'Jordon Agraz', 'without flapping the gull lands in the sea, and the score goes on the family board');
+    ok((await g.textContent('#game-board')).includes('Jordon'), 'you appear on the board beside the game');
+    await g.click('[data-action=game-sound]');
+    ok((await g.getAttribute('#game-sound', 'aria-pressed')) === 'false', 'sound can be switched off');
+    await g.click('[data-action=game-exit]');
+    await g.waitForTimeout(SLOW * 400);
+    ok(await g.evaluate(() => !document.querySelector('#game-host canvas')) && await g.isVisible('#games-lobby'), 'back to all games, and the game is put away');
+    await g.click('.gc-neveria .btn-accent');
+    await g.waitForTimeout(SLOW * 1500);
+    const res = await g.evaluate(() => {
+      const api = document.getElementById('game-host').gameApi, d = api.debug;
+      api.start(); d.arrive(); d.take(); d.makePerfect(); d.serve();
+      const last = (api.state().results || []).slice(-1)[0] || {};
+      return { stars: last.stars, tip: last.tip };
+    });
+    ok(res.stars === 5 && res.tip > 0, 'La Nevería: a perfectly made order earns five stars and a tip');
+    await g.evaluate(() => { const d = document.getElementById('game-host').gameApi.debug; d.dismiss(); d.fastForward(900); });
+    await g.waitForTimeout(SLOW * 900);
+    const nev = await store(g, () => window.__store.scores.u1_neveria);
+    ok((await phase()) === 'over' && nev && nev.best >= res.tip, 'when the shift ends, the tips go on the family board');
+    await go(g, 'home');
+    ok(await g.evaluate(() => !document.querySelector('#game-host canvas')), 'leaving Game Night puts the game away');
+    await done(g, 'game night');
+
+    const old = await open('/family/#games', { signedIn: true, role: 'owner', oldRules: true });
+    await old.waitForTimeout(SLOW * 1200);
+    ok(!!(await old.$('#games-lobby .rules-needed')) && (await old.$$('.game-card')).length === 2, 'before the leaderboard rules are published the games still work, and admins see how to switch the board on');
+    await done(old, 'game night (rules not published)');
+  }
+
   console.log('— install prompt + sign out');
   {
     const ua = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';

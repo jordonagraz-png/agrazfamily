@@ -385,6 +385,24 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ---- Game night: each member's best score in each game ----
+    // One doc per member per game ("<uid>_<game>"); a best can only go up.
+    match /scores/{id} {
+      function validScore() {
+        return id == request.auth.uid + '_' + request.resource.data.game
+          && request.resource.data.keys().hasOnly(['uid', 'game', 'best', 'name', 'at'])
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.game in ['gull', 'neveria']
+          && request.resource.data.best is int && request.resource.data.best >= 0 && request.resource.data.best <= 1000000
+          && str(request.resource.data.name, 1, 80)
+          && request.resource.data.at is string;
+      }
+      allow read:   if isMember();
+      allow create: if isMember() && validScore();
+      allow update: if isMember() && validScore() && request.resource.data.best > resource.data.best;
+      allow delete: if isMember() && (resource.data.uid == request.auth.uid || isAdmin());
+    }
+
     // ---- Family tree photos: one small portrait per person ----
     match /treePhotos/{pid} {
       function validTreePhoto() {
