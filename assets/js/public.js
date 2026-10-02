@@ -13,6 +13,9 @@
   if (legacy[h]) { location.replace('/family/#' + legacy[h]); return; }
 
   var REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // The ?v= stamp this script was loaded with — reused for anything it loads later.
+  var ASSET_V = (function () { try { return new URL(document.currentScript.src).search; } catch (e) { return ''; } })();
+  var root = document.documentElement;
 
   /* ---------- the hero follows the sun (photo chosen + preloaded in <head>) ---------- */
   var hero = document.getElementById('hero-img');
@@ -21,7 +24,31 @@
     hero.srcset = [800, 1600, 2400].map(function (w) { return u + w + ' ' + w + 'w'; }).join(', ');
     hero.src = u + '1600';
   }
-  var root = document.documentElement;
+
+  /* ---------- …and the sea in it moves (assets/js/livephoto.js, shared with the hub) ---------- */
+  // Where the sea is in each photo (fractions of its height) and how lively it is — the same numbers
+  // the hub's welcome photo uses (assets/css/portal.css, --tod-*): horizon, sea end, calm, glitter, stars, sun rays.
+  var LIVE = { dawn: [0.39, 0.75, 0.85, 1, 0, 1], day: [0.535, 0.8, 0.85, 1, 0, 0.7], dusk: [0.54, 1, 1, 1, 0, 0.9], night: [0.695, 1, 0.3, 0.35, 1, 0] };
+  function liveHero() {
+    var media = hero && hero.parentElement, n = LIVE[root.getAttribute('data-tod')] || LIVE.dusk;
+    var src = hero && (hero.currentSrc || hero.src);
+    if (!media || !src || !/^https:\/\/images\.unsplash\.com\//.test(src)) return;
+    var pos = getComputedStyle(hero).objectPosition.split(/\s+/).map(function (v) { return /%$/.test(v) ? parseFloat(v) / 100 : 0.5; });
+    var sc = document.createElement('script');
+    sc.src = '/assets/js/livephoto.js' + ASSET_V;
+    sc.onload = function () {
+      if (!window.AgrazLive) return;
+      window.AgrazLive.mount(media, { src: src, posX: pos[0], posY: pos[1] === undefined ? 0.5 : pos[1], horizon: n[0], seaEnd: n[1], calm: n[2], glitter: n[3], stars: n[4], sunRays: n[5] });
+    };
+    document.head.appendChild(sc);
+  }
+  if (hero && !REDUCED && !navigator.webdriver) {
+    // Wait for the photo's settling zoom to finish, so the moving copy lines up with it exactly.
+    var started = false, go = function () { if (!started) { started = true; liveHero(); } };
+    var zoom = hero.getAnimations ? hero.getAnimations().filter(function (a) { return a.animationName === 'heroZoom'; })[0] : null;
+    if (zoom) zoom.finished.then(go, go); else setTimeout(go, 3300);
+    hero.addEventListener('error', function () { started = true; }, { once: true }); // no photo, nothing to bring to life
+  }
 
   /* ---------- theme ---------- */
   function effectiveTheme() {
@@ -97,6 +124,20 @@
     };
     window.addEventListener('scroll', function () { if (!ticking) { ticking = true; requestAnimationFrame(update); } }, { passive: true });
     update();
+  }
+
+  /* ---------- the hero photo drifts a little slower than the page as it scrolls away ---------- */
+  var heroMedia = document.querySelector('.hero-media');
+  if (heroMedia && !REDUCED) {
+    var heroTick = false;
+    var drift = function () {
+      heroTick = false;
+      var y = window.scrollY;
+      if (y > window.innerHeight * 1.5) return;
+      heroMedia.style.transform = y > 0 ? 'translate3d(0,' + (y * 0.12).toFixed(1) + 'px,0)' : '';
+    };
+    window.addEventListener('scroll', function () { if (!heroTick) { heroTick = true; requestAnimationFrame(drift); } }, { passive: true });
+    drift();
   }
 
   /* ---------- misc ---------- */
