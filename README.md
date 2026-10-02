@@ -38,7 +38,8 @@ one the Invite page creates.
 Until steps 1–3 are done, existing members can still sign in, but **new people
 can't join** (they'll see "That invite code isn't right") and the newer
 features (Vault, profiles, recipes, RSVPs, hearts, comments, guestbook,
-candles) show "needs the latest security rules".
+candles, Family Globe, Voice Stories, Time Capsules) show "needs the latest
+security rules".
 
 **Publishing the rules is what actually protects the family's data.** The
 site itself won't let anyone join without a server-checked code, but until the
@@ -99,13 +100,30 @@ Everything lives in the hub under **Invite family** (sidebar, the phone's
   automatically. Everyone can **RSVP** (Going / Maybe / Can't go) and **add
   any event to their own calendar** (Apple, Outlook or Google)
 - **Updates** — a family feed with hearts and comments
+- **Family Globe** — a live, spinning Earth showing where everyone lives,
+  with the real day/night line (computed from the sun's position), everyone's
+  local time, distances, and **Family clocks**: slide through the next 24
+  hours to see who's awake, and it suggests the best time for a family call.
+  Each person adds their own spot (tap the globe or "Use my location", rounded
+  to about 7 miles — never a street address)
+- **Voice Stories** — record family members telling their stories, right in
+  the browser, with a live waveform and story starters ("How did you two
+  meet?"). Everyone can listen, heart and replay them
+- **Time Capsules** — write a letter (and tuck in a photo) that stays
+  **sealed until a date you choose** — a grandchild's 18th birthday, next New
+  Year's, ten years from now. The seal is enforced by the security rules on
+  Google's servers, so nobody can open it early in the hub, not even the person
+  who wrote it. When the day comes, the hub announces it and opens it with a
+  little ceremony
 - **Recipes** — the family recipe book: photos, tick-off ingredients,
   numbered steps, search, and a clean print layout
 - **Directory** — everyone's phone, email, birthday and address (each person edits their own)
 - **Family Vault** — shared notes for emergency contacts, doctors, insurance,
-  Wi-Fi… Opening it asks for your password again; notes stay hidden until
-  tapped, and it **locks itself** after 5 idle minutes or when you leave the
-  tab. *Don't store bank passwords or full SSNs.*
+  Wi-Fi… Opening it asks for your password again — or, once you turn on
+  **quick unlock**, Face ID / Touch ID / fingerprint / Windows Hello (a passkey
+  kept on that device). Notes stay hidden until tapped, and it **locks itself**
+  after 5 idle minutes or when you leave the tab. *Don't store bank passwords
+  or full SSNs.*
 - **In Memory** — the memorial for Hector: the family's photos, **light a
   candle**, and a guestbook of shared memories
 - **Invite family** — share an invite link (code built in) by text, email or
@@ -117,9 +135,19 @@ Everything lives in the hub under **Invite family** (sidebar, the phone's
   the time of day (first light, midday, golden hour, and a starry night)
 - **Install as an app** — phones get a one-time tip to add the hub to their
   home screen
+- **Smooth page transitions** in browsers that support them (View Transitions)
 
 Photos are stored in Firestore (resized in the browser to stay under the 1 MB
-document limit). Nothing private is ever stored in this repository.
+document limit), and so are voice recordings (compressed speech, split into
+parts of under 1 MB; a 5-minute story is about 1.2 MB). Nothing private is
+ever stored in this repository.
+
+**About the seals and locks:** a time capsule can't be read early *through the
+hub* — the rules refuse to hand it over. Like everything in the database, it's
+still visible to whoever manages the Firebase project in the Firebase console,
+so treat the console like the family safe. Quick unlock protects the vault on a
+phone or computer that's already signed in; the vault's notes are still
+protected by the rules either way.
 
 ## Editing the public site
 
@@ -146,10 +174,13 @@ assets/css/public.css Public site styles
 assets/css/portal.css Family Hub styles
 assets/js/public.js   Public site interactions
 assets/js/portal.js   Family Hub app (Firebase Auth + Firestore)
+assets/js/globe.js    Family Globe renderer (canvas, no libraries; loaded on demand)
+assets/data/land.bin  Land mask for the globe (5 KB, from Natural Earth — public domain)
 assets/icons.svg      Icon set + logo mark
 firestore.rules       Server-side security rules (publish in Firebase)
 sw.js                 Service worker (offline shell; never caches private data)
 tests/                Security-rule + UI tests (run on every push)
+tools/                make-land-mask.mjs rebuilds assets/data/land.bin
 ```
 
 No build step — it's static HTML/CSS/JS served by GitHub Pages. Both pages ship
@@ -166,16 +197,19 @@ npm run serve        # http://127.0.0.1:8080/
 
 Every push runs two test suites on GitHub (see *Actions → Tests*):
 
-- **Security rules** (`tests/rules.test.mjs`) — ~125 checks against the
+- **Security rules** (`tests/rules.test.mjs`) — ~170 checks against the
   Firestore emulator: outsiders and wrong invite codes are locked out, the code
   can't be read, pending members see nothing, nobody can heart/RSVP/comment as
   someone else, removed members lose access, only the owner can make admins
-  and nobody can demote the owner.
-- **UI** (`tests/ui.test.mjs`) — ~160 end-to-end checks in a real browser with
-  a fake Firebase: sign-in, joining and approval, RSVPs and calendar invites,
-  hearts and comments, recipes and printing, candles and guestbook, vault
-  locking, birthday banner, follows-the-sun, and that private content is
-  cleared on sign-out.
+  and nobody can demote the owner, a sealed time capsule can't be read (or
+  swapped) before its day, and voice recordings can't be faked or replaced.
+- **UI** (`tests/ui.test.mjs`) — ~240 end-to-end checks in a real browser with
+  a fake Firebase, a fake microphone and a virtual fingerprint sensor: sign-in,
+  joining and approval, RSVPs and calendar invites, hearts and comments,
+  recipes and printing, candles and guestbook, vault locking and quick unlock,
+  the globe and family clocks, recording and playing voice stories, sealing and
+  opening time capsules, birthday banner, follows-the-sun, and that private
+  content is cleared on sign-out.
 
 Run them yourself with `npm install` then `npm test` (needs Node 20+ and Java
 for the emulator). To publish rules from the command line: `npm run deploy:rules`.
@@ -190,4 +224,7 @@ for the emulator). To publish rules from the command line: `npm run deploy:rules
 | The Invite page says "ask a family admin" | Open your one-time owner link while signed in (or add `role: "owner"` to your `users` doc) |
 | "That owner link didn't work" | Publish the latest rules, sign in first, and use the link only once — the family may already have an owner |
 | JARVIS opens the wrong address | My Profile → Preferences → JARVIS address (saved per device) |
+| "Record a story" can't use the microphone | Allow the microphone for agrazfamily.com in the browser's site settings |
+| "Use my location" doesn't work | Allow location for the site — or just tap the globe where you live |
+| A capsule says "Almost — it opens any moment now" | The phone's clock is a little ahead of Google's; try again in a minute |
 | Forgot password | "Forgot password?" on the sign-in screen emails a reset link |

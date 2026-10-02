@@ -1,6 +1,7 @@
 # GitHub Pages: publish the site files only (tests and tooling stay in the repo).
 exclude:
   - tests
+  - tools
   - node_modules
   - package.json
   - package-lock.json

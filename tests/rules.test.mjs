@@ -3,7 +3,7 @@
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { doc, getDoc, setDoc, updateDoc, addDoc, collection, getDocs, deleteDoc, query, where, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, addDoc, collection, getDocs, deleteDoc, query, where, writeBatch, Bytes } from 'firebase/firestore';
 
 // The real owner key is never in the repo; tests swap in the fingerprint of a throwaway key.
 const TEST_OWNER_KEY = 'test-owner-key-for-ci-only';
@@ -194,6 +194,75 @@ await t('admin removes anyone\'s guestbook memory', deleteDoc(doc(alice, 'tribut
 await t('members still cannot delete others\' memories', deleteDoc(doc(mia, 'tributes/t1')), false);
 await t('admin removes a member', deleteDoc(doc(alice, 'users/mia')), true);
 await t('owner removes an admin', deleteDoc(doc(owen, 'users/alice')), true);
+
+console.log('— family globe');
+await seed();
+const spot = { lat: 25.8, lng: -80.2, label: 'Miami, FL', tz: 'America/New_York' };
+await t('put yourself on the globe', updateDoc(doc(bob, 'users/bob'), { place: spot }), true);
+await t('take yourself off the globe', updateDoc(doc(bob, 'users/bob'), { place: null }), true);
+await t('globe spot needs real coordinates', updateDoc(doc(bob, 'users/bob'), { place: { ...spot, lat: 123 } }), false);
+await t('globe spot needs a place name', updateDoc(doc(bob, 'users/bob'), { place: { lat: 1, lng: 2 } }), false);
+await t('globe spot rejects extra fields', updateDoc(doc(bob, 'users/bob'), { place: { ...spot, street: '12 Seagrape Ln' } }), false);
+await t('cannot move someone else\'s pin', updateDoc(doc(bob, 'users/alice'), { place: spot }), false);
+
+console.log('— time capsules');
+await seed();
+const HOUR = 3600e3, YEAR = 365 * 24 * HOUR;
+await env.withSecurityRulesDisabled(async c => {
+  const db = c.firestore();
+  await setDoc(doc(db, 'capsules/old'), { title: 'Opened already', uid: 'alice', author: 'Alice', createdAt: 'x', openAt: Date.now() - HOUR, hasPhoto: false });
+  await setDoc(doc(db, 'capsuleLetters/old'), { text: 'Hello from the past', uid: 'alice' });
+  await setDoc(doc(db, 'capsules/later'), { title: 'Not yet', uid: 'alice', author: 'Alice', createdAt: 'x', openAt: Date.now() + YEAR, hasPhoto: false });
+  await setDoc(doc(db, 'capsuleLetters/later'), { text: 'Secret until next year', uid: 'alice' });
+  await setDoc(doc(db, 'users/dan'), { name: 'Dan', email: 'dan@x.com', uid: 'dan', joinedDate: 'x' });
+});
+const dan = as('dan', 'dan@x.com');
+const capsule = (over = {}) => ({ title: 'For Sofia at 18', to: 'Sofia', uid: 'bob', author: 'Bob Agraz', createdAt: 'x', openAt: Date.now() + YEAR, hasPhoto: false, ...over });
+const seal = (db, id, cap, letter) => { const b = writeBatch(db); b.set(doc(db, `capsules/${id}`), cap); if (letter) b.set(doc(db, `capsuleLetters/${id}`), letter); return b.commit(); };
+await t('members see sealed capsules (but not what\'s inside)', getDocs(collection(bob, 'capsules')), true);
+await t('a sealed letter can\'t be read early — not even by its writer', getDoc(doc(alice, 'capsuleLetters/later')), false);
+await t('nobody else can read it early either', getDoc(doc(bob, 'capsuleLetters/later')), false);
+await t('letters can\'t be listed', getDocs(collection(bob, 'capsuleLetters')), false);
+await t('once the day comes, the family can read it', getDoc(doc(bob, 'capsuleLetters/old')), true);
+await t('outsiders can\'t read opened letters', getDoc(doc(eve, 'capsuleLetters/old')), false);
+await t('seal a capsule with its letter', seal(bob, 'k1', capsule(), { text: 'Dear Sofia…', uid: 'bob' }), true);
+await t('seal one with a photo', seal(bob, 'k2', capsule({ hasPhoto: true }), { text: 'Look at us!', photo: IMG, uid: 'bob' }), true);
+await t('a capsule needs its letter', seal(bob, 'k3', capsule(), null), false);
+await t('the opening day must be in the future', seal(bob, 'k4', capsule({ openAt: Date.now() - HOUR }), { text: 'x', uid: 'bob' }), false);
+await t('…and less than 100 years away', seal(bob, 'k5', capsule({ openAt: Date.now() + 101 * YEAR }), { text: 'x', uid: 'bob' }), false);
+await t('cannot seal one in someone else\'s name', seal(bob, 'k6', capsule({ uid: 'alice' }), { text: 'x', uid: 'bob' }), false);
+await t('cannot swap the letter in a sealed capsule', setDoc(doc(alice, 'capsuleLetters/later'), { text: 'Replaced!', uid: 'alice' }), false);
+await t('cannot slip a letter into someone else\'s capsule', (async () => { await deleteDoc(doc(alice, 'capsuleLetters/later')); await setDoc(doc(bob, 'capsuleLetters/later'), { text: 'Mine now', uid: 'bob' }); })(), false);
+await t('cannot change a capsule\'s opening day', updateDoc(doc(bob, 'capsules/k1'), { openAt: Date.now() + 2 * HOUR }), false);
+await t('cannot mark a sealed capsule as opened', updateDoc(doc(bob, 'capsules/k1'), { 'openedBy.bob': true }), false);
+await t('mark an opened capsule as read', updateDoc(doc(bob, 'capsules/old'), { 'openedBy.bob': true }), true);
+await t('cannot mark it read for someone else', updateDoc(doc(bob, 'capsules/old'), { 'openedBy.alice': true }), false);
+await t('the writer can delete their capsule', deleteDoc(doc(bob, 'capsules/k2')), true);
+await t('other members cannot delete it', deleteDoc(doc(dan, 'capsules/k1')), false);
+await t('admins can remove any capsule', deleteDoc(doc(alice, 'capsules/k1')), true);
+
+console.log('— voice stories');
+await seed();
+await env.withSecurityRulesDisabled(c => setDoc(doc(c.firestore(), 'users/dan'), { name: 'Dan', email: 'dan@x.com', uid: 'dan', joinedDate: 'x' }));
+const audio = n => Bytes.fromUint8Array(new Uint8Array(n).fill(7));
+const story = (over = {}) => ({ title: 'How we met', prompt: 'How did you two meet?', uid: 'bob', author: 'Bob Agraz', createdAt: 'x', duration: 42.5, mime: 'audio/webm;codecs=opus', parts: 1, peaks: 'AAECAwQ=', ...over });
+const record = (db, id, st, parts) => { const b = writeBatch(db); b.set(doc(db, `stories/${id}`), st); parts.forEach((p, n) => b.set(doc(db, `storyAudio/${id}_${n}`), { story: id, n, data: p, uid: st.uid })); return b.commit(); };
+await t('save a voice story', record(bob, 's1', story(), [audio(2000)]), true);
+await t('save a long one in three parts', record(bob, 's2', story({ parts: 3, mime: 'audio/mp4' }), [audio(900000), audio(900000), audio(1000)]), true);
+await t('members can listen', getDocs(query(collection(alice, 'storyAudio'), where('story', '==', 's1'))), true);
+await t('outsiders cannot listen', getDocs(query(collection(eve, 'storyAudio'), where('story', '==', 's1'))), false);
+await t('a story needs its audio', record(bob, 's3', story(), []), false);
+await t('audio parts are at most 900 KB', record(bob, 's4', story(), [audio(900001)]), false);
+await t('audio must be audio bytes', (() => { const b = writeBatch(bob); b.set(doc(bob, 'stories/s5'), story()); b.set(doc(bob, 'storyAudio/s5_0'), { story: 's5', n: 0, data: 'not bytes', uid: 'bob' }); return b.commit(); })(), false);
+await t('only audio types are allowed', record(bob, 's6', story({ mime: 'text/html' }), [audio(10)]), false);
+await t('cannot add audio to someone else\'s story', setDoc(doc(alice, 'storyAudio/s1_1'), { story: 's1', n: 1, data: audio(10), uid: 'alice' }), false);
+await t('cannot replace a story\'s audio later', setDoc(doc(bob, 'storyAudio/s1_2'), { story: 's1', n: 2, data: audio(10), uid: 'bob' }), false);
+await t('cannot record in someone else\'s name', record(bob, 's7', story({ uid: 'alice' }), [audio(10)]), false);
+await t('heart a story', updateDoc(doc(alice, 'stories/s1'), { 'hearts.alice': true }), true);
+await t('cannot retitle someone else\'s story', updateDoc(doc(alice, 'stories/s1'), { title: 'Mine' }), false);
+await t('other members cannot delete a story', deleteDoc(doc(dan, 'stories/s1')), false);
+await t('the storyteller can delete it', deleteDoc(doc(bob, 'stories/s2')), true);
+await t('admins can remove any story', deleteDoc(doc(alice, 'stories/s1')), true);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 await env.cleanup();

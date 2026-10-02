@@ -1,13 +1,31 @@
 /* Test double for the Firebase compat SDK subset used by assets/js/portal.js.
    Loaded by tests/ui.test.mjs in place of https://www.gstatic.com/firebasejs/…/firebase-app-compat.js.
    Options (set window.__MOCK before load): signedIn, newUser, empty, bdayToday, admin (false = plain member),
-   role ('admin' | 'owner'), requireApproval, noInvite. The test owner key is 'test-owner-key'.
+   role ('admin' | 'owner'), requireApproval, noInvite, placed (you're on the Family Globe).
+   The test owner key is 'test-owner-key'.
    Optional window.__IMG = { photos: [...dataUrls], memorial: [...], av1 } to use real photos. */
 (function () {
   const M = window.__MOCK || {};
   const delay = (v, ms = 60) => new Promise(r => setTimeout(() => r(v), ms));
   const fail = (code, ms = 60) => new Promise((_, rej) => setTimeout(() => rej(Object.assign(new Error(code), { code })), ms));
-  const clone = v => JSON.parse(JSON.stringify(v));
+  // firebase.firestore.Blob stand-in (audio bytes for voice stories)
+  class MockBlob {
+    constructor(b64) { this.b64 = b64; }
+    static fromUint8Array(u8) { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return new MockBlob(btoa(s)); }
+    toUint8Array() { const s = atob(this.b64), u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; }
+    toJSON() { return { __blob: this.b64 }; }
+  }
+  const clone = v => JSON.parse(JSON.stringify(v), (k, x) => (x && typeof x === 'object' && typeof x.__blob === 'string' ? new MockBlob(x.__blob) : x));
+  // A short, real WAV (a few gentle tones) so stories can actually play in tests.
+  function toneWav(seconds, base) {
+    const rate = 8000, n = Math.round(seconds * rate), v = new DataView(new ArrayBuffer(44 + n));
+    const w = (o, str) => { for (let i = 0; i < str.length; i++) v.setUint8(o + i, str.charCodeAt(i)); };
+    w(0, 'RIFF'); v.setUint32(4, 36 + n, true); w(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, rate, true); v.setUint32(28, rate, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true); w(36, 'data'); v.setUint32(40, n, true);
+    for (let i = 0; i < n; i++) v.setUint8(44 + i, 128 + Math.round(40 * Math.sin(2 * Math.PI * (base + 40 * Math.floor(i / 2000)) * i / rate) * Math.sin(Math.PI * (i % 2000) / 2000)));
+    return MockBlob.fromUint8Array(new Uint8Array(v.buffer));
+  }
+  const peaks = seed => btoa(String.fromCharCode(...Array.from({ length: 96 }, (_, i) => Math.round(70 + 120 * Math.abs(Math.sin(i / (3 + seed)) * Math.cos(i / 7))))));
   const day = off => { const d = new Date(); d.setDate(d.getDate() + off); return d.toISOString().slice(0, 10); };
   const ago = h => new Date(Date.now() - h * 3600e3).toISOString();
   const md = () => { const d = new Date(); return `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
@@ -78,6 +96,26 @@
       t1: { text: 'He taught every one of us to fish off the pier — and to be patient when nothing was biting.', uid: 'u3', author: 'Daniel Agraz', createdAt: ago(400) },
       t2: { text: 'Sunday mornings will always smell like his café con leche.', uid: 'u2', author: 'Maria Agraz', createdAt: ago(200) }
     },
+    stories: {
+      st1: { title: 'How Grandma and Grandpa met', prompt: 'How did you two meet?', uid: 'u2', author: 'Maria Agraz', createdAt: ago(30), duration: 3, mime: 'audio/wav', parts: 1, peaks: peaks(1), hearts: { u1: true, u3: true } },
+      st2: { title: 'Marco’s famous grill toast', uid: 'u6', author: 'Marco Agraz', createdAt: ago(120), duration: 2, mime: 'audio/wav', parts: 1, peaks: peaks(2) },
+      st3: { title: 'Sofia sings “Cielito Lindo”', prompt: '', uid: 'u4', author: 'Sofia Agraz', createdAt: ago(400), duration: 2.5, mime: 'audio/wav', parts: 1, peaks: peaks(3) }
+    },
+    storyAudio: {
+      st1_0: { story: 'st1', n: 0, data: toneWav(3, 330), uid: 'u2' },
+      st2_0: { story: 'st2', n: 0, data: toneWav(2, 392), uid: 'u6' },
+      st3_0: { story: 'st3', n: 0, data: toneWav(2.5, 440), uid: 'u4' }
+    },
+    capsules: {
+      k1: { title: 'For Sofia’s 18th birthday', to: 'Sofia', uid: 'u2', author: 'Maria Agraz', createdAt: ago(2000), openAt: Date.now() + 4 * 365 * 864e5, hasPhoto: false },
+      k2: { title: 'Our first year in the hub', to: 'The whole family', uid: 'u1', author: 'Jordon Agraz', createdAt: ago(8760), openAt: Date.now() - 2 * 3600e3, hasPhoto: true, openedBy: { u3: true } },
+      k3: { title: 'Open on New Year’s Day', uid: 'u3', author: 'Daniel Agraz', createdAt: ago(300), openAt: Date.now() + 90 * 864e5, hasPhoto: false }
+    },
+    capsuleLetters: {
+      k1: { text: 'Dear Sofia,\n\nToday you scored your first goal and ran straight to the stands to hug me.', uid: 'u2' },
+      k2: { text: 'Dear family,\n\nA year ago we put this little corner of the internet together so we’d never lose a photo, a recipe or a story again.\n\nLook how far we’ve come.\nLove,\nJordon', uid: 'u1' },
+      k3: { text: 'Happy New Year! Did we keep our resolutions?', uid: 'u3' }
+    },
     candles: {
       u2: { name: 'Maria Agraz', litAt: ago(300) },
       u3: { name: 'Daniel Agraz', litAt: ago(250) },
@@ -94,7 +132,14 @@
   IMG.memorial.forEach((src, i) => { store.memorial['h' + i] = { imageData: src, uploadedBy: 'Maria Agraz', uid: 'u2', order: 1000 + i, createdAt: ago(1000 + i) }; });
   Object.values(store.memories).forEach(m => { if (!m.hearts) delete m.hearts; });
   if (!store.users.u1.role) delete store.users.u1.role;
-  if (M.empty) ['events', 'updates', 'memories', 'vault', 'memorial', 'recipes', 'tributes', 'candles', 'comments'].forEach(k => { store[k] = {}; });
+  // Family Globe spots (u1 only with placed: true)
+  Object.assign(store.users.u2, { place: { lat: 25.7, lng: -80.2, label: 'Key Biscayne, FL', tz: 'America/New_York' } });
+  Object.assign(store.users.u3, { place: { lat: 40.4, lng: -3.7, label: 'Madrid, Spain', tz: 'Europe/Madrid' } });
+  Object.assign(store.users.u5, { place: { lat: 30.3, lng: -97.7, label: 'Austin, TX', tz: 'America/Chicago' } });
+  Object.assign(store.users.u6, { place: { lat: 26.1, lng: -80.1, label: 'Fort Lauderdale, FL', tz: 'America/New_York' } });
+  if (M.placed) store.users.u1.place = { lat: 25.8, lng: -80.2, label: 'Miami, FL', tz: 'America/New_York' };
+  store.capsuleLetters.k2.photo = IMG.photos[4];
+  if (M.empty) ['events', 'updates', 'memories', 'vault', 'memorial', 'recipes', 'tributes', 'candles', 'comments', 'capsules', 'capsuleLetters', 'stories', 'storyAudio'].forEach(k => { store[k] = {}; });
   if (M.newUser) delete store.users.u1;
   if (M.noInvite) delete store.config.invite;
 
@@ -150,7 +195,7 @@
       limit: n => next({ n }),
       startAfter: s => next({ after: s.id }),
       get() {
-        if (!member()) return fail('permission-denied');
+        if (!member() || c === 'capsuleLetters') return fail('permission-denied');
         let ids = Object.keys(store[c]).filter(id => o.wheres.every(w => matches(store[c][id], w)));
         if (o.f) ids.sort((a, b) => { const x = store[c][a][o.f], y = store[c][b][o.f]; return (x > y ? 1 : x < y ? -1 : 0) * (o.dir === 'desc' ? -1 : 1); });
         if (o.after) ids = ids.slice(ids.indexOf(o.after) + 1);
@@ -160,6 +205,7 @@
       },
       add(data) { if (!member()) return fail('permission-denied'); const id = 'auto' + (auto++); store[c][id] = clone(data); return delay({ id }); },
       doc(id) {
+        id = id || 'auto' + (auto++);
         return {
           id,
           get: () => {
@@ -168,6 +214,8 @@
             if (c === 'users' && id !== current.uid && !member()) return fail('permission-denied');
             if (c === 'config' && !(admin() && id === 'invite')) return fail('permission-denied');
             if (c !== 'users' && c !== 'joins' && !member()) return fail('permission-denied');
+            // like firestore.rules: a time capsule's letter stays sealed until its day
+            if (c === 'capsuleLetters' && !(store.capsules[id] && store.capsules[id].openAt <= Date.now())) return fail('permission-denied');
             return delay(snapDoc(c, id));
           },
           set(data) {
@@ -179,6 +227,7 @@
             if (c === 'config' && id === 'owner') {
               if (store.config.owner || !member() || data.uid !== current.uid || data.key !== 'test-owner-key') return fail('permission-denied');
             } else if (c === 'config' && !(admin() && id === 'invite' && /^[A-Za-z0-9-]{6,64}$/.test(data.code || ''))) return fail('permission-denied');
+            if (c === 'capsules' && !(member() && typeof data.openAt === 'number' && data.openAt > Date.now() + 3600e3 && data.uid === current.uid)) return fail('permission-denied');
             store[c][id] = clone(data);
             return delay();
           },
@@ -213,6 +262,8 @@
   const authFn = () => auth;
   authFn.Auth = { Persistence: { LOCAL: 'local', SESSION: 'session' } };
   authFn.EmailAuthProvider = { credential: (email, password) => ({ email, password }) };
-  window.firebase = { initializeApp() {}, auth: authFn, firestore: () => db };
+  const fsFn = () => db;
+  fsFn.Blob = MockBlob;
+  window.firebase = { initializeApp() {}, auth: authFn, firestore: fsFn };
   window.__store = store;
 })();

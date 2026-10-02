@@ -25,6 +25,8 @@ rules_version = '2';
 //    post or comment.
 //  • To remove someone: delete their users/{uid} doc (admins can do this from
 //    the site too) and disable their account under Authentication → Users.
+//  • Time capsule letters (capsuleLetters) can't be read by anyone before their
+//    capsule's openAt time — the seal is enforced here, not by the website.
 // ============================================================================
 
 service cloud.firestore {
@@ -106,8 +108,15 @@ service cloud.firestore {
 
     // ---- Member profiles (the family directory) ----
     match /users/{uid} {
+      // Your spot on the Family Globe: rounded coordinates, a place name, your time zone.
+      function validPlace(p) {
+        return p is map && p.keys().hasOnly(['lat', 'lng', 'label', 'tz'])
+          && p.lat is number && p.lat >= -90 && p.lat <= 90
+          && p.lng is number && p.lng >= -180 && p.lng <= 180
+          && str(p.label, 1, 60) && optStr(p, 'tz', 64);
+      }
       function validProfile(d) {
-        return d.keys().hasOnly(['name', 'email', 'uid', 'joinedDate', 'phone', 'birthday', 'address', 'bio', 'avatar', 'approved', 'role'])
+        return d.keys().hasOnly(['name', 'email', 'uid', 'joinedDate', 'phone', 'birthday', 'address', 'bio', 'avatar', 'approved', 'role', 'place'])
           && d.uid == uid
           && str(d.name, 1, 80)
           && optStr(d, 'email', 254) && optStr(d, 'joinedDate', 40)
@@ -115,7 +124,8 @@ service cloud.firestore {
           && optStr(d, 'address', 300) && optStr(d, 'bio', 280)
           && (!('avatar' in d) || d.avatar == '' || isImage(d.avatar, 150000))
           && (!('approved' in d) || d.approved is bool)
-          && (!('role' in d) || d.role in ['', 'admin', 'owner']);
+          && (!('role' in d) || d.role in ['', 'admin', 'owner'])
+          && (!('place' in d) || d.place == null || validPlace(d.place));
       }
       // Members see the whole family; anyone signed in may read their own doc
       // (that's how the site knows to ask for the code or show "waiting").
@@ -274,6 +284,81 @@ service cloud.firestore {
                     && request.resource.data.keys().hasOnly(['name', 'litAt'])
                     && str(request.resource.data.name, 1, 80);
       allow delete: if isMember() && (request.auth.uid == uid || isAdmin());
+    }
+
+    // ---- Time capsules: letters sealed until a chosen day ----
+    // The seal is enforced HERE, by Google's servers: nobody — not even the person who
+    // wrote it — can read a letter before its openAt time (milliseconds since 1970).
+    // The capsule (who, for whom, when) is visible to the family; the letter isn't.
+    match /capsules/{id} {
+      allow read:   if isMember();
+      allow create: if isMember()
+                    && request.resource.data.keys().hasOnly(['title', 'to', 'uid', 'author', 'createdAt', 'openAt', 'hasPhoto'])
+                    && request.resource.data.uid == request.auth.uid
+                    && str(request.resource.data.title, 1, 120)
+                    && optStr(request.resource.data, 'to', 120)
+                    && str(request.resource.data.author, 1, 80)
+                    && request.resource.data.openAt is int
+                    && request.resource.data.openAt > request.time.toMillis() + 3600000
+                    && request.resource.data.openAt < request.time.toMillis() + 3155760000000
+                    && request.resource.data.hasPhoto is bool
+                    && existsAfter(/databases/$(database)/documents/capsuleLetters/$(id));
+      // Once it's open, each person can mark that they've read it.
+      allow update: if isMember()
+                    && request.time.toMillis() >= resource.data.openAt
+                    && onlyMyEntry('openedBy', [true]);
+      allow delete: if isMember() && (resource.data.uid == request.auth.uid || isAdmin());
+    }
+    match /capsuleLetters/{id} {
+      allow get:    if isMember()
+                    && request.time.toMillis() >= get(/databases/$(database)/documents/capsules/$(id)).data.openAt;
+      // Written only together with its brand-new capsule, so a sealed letter can never be swapped.
+      allow create: if isMember()
+                    && request.resource.data.keys().hasOnly(['text', 'photo', 'uid'])
+                    && request.resource.data.uid == request.auth.uid
+                    && str(request.resource.data.text, 1, 20000)
+                    && (!('photo' in request.resource.data) || request.resource.data.photo == '' || isImage(request.resource.data.photo, 800000))
+                    && !exists(/databases/$(database)/documents/capsules/$(id))
+                    && getAfter(/databases/$(database)/documents/capsules/$(id)).data.uid == request.auth.uid;
+      allow delete: if isMember() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow list, update: if false;
+    }
+
+    // ---- Voice stories: recordings of the family telling their stories (+ hearts) ----
+    // The audio is split into up to 3 parts of ≤ 900 KB (storyAudio/{storyId}_{n}).
+    match /stories/{id} {
+      allow read:   if isMember();
+      allow create: if isMember()
+                    && request.resource.data.keys().hasOnly(['title', 'prompt', 'uid', 'author', 'createdAt', 'duration', 'mime', 'parts', 'peaks'])
+                    && request.resource.data.uid == request.auth.uid
+                    && str(request.resource.data.title, 1, 120)
+                    && optStr(request.resource.data, 'prompt', 200)
+                    && str(request.resource.data.author, 1, 80)
+                    && request.resource.data.duration is number
+                    && request.resource.data.duration > 0 && request.resource.data.duration <= 900
+                    && str(request.resource.data.mime, 6, 60)
+                    && request.resource.data.mime.matches('audio/[a-z0-9.+-]+(;[ ]?codecs=[A-Za-z0-9.,"+-]+)?')
+                    && request.resource.data.parts is int
+                    && request.resource.data.parts >= 1 && request.resource.data.parts <= 3
+                    && optStr(request.resource.data, 'peaks', 400)
+                    && existsAfter(/databases/$(database)/documents/storyAudio/$(id + '_0'));
+      allow update: if isMember() && onlyMyEntry('hearts', [true, false]);
+      allow delete: if isMember() && (resource.data.uid == request.auth.uid || isAdmin());
+    }
+    match /storyAudio/{part} {
+      allow read:   if isMember();
+      allow create: if isMember()
+                    && request.resource.data.keys().hasOnly(['story', 'n', 'data', 'uid'])
+                    && request.resource.data.uid == request.auth.uid
+                    && request.resource.data.n is int
+                    && request.resource.data.n >= 0 && request.resource.data.n <= 2
+                    && request.resource.data.story is string
+                    && part == request.resource.data.story + '_' + string(request.resource.data.n)
+                    && request.resource.data.data is bytes
+                    && request.resource.data.data.size() <= 900000
+                    && !exists(/databases/$(database)/documents/stories/$(request.resource.data.story))
+                    && getAfter(/databases/$(database)/documents/stories/$(request.resource.data.story)).data.uid == request.auth.uid;
+      allow delete: if isMember() && (resource.data.uid == request.auth.uid || isAdmin());
     }
 
     // Everything else is closed.

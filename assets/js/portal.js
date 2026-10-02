@@ -33,10 +33,10 @@
   const VAULT_AWAY_MS = 60e3; // …or after the tab has been in the background this long
   const NEED_RULES = 'This needs the latest security rules — see README.';
 
-  const VIEWS = ['home', 'photos', 'calendar', 'updates', 'recipes', 'directory', 'invite', 'vault', 'memorial', 'profile'];
+  const VIEWS = ['home', 'photos', 'calendar', 'updates', 'globe', 'stories', 'capsules', 'recipes', 'directory', 'invite', 'vault', 'memorial', 'profile'];
   const ALIASES = { memories: 'photos', events: 'calendar' };
-  const TITLES = { home: 'Home', photos: 'Photos', calendar: 'Calendar', updates: 'Updates', recipes: 'Recipes', directory: 'Directory', invite: 'Invite family', vault: 'Family Vault', memorial: 'In Memory', profile: 'My Profile' };
-  const SECONDARY = ['recipes', 'directory', 'invite', 'vault', 'memorial', 'profile'];
+  const TITLES = { home: 'Home', photos: 'Photos', calendar: 'Calendar', updates: 'Updates', globe: 'Family Globe', stories: 'Voice Stories', capsules: 'Time Capsules', recipes: 'Recipes', directory: 'Directory', invite: 'Invite family', vault: 'Family Vault', memorial: 'In Memory', profile: 'My Profile' };
+  const SECONDARY = ['globe', 'stories', 'capsules', 'recipes', 'directory', 'invite', 'vault', 'memorial', 'profile'];
   const RECIPE_CATS = { mains: 'Mains', sides: 'Sides', desserts: 'Desserts', breakfast: 'Breakfast', drinks: 'Drinks', other: 'Other' };
   const CATS = {
     emergency: { label: 'Emergency', icon: 'siren' },
@@ -140,11 +140,12 @@
       if (btn.dataset.html) { btn.innerHTML = btn.dataset.html; delete btn.dataset.html; }
     }
   }
-  function confirmBox(title, body, okLabel) {
+  function confirmBox(title, body, okLabel, tone) {
     const d = $('#confirm-dialog');
     $('#confirm-title').textContent = title;
     $('#confirm-body').textContent = body || '';
     $('#confirm-ok').textContent = okLabel || 'Delete';
+    $('#confirm-ok').className = `btn ${tone === 'go' ? 'btn-accent' : 'btn-danger'}`;
     d.returnValue = '';
     d.showModal();
     return new Promise(res => d.addEventListener('close', () => res(d.returnValue === 'ok'), { once: true }));
@@ -203,7 +204,9 @@
     comments: {}, openThreads: new Set(), lbThread: false,
     recipes: null, recipeCat: 'all', openRecipe: null, editingRecipe: null, recipePhoto: undefined,
     tributes: null, candles: null, otd: null, addcal: null, prefillPost: '', installEvt: null,
-    vaultOpen: false, lastActive: Date.now(), hiddenAt: 0, invite: undefined
+    vaultOpen: false, lastActive: Date.now(), hiddenAt: 0, invite: undefined,
+    globe: { api: null, offset: 0, draft: null, picking: false, active: new Set() },
+    capsules: null, capPhoto: '', justSealed: null, stories: null, storyUrls: {}
   };
   const myName = () => (S.me && S.me.name) || (S.user && (S.user.displayName || S.user.email)) || 'Family member';
 
@@ -442,6 +445,7 @@
     paintMe();
     route();
     loadMembers().catch(() => { if (S.view === 'home') $('#home-family').innerHTML = errorHTML('the family'); });
+    loadCapsules().catch(() => {}); // for the "ready to open" badge and home banner
   }
 
   function paintMe() {
@@ -455,17 +459,39 @@
     Object.assign(S, {
       me: null, members: [], byUid: {}, view: null, events: null, updates: null, vault: null, memorial: null, recent: null,
       vaultCat: 'all', avatarDraft: undefined, pending: [], comments: {}, lbThread: false, recipes: null, recipeCat: 'all',
-      openRecipe: null, tributes: null, candles: null, otd: null, addcal: null, prefillPost: '', vaultOpen: false, invite: undefined
+      openRecipe: null, tributes: null, candles: null, otd: null, addcal: null, prefillPost: '', vaultOpen: false, invite: undefined,
+      capsules: null, capPhoto: '', justSealed: null, stories: null
     });
+    stopPlayer();
+    if ($('#story-dialog').open) $('#story-dialog').close();
+    resetRecorder();
+    Object.values(S.storyUrls).forEach(u => URL.revokeObjectURL(u));
+    S.storyUrls = {};
+    clearTimeout(capsuleTimer);
+    $$('[data-capsule-badge]').forEach(b => { b.hidden = true; });
     S.openThreads.clear();
+    if (S.globe.api) S.globe.api.destroy();
+    S.globe = { api: null, offset: 0, draft: null, picking: false, active: new Set() };
+    $('#globe-time').value = '0';
+    $('#globe-time-label').textContent = 'Now';
+    $('#globe-now').hidden = true;
+    $('#globe-live').classList.remove('travel');
+    $('#globe-live-text').textContent = 'Live daylight';
+    $('#globe-pick').hidden = true;
+    $('#globe-stage').classList.remove('is-picking');
+    $('#globe-spin').setAttribute('aria-pressed', 'true');
+    $('#globe-spin').setAttribute('aria-label', 'Pause spinning');
+    $('#globe-spin').innerHTML = icon('pause');
     S.photos = { items: [], last: null, done: false, loading: false, loaded: false, rendered: 0 };
     S.revealed.clear();
     clearStaging('photos');
     clearStaging('memorial');
     // Don't leave private content in the page after signing out.
     ['#home-upcoming', '#home-family', '#home-photos', '#home-updates', '#home-bday', '#home-otd-strip', '#photo-grid', '#cal-grid', '#cal-agenda', '#feed',
-      '#people', '#pending-panel', '#notes', '#vault-filters', '#memorial-grid', '#tributes', '#candle-row', '#recipes', '#recipe-filters', '#lb-thread', '#invite-body'].forEach(s => { const el = $(s); if (el) el.innerHTML = ''; });
-    ['#home-bday', '#home-otd', '#pending-panel'].forEach(s => { $(s).hidden = true; });
+      '#people', '#pending-panel', '#notes', '#vault-filters', '#memorial-grid', '#tributes', '#candle-row', '#recipes', '#recipe-filters', '#lb-thread', '#invite-body',
+      '#globe-clocks', '#globe-strip', '#globe-best', '#globe-pins', '#capsules', '#home-capsule', '#co-text', '#stories'].forEach(s => { const el = $(s); if (el) el.innerHTML = ''; });
+    ['#home-bday', '#home-otd', '#pending-panel', '#home-capsule'].forEach(s => { $(s).hidden = true; });
+    $('#co-photo').removeAttribute('src');
     paintPendingBadge();
     $('#memorial-cover').innerHTML = icon('candle');
     $$('.view').forEach(v => { v.hidden = true; });
@@ -488,8 +514,17 @@
     else if (document.body.dataset.state === 'auth' && location.hash.startsWith('#join')) authMode('join');
   });
 
+  // Pages cross-fade with the View Transitions API where the browser has it.
+  const VT = !!document.startViewTransition && !REDUCED && !navigator.webdriver;
+  if (VT) root.classList.add('vt');
   function show(v) {
+    if (VT && S.view && S.view !== v && !document.hidden) { document.startViewTransition(() => showNow(v)); return; }
+    showNow(v);
+  }
+  function showNow(v) {
     const changed = S.view !== v;
+    if (changed && S.view === 'globe') { stopPicking(); if (S.globe.api) S.globe.api.stop(); }
+    if (changed && S.view === 'stories' && player.audio) player.audio.pause();
     S.view = v;
     $$('.view').forEach(el => { el.hidden = el.dataset.view !== v; });
     $$('[data-nav]').forEach(a => {
@@ -520,6 +555,7 @@
     else if (S.view === 'updates' && S.updates) renderFeed();
     else if (S.view === 'memorial') { if (S.tributes) renderGuestbook(); if (S.candles) renderCandles(); }
     else if (S.view === 'invite') renderInvite();
+    else if (S.view === 'globe' && S.globe.api) { S.globe.api.setPeople(globePeople(), S.user.uid); paintPlaceBtn(); renderGlobeSide(); }
   }
   async function loadEvents(force) {
     if (S.events && !force) return S.events;
@@ -1160,6 +1196,7 @@
     $('#vault-lock').hidden = S.vaultOpen;
     $('#vault-content').hidden = !S.vaultOpen;
     $('#vault-actions').hidden = !S.vaultOpen;
+    paintBio();
     if (!S.vaultOpen) {
       $('#vault-msg').textContent = '';
       $('#vault-user').value = (S.user && S.user.email) || '';
@@ -1544,7 +1581,7 @@
     return `<button type="button" class="react heart${on ? ' on' : ''}${light ? ' light' : ''}" data-action="heart" data-col="${colName}" data-id="${esc(it.id)}" aria-pressed="${on}" aria-label="${on ? 'Remove your heart' : 'Send a heart'}${n ? ` (${n})` : ''}">${icon(on ? 'heart-fill' : 'heart')}<span>${n || ''}</span></button>`;
   }
   function itemsFor(colName, id) {
-    const lists = colName === 'updates' ? [S.updates || []] : [S.photos.items, S.recent || [], S.otd || []];
+    const lists = colName === 'updates' ? [S.updates || []] : colName === 'stories' ? [S.stories || []] : [S.photos.items, S.recent || [], S.otd || []];
     const out = [];
     lists.forEach(l => l.forEach(x => { if (x.id === id && !out.includes(x)) out.push(x); }));
     return out;
@@ -2005,6 +2042,92 @@
     else if (S.vaultOpen && S.hiddenAt && Date.now() - S.hiddenAt > VAULT_AWAY_MS) lockVault('The vault locked while you were away');
   });
 
+  /* ===================== Vault: Face ID / fingerprint unlock ===================== */
+  // A passkey kept on this device (WebAuthn, platform authenticator, user verification
+  // required). It's a quick lock for this phone or computer — if someone picks it up while
+  // you're signed in, they still can't open the vault. The notes themselves stay protected
+  // by firestore.rules either way, and your password always works too.
+  const bioKey = () => (S.user ? `agraz-vault-key:${S.user.uid}` : '');
+  const b64u = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const unb64u = str => Uint8Array.from(atob(str.replace(/-/g, '+').replace(/_/g, '/')), ch => ch.charCodeAt(0));
+  function bioName() {
+    const ua = navigator.userAgent;
+    return /iPhone|iPad/.test(ua) ? 'Face ID' : /Macintosh/.test(ua) ? 'Touch ID' : /Android/.test(ua) ? 'your fingerprint' : /Windows/.test(ua) ? 'Windows Hello' : 'your device lock';
+  }
+  let bioOk = null;
+  async function bioAvailable() {
+    if (bioOk === null) {
+      try { bioOk = !!(window.PublicKeyCredential && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()); }
+      catch (e) { bioOk = false; }
+    }
+    return bioOk;
+  }
+  function bioCred() { try { return localStorage.getItem(bioKey()) || ''; } catch (e) { return ''; } }
+  async function paintBio() {
+    const ok = await bioAvailable(), has = ok && !!bioCred();
+    $('#vault-bio').hidden = !has;
+    $('#vault-or').hidden = !has;
+    $('#vault-bio-label').textContent = `Unlock with ${bioName()}`;
+    const offer = $('#vault-bio-offer');
+    offer.hidden = !ok || !S.vaultOpen;
+    offer.innerHTML = !ok ? '' : has
+      ? `${icon('fingerprint')}<p><strong>Quick unlock is on.</strong> This device opens the vault with ${esc(bioName())}.</p><button class="link-btn" type="button" data-action="vault-bio-off">Turn off</button>`
+      : `${icon('fingerprint')}<p><strong>Unlock faster next time.</strong> Use ${esc(bioName())} on this device instead of typing your password.</p><button class="btn btn-sm btn-ghost" type="button" data-action="vault-bio-on">Turn on</button>`;
+  }
+  async function enableBio(btn) {
+    busy(btn, true, 'Setting up…');
+    try {
+      const cred = await navigator.credentials.create({
+        publicKey: {
+          challenge: crypto.getRandomValues(new Uint8Array(32)),
+          rp: { name: 'Agraz Family Hub' },
+          user: { id: new TextEncoder().encode(S.user.uid).slice(0, 64), name: S.user.email || myName(), displayName: myName() },
+          pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+          authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'discouraged' },
+          timeout: 60000,
+          attestation: 'none'
+        }
+      });
+      localStorage.setItem(bioKey(), b64u(cred.rawId));
+      toast(`All set — next time, open the vault with ${bioName()}`);
+    } catch (e) {
+      if (!e || e.name !== 'NotAllowedError') toast('Couldn’t set that up on this device.', true);
+    } finally {
+      busy(btn, false);
+      paintBio();
+    }
+  }
+  async function unlockWithBio() {
+    const id = bioCred(), btn = $('#vault-bio');
+    if (!id) return;
+    $('#vault-msg').textContent = '';
+    busy(btn, true, 'Waiting…');
+    try {
+      const a = await navigator.credentials.get({
+        publicKey: {
+          challenge: crypto.getRandomValues(new Uint8Array(32)),
+          allowCredentials: [{ type: 'public-key', id: unb64u(id), transports: ['internal'] }],
+          userVerification: 'required',
+          timeout: 60000
+        }
+      });
+      // byte 32 of authenticatorData holds the flags; 0x04 = the person was verified (face, finger, PIN)
+      if (!(new Uint8Array(a.response.authenticatorData)[32] & 0x04)) throw new Error('unverified');
+      S.vaultOpen = true;
+      S.lastActive = Date.now();
+      openVault();
+    } catch (e) {
+      $('#vault-msg').textContent = e && e.name === 'NotAllowedError' ? '' : `${bioName()} didn’t work this time — use your password instead.`;
+    } finally {
+      busy(btn, false);
+    }
+  }
+  function disableBio() {
+    try { localStorage.removeItem(bioKey()); } catch (e) {}
+    paintBio();
+    toast('Quick unlock is off for this device');
+  }
+
   /* ===================== Invite family ===================== */
   const CODE_WORDS = ['coral', 'tide', 'shell', 'dune', 'harbor', 'breeze', 'pier', 'sunset', 'lagoon', 'reef', 'anchor', 'sail',
     'palm', 'wave', 'salt', 'pelican', 'marina', 'island', 'sandy', 'seaside', 'starfish', 'surf', 'cove', 'beacon',
@@ -2251,10 +2374,934 @@
     }
   }
 
+  /* ===================== Family Globe ===================== */
+  // The globe itself is drawn by /assets/js/globe.js, loaded the first time it's opened.
+  let globeLib = null;
+  function loadGlobeLib() {
+    if (window.AgrazGlobe) return Promise.resolve();
+    if (!globeLib) {
+      globeLib = new Promise((resolve, reject) => {
+        const sc = document.createElement('script');
+        sc.src = '/assets/js/globe.js';
+        sc.onload = resolve;
+        sc.onerror = () => { globeLib = null; reject(new Error('globe')); };
+        document.head.appendChild(sc);
+      });
+    }
+    return globeLib;
+  }
+  const hasPlace = m => !!(m && m.place && typeof m.place.lat === 'number' && typeof m.place.lng === 'number');
+  const roundLL = ll => ({ lat: Math.round(ll.lat * 10) / 10, lng: Math.round(ll.lng * 10) / 10 });
+  const fmtLatLng = d => `${Math.abs(d.lat).toFixed(1)}°${d.lat >= 0 ? 'N' : 'S'}, ${Math.abs(d.lng).toFixed(1)}°${d.lng >= 0 ? 'E' : 'W'}`;
+  const myTz = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) { return ''; } };
+  function okTz(tz) { if (!tz) return false; try { new Intl.DateTimeFormat('en-US', { timeZone: tz }); return true; } catch (e) { return false; } }
+  // Their saved time zone; failing that, a rough one from their longitude.
+  function tzOf(m) {
+    if (okTz(m.place.tz)) return m.place.tz;
+    const off = Math.round(m.place.lng / 15);
+    return off === 0 ? 'UTC' : `Etc/GMT${off < 0 ? '+' : '-'}${Math.abs(off)}`;
+  }
+  const clockAt = (m, date) => date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZone: tzOf(m) });
+  function hourAt(m, date) {
+    const h = new Intl.DateTimeFormat('en-US', { hour: 'numeric', hourCycle: 'h23', timeZone: tzOf(m) }).formatToParts(date).find(p => p.type === 'hour');
+    return h ? Number(h.value) % 24 : date.getHours();
+  }
+  function skyAt(m, date) {
+    const alt = window.AgrazGlobe.sunAltitude(m.place.lat, m.place.lng, date);
+    const h = hourAt(m, date);
+    if (alt > 6) return { key: 'day', icon: 'sun', label: h < 12 ? 'Morning' : h < 17 ? 'Afternoon' : 'Evening' };
+    if (alt > -6) return { key: 'dusk', icon: 'sunrise', label: h < 12 ? 'Sunrise' : 'Sunset' };
+    return { key: 'night', icon: 'moon', label: h >= 22 || h < 5 ? 'Night' : h >= 12 ? 'Evening' : 'Early morning' };
+  }
+  function milesFromMe(m) {
+    if (!S.me || !hasPlace(S.me) || m.uid === S.user.uid) return '';
+    const mi = window.AgrazGlobe.distanceKm(S.me.place, m.place) * 0.621371;
+    if (mi < 15) return 'Nearby';
+    return `${(mi >= 1000 ? Math.round(mi / 10) * 10 : Math.round(mi)).toLocaleString('en-US')} mi away`;
+  }
+  const globeTime = () => (S.globe.offset ? new Date(Date.now() + S.globe.offset * 60e3) : new Date());
+  const globePeople = () => S.members.filter(hasPlace).map(m => ({ id: m.uid, lat: m.place.lat, lng: m.place.lng, m }));
+
+  function globePinHTML(list, date) {
+    const first = list[0].m;
+    const faces = list.slice(0, 3).map(p => avatarHTML(p.m, 28)).join('');
+    const title = list.length === 1 ? firstName(first.name) : (String(first.place.label).split(',')[0] || firstName(first.name));
+    const sub = list.length === 1 ? clockAt(first, date) : `${list.length} of us · ${clockAt(first, date)}`;
+    const names = joinNames(list.map(p => p.m.name || 'Family member'));
+    return `<span class="gpin-faces">${faces}</span><span class="gpin-label n${Math.min(list.length, 3)}"><b>${esc(title)}</b><small>${esc(sub)}</small></span><span class="sr-only">${esc(names)}</span>`;
+  }
+
+  async function openGlobe() {
+    paintPlaceBtn();
+    if (!S.members.length) loadMembers().catch(() => {});
+    if (S.globe.api) { S.globe.api.setPeople(globePeople(), S.user.uid); S.globe.api.start(); renderGlobeSide(); return; }
+    const status = $('#globe-status');
+    status.hidden = false;
+    status.textContent = 'Loading the globe…';
+    try {
+      await loadGlobeLib();
+      const land = await window.AgrazGlobe.loadLand();
+      if (S.view !== 'globe' || !S.me || S.globe.api) return;
+      const placed = globePeople();
+      const mine = hasPlace(S.me) ? S.me.place : placed[0];
+      S.globe.api = window.AgrazGlobe.create($('#globe-stage'), {
+        land,
+        pinLayer: $('#globe-pins'),
+        pinHTML: globePinHTML,
+        lat: mine ? Math.max(-45, Math.min(45, mine.lat)) : 24,
+        lng: mine ? mine.lng - 25 : -40,
+        onPick: ll => { S.globe.draft = roundLL(ll); S.globe.api.setDraft(S.globe.draft); paintPick(); }
+      });
+      status.hidden = true;
+      S.globe.api.setPeople(placed, S.user.uid);
+      S.globe.api.start();
+      renderGlobeSide();
+    } catch (e) {
+      status.textContent = 'The globe couldn’t load. Check your connection and try again.';
+    }
+  }
+
+  function paintPlaceBtn() {
+    const on = hasPlace(S.me);
+    $('#globe-place-btn span').textContent = on ? 'Move my pin' : 'Put me on the globe';
+  }
+
+  function renderGlobeSide() {
+    if (!window.AgrazGlobe || !S.user) return;
+    const date = globeTime();
+    const placed = S.members.filter(hasPlace).sort((a, b) => a.place.lng - b.place.lng);
+    $('#globe-clocks').innerHTML = placed.map(m => {
+      const sky = skyAt(m, date), far = milesFromMe(m), me = m.uid === S.user.uid;
+      return `<li><button type="button" class="clock${S.globe.active.has(m.uid) ? ' is-active' : ''}" data-action="globe-focus" data-uid="${esc(m.uid)}">
+        ${avatarHTML(m, 40)}
+        <span class="clock-who"><strong>${esc(m.name || 'Family member')}${me ? '<span class="you-tag">You</span>' : ''}</strong><small>${esc(m.place.label)}${far ? ` · ${esc(far)}` : ''}</small></span>
+        <span class="clock-time"><b>${esc(clockAt(m, date))}</b><small class="sky-${sky.key}">${icon(sky.icon)}${sky.label}</small></span>
+      </button></li>`;
+    }).join('') || `<li class="empty empty-sm">${icon('earth')}<span>Nobody’s on the globe yet — be the first!</span></li>`;
+    const missing = S.members.filter(m => !hasPlace(m)).map(m => (m.uid === S.user.uid ? 'you' : firstName(m.name)));
+    const miss = $('#globe-missing');
+    miss.hidden = !missing.length || !placed.length;
+    miss.textContent = missing.length ? `Not on the globe yet: ${joinNames(missing)}.` : '';
+    renderPlanner();
+  }
+
+  // Family call planner: for each of the next 24 hours, how many of us are between 9am and 9pm?
+  function renderPlanner() {
+    const placed = S.members.filter(hasPlace);
+    const clocks = placed.map(m => d => hourAt(m, d));
+    if (!placed.some(m => m.uid === S.user.uid)) clocks.push(d => d.getHours()); // you, on this device's clock
+    const n = clocks.length;
+    const start = new Date(); start.setMinutes(0, 0, 0);
+    const slots = Array.from({ length: 24 }, (_, i) => {
+      const d = new Date(start.getTime() + i * 3600e3);
+      return { d, ok: clocks.filter(h => { const x = h(d); return x >= 9 && x < 21; }).length };
+    });
+    const at = Math.floor(S.globe.offset / 60);
+    $('#globe-strip').innerHTML = slots.map((s, i) =>
+      `<i class="gt-cell l${n ? Math.round((s.ok / n) * 4) : 0}${i === at ? ' is-now' : ''}" data-action="globe-hour" data-i="${i}" title="${esc(s.d.toLocaleTimeString(undefined, { hour: 'numeric' }))}: ${s.ok} of ${n}"></i>`).join('') +
+      `<span class="gt-ticks">${[0, 6, 12, 18].map(i => `<span>${i ? esc(slots[i].d.toLocaleTimeString(undefined, { hour: 'numeric' })) : 'Now'}</span>`).join('')}</span>`;
+    const best = $('#globe-best');
+    if (placed.length < 2) { best.textContent = 'Put a few of us on the globe and this finds the best time for a family call.'; return; }
+    const max = Math.max(...slots.map(s => s.ok));
+    let run = null;
+    for (let i = 0; i < slots.length; i++) {
+      if (slots[i].ok !== max) continue;
+      let j = i; while (j + 1 < slots.length && slots[j + 1].ok === max) j++;
+      if (!run || j - i > run[1] - run[0]) run = [i, j];
+      i = j;
+    }
+    const hr = d => d.toLocaleTimeString(undefined, { hour: 'numeric' });
+    const end = new Date(slots[run[1]].d.getTime() + 3600e3);
+    const when = `${dayWord(slots[run[0]].d)} ${hr(slots[run[0]].d)} – ${hr(end)}`;
+    best.innerHTML = max === 0 ? 'Nobody overlaps between 9 am and 9 pm in the next day.' :
+      `${icon('sparkle')}<span><strong>Best time for a family call:</strong> ${esc(when)} your time — ${max === n ? `all ${n} of you are` : `${max} of ${n} are`} between 9 am and 9 pm.</span>`;
+  }
+  function dayWord(d) {
+    const t = new Date(); t.setHours(0, 0, 0, 0);
+    const diff = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - t) / 864e5);
+    return diff === 0 ? 'today' : diff === 1 ? 'tomorrow' : d.toLocaleDateString(undefined, { weekday: 'long' });
+  }
+
+  function setGlobeOffset(steps) {
+    S.globe.offset = Math.max(0, Math.min(96, steps)) * 15;
+    $('#globe-time').value = String(S.globe.offset / 15);
+    const live = !S.globe.offset;
+    const d = globeTime();
+    const label = live ? 'Now' : `${dayWord(d).replace(/^./, c => c.toUpperCase())} ${d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`;
+    $('#globe-time-label').textContent = label;
+    $('#globe-now').hidden = live;
+    $('#globe-live').classList.toggle('travel', !live);
+    $('#globe-live-text').textContent = live ? 'Live daylight' : `Daylight at ${label.replace(/^(Today|Tomorrow) /, (m, w) => (w === 'Today' ? '' : 'tomorrow '))}`;
+    if (S.globe.api) S.globe.api.setTime(live ? null : d);
+    renderGlobeSide();
+  }
+
+  function startPicking() {
+    if (!S.globe.api) return;
+    const mine = hasPlace(S.me) ? S.me.place : null;
+    S.globe.picking = true;
+    S.globe.draft = mine ? { lat: mine.lat, lng: mine.lng } : null;
+    S.globe.api.setPicking(true);
+    if (mine) { S.globe.api.setDraft(S.globe.draft); S.globe.api.focus(mine.lat, mine.lng); }
+    $('#globe-label').value = mine ? mine.label : '';
+    $('#globe-remove').hidden = !mine;
+    $('#globe-pick').hidden = false;
+    $('#globe-stage').classList.add('is-picking');
+    paintPick();
+  }
+  function stopPicking() {
+    S.globe.picking = false;
+    S.globe.draft = null;
+    if (S.globe.api) S.globe.api.setPicking(false);
+    $('#globe-pick').hidden = true;
+    $('#globe-stage').classList.remove('is-picking');
+  }
+  function paintPick() {
+    const d = S.globe.draft;
+    $('#globe-pick-title').textContent = d ? `Your spot: ${fmtLatLng(d)}` : 'Tap the globe where you live';
+    $('#globe-save').disabled = !d;
+  }
+  function locateMe() {
+    const btn = $('#globe-locate');
+    if (!navigator.geolocation) { toast('This browser can’t share your location — tap the globe instead.', true); return; }
+    busy(btn, true, 'Finding you…');
+    navigator.geolocation.getCurrentPosition(pos => {
+      busy(btn, false);
+      if (!S.globe.picking || !S.globe.api) return;
+      S.globe.draft = roundLL({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+      S.globe.api.setDraft(S.globe.draft);
+      S.globe.api.focus(S.globe.draft.lat, S.globe.draft.lng);
+      paintPick();
+    }, err => {
+      busy(btn, false);
+      toast(err && err.code === 1 ? 'Location is off for this site — tap the globe where you live instead.' : 'Couldn’t find you — tap the globe where you live instead.', true);
+    }, { enableHighAccuracy: false, timeout: 12000, maximumAge: 600000 });
+  }
+  async function savePlace(remove) {
+    const label = $('#globe-label').value.trim().replace(/\s+/g, ' ');
+    if (!remove && !S.globe.draft) { toast('Tap the globe where you live first.', true); return; }
+    if (!remove && !label) { toast('Give your spot a name, like “Miami, FL”.', true); $('#globe-label').focus(); return; }
+    const place = remove ? null : Object.assign(roundLL(S.globe.draft), { label: label.slice(0, 60), tz: myTz().slice(0, 64) });
+    const btn = remove ? $('#globe-remove') : $('#globe-save');
+    busy(btn, true, remove ? 'Removing…' : 'Saving…');
+    try {
+      await col('users').doc(S.user.uid).update({ place });
+      S.me.place = place;
+      if (S.byUid[S.user.uid]) S.byUid[S.user.uid].place = place;
+      stopPicking();
+      if (S.globe.api) { S.globe.api.setPeople(globePeople(), S.user.uid); if (place) S.globe.api.focus(place.lat, place.lng); }
+      paintPlaceBtn();
+      renderGlobeSide();
+      toast(place ? 'You’re on the family globe' : 'You’re off the globe');
+    } catch (err) {
+      toast(denied(err) ? NEED_RULES : 'Couldn’t save your spot. Please try again.', true);
+    } finally {
+      busy(btn, false);
+      if (S.globe.picking) paintPick();
+    }
+  }
+  function focusPeople(ids) {
+    const list = ids.map(id => S.byUid[id]).filter(hasPlace);
+    if (!list.length || !S.globe.api) return;
+    S.globe.active = new Set(ids);
+    S.globe.api.setActive(ids);
+    S.globe.api.focus(list[0].place.lat, list[0].place.lng);
+    renderGlobeSide();
+    const el = $(`.clock[data-uid="${CSS.escape(ids[0])}"]`);
+    if (el) el.scrollIntoView({ block: 'nearest', behavior: REDUCED ? 'auto' : 'smooth' });
+  }
+  $('#globe-time').addEventListener('input', e => setGlobeOffset(Number(e.target.value)));
+  $('#globe-pick').addEventListener('submit', e => { e.preventDefault(); savePlace(false); });
+  $('#globe-pick').addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); stopPicking(); } });
+
+  /* ===================== Voice Stories ===================== */
+  // Recorded in the browser (MediaRecorder), stored in Firestore as up to three ≤ 880 KB
+  // parts (storyAudio/{id}_{n}) next to the story itself. Played back from a blob: URL.
+  const STORY_PROMPTS = ['How did you two meet?', 'What was the house you grew up in like?', 'Tell us about your first job.',
+    'What’s the story behind a family recipe?', 'What was the best day of your life?', 'What do you want the grandkids to know?',
+    'Tell us about someone we miss.', 'What was the funniest family dinner ever?'];
+  const MAX_REC_S = 600, MAX_AUDIO = 2.6e6, PART = 880000, PEAKS = 96;
+  const fmtDur = s => { s = Math.max(0, Math.round(s || 0)); return `${Math.floor(s / 60)}:${pad(s % 60)}`; };
+  const rec = { state: 'idle', stream: null, mr: null, chunks: [], bytes: 0, t0: 0, timer: 0, raf: 0, ctx: null, analyser: null, levels: [], blob: null, url: '', mime: '', duration: 0, peaks: '', prompt: '', audio: null, discard: false };
+  const player = { audio: null, id: null, loading: null, raf: 0 };
+
+  async function loadStories(force) {
+    if (S.stories && !force) return S.stories;
+    const snap = await col('stories').orderBy('createdAt', 'desc').limit(60).get();
+    S.stories = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    return S.stories;
+  }
+  async function openStories() {
+    if (!S.stories) $('#stories').innerHTML = skelRows(3);
+    try { await loadStories(true); }
+    catch (e) {
+      $('#stories').innerHTML = denied(e) ? emptyHTML('lock', 'Voice stories need the latest security rules', 'Publish firestore.rules — see README.') : errorHTML('voice stories');
+      return;
+    }
+    if (S.view === 'stories') renderStories();
+  }
+  function peaksOf(st) {
+    try { return Array.from(atob(st.peaks || ''), ch => ch.charCodeAt(0)); } catch (e) { return []; }
+  }
+  function waveSVG(peaks, n) {
+    const vals = peaks.length ? peaks : Array.from({ length: n }, (_, i) => 60 + 50 * Math.sin(i / 3));
+    const W = vals.length * 4, H = 40;
+    return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">${vals.map((v, i) => {
+      const h = Math.max(3, (v / 255) * H);
+      return `<rect x="${i * 4 + 0.6}" y="${((H - h) / 2).toFixed(1)}" width="2.8" height="${h.toFixed(1)}" rx="1.4"/>`;
+    }).join('')}</svg>`;
+  }
+  function renderStories() {
+    const list = S.stories || [];
+    if (!list.length) {
+      $('#stories').innerHTML = emptyHTML('mic', 'No voice stories yet', 'Be the first — or hand your phone to Grandma and ask her how she met Grandpa.',
+        `<button class="btn btn-accent btn-sm" type="button" data-action="new-story">${icon('mic')}Record a story</button>`);
+      return;
+    }
+    $('#stories').innerHTML = list.map(st => {
+      const m = S.byUid[st.uid] || { name: st.author, uid: st.uid };
+      const mine = S.user && st.uid === S.user.uid;
+      const wave = waveSVG(peaksOf(st), PEAKS);
+      const playing = player.id === st.id && player.audio && !player.audio.paused;
+      return `<article class="story${player.id === st.id ? ' is-current' : ''}" data-story="${esc(st.id)}">
+        <button class="story-play${playing ? ' is-playing' : ''}" type="button" data-action="story-play" data-id="${esc(st.id)}" aria-label="${playing ? 'Pause' : 'Play'} “${esc(st.title)}”">${icon(playing ? 'pause' : 'play')}</button>
+        <div class="story-main">
+          <div class="story-top"><h3>${esc(st.title)}</h3><span class="story-time" data-story-time="${esc(st.id)}">${fmtDur(st.duration)}</span></div>
+          <p class="story-meta">${avatarHTML(m, 28)}<span>${esc(st.author || 'Family member')} · ${esc(timeAgo(st.createdAt))}${st.prompt ? ` · <em>“${esc(st.prompt)}”</em>` : ''}</span></p>
+          <div class="story-wave" data-action="story-seek" data-id="${esc(st.id)}" role="presentation">
+            <div class="wave-base">${wave}</div><div class="wave-played" data-wave="${esc(st.id)}">${wave}</div>
+          </div>
+          <div class="story-foot">${heartBtn('stories', st)}${mine || isAdmin() ? `<button class="icon-btn story-del" type="button" data-action="delete-story" data-id="${esc(st.id)}" aria-label="Delete “${esc(st.title)}”">${icon('trash')}</button>` : ''}</div>
+        </div>
+      </article>`;
+    }).join('');
+    paintPlayer();
+  }
+
+  // ---- playback ----
+  // iPhones only let a page start audio during a tap. Loading a story takes a moment, so
+  // the tap first plays a split second of silence; that unlocks the player for the story.
+  let silentUrl = '';
+  function unlockAudio(a) {
+    if (!silentUrl) {
+      const n = 800, v = new DataView(new ArrayBuffer(44 + n));
+      const w = (o, str) => { for (let i = 0; i < str.length; i++) v.setUint8(o + i, str.charCodeAt(i)); };
+      w(0, 'RIFF'); v.setUint32(4, 36 + n, true); w(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+      v.setUint32(24, 8000, true); v.setUint32(28, 8000, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true); w(36, 'data'); v.setUint32(40, n, true);
+      for (let i = 0; i < n; i++) v.setUint8(44 + i, 128);
+      silentUrl = URL.createObjectURL(new Blob([v.buffer], { type: 'audio/wav' }));
+    }
+    a.src = silentUrl;
+    a.play().catch(() => {});
+  }
+  async function storyUrl(st) {
+    if (S.storyUrls[st.id]) return S.storyUrls[st.id];
+    const snap = await col('storyAudio').where('story', '==', st.id).get();
+    const parts = snap.docs.map(d => d.data()).sort((a, b) => a.n - b.n).map(p => p.data.toUint8Array());
+    if (!parts.length) throw new Error('missing');
+    S.storyUrls[st.id] = URL.createObjectURL(new Blob(parts, { type: st.mime || 'audio/webm' }));
+    return S.storyUrls[st.id];
+  }
+  async function playStory(id) {
+    const st = (S.stories || []).find(x => x.id === id);
+    if (!st) return;
+    if (!player.audio) {
+      player.audio = new Audio();
+      player.audio.preload = 'auto';
+      player.audio.addEventListener('play', paintPlayer);
+      player.audio.addEventListener('pause', paintPlayer);
+      player.audio.addEventListener('ended', () => { player.audio.currentTime = 0; paintPlayer(); });
+      player.audio.addEventListener('error', () => { if (player.id && player.audio.src === S.storyUrls[player.id]) toast('Couldn’t play that recording on this device.', true); });
+    }
+    const a = player.audio;
+    if (player.id === id && a.src) { if (a.paused) a.play().catch(() => {}); else a.pause(); return; }
+    player.id = id;
+    player.loading = id;
+    if (S.storyUrls[id]) a.src = S.storyUrls[id]; else unlockAudio(a);
+    paintPlayer();
+    try {
+      const url = await storyUrl(st);
+      if (player.id !== id) return;
+      if (a.src !== url) a.src = url;
+      await a.play();
+    } catch (e) {
+      if (player.id === id) { player.id = null; toast(denied(e) ? NEED_RULES : 'Couldn’t load that story. Please try again.', true); }
+    } finally {
+      if (player.loading === id) player.loading = null;
+      paintPlayer();
+    }
+  }
+  function paintPlayer() {
+    const a = player.audio;
+    $$('.story').forEach(card => {
+      const id = card.dataset.story, cur = id === player.id;
+      const st = (S.stories || []).find(x => x.id === id);
+      const playing = cur && a && !a.paused;
+      card.classList.toggle('is-current', cur);
+      const btn = card.querySelector('.story-play');
+      btn.classList.toggle('is-playing', playing);
+      btn.classList.toggle('is-loading', player.loading === id);
+      btn.setAttribute('aria-label', `${playing ? 'Pause' : 'Play'} “${st ? st.title : ''}”`);
+      btn.innerHTML = icon(playing ? 'pause' : 'play');
+      if (!cur) {
+        card.querySelector('.wave-played').style.clipPath = 'inset(0 100% 0 0)';
+        card.querySelector('.story-time').textContent = fmtDur(st && st.duration);
+      }
+    });
+    cancelAnimationFrame(player.raf);
+    if (a && !a.paused) player.raf = requestAnimationFrame(tickPlayer);
+    tickPlayer(true);
+  }
+  function tickPlayer(once) {
+    const a = player.audio;
+    if (!a || !player.id) return;
+    const st = (S.stories || []).find(x => x.id === player.id);
+    const total = isFinite(a.duration) && a.duration > 0 ? a.duration : (st && st.duration) || 1;
+    const pct = Math.min(100, (a.currentTime / total) * 100);
+    const layer = $(`.wave-played[data-wave="${CSS.escape(player.id)}"]`);
+    if (layer) layer.style.clipPath = `inset(0 ${(100 - pct).toFixed(2)}% 0 0)`;
+    const tm = $(`[data-story-time="${CSS.escape(player.id)}"]`);
+    if (tm) tm.textContent = `${fmtDur(a.currentTime)} / ${fmtDur(total)}`;
+    if (once !== true && !a.paused) player.raf = requestAnimationFrame(tickPlayer);
+  }
+  function seekStory(id, e, el) {
+    const a = player.audio;
+    if (player.id !== id || !a || !a.src) { playStory(id); return; }
+    const r = el.getBoundingClientRect();
+    const total = isFinite(a.duration) && a.duration > 0 ? a.duration : 0;
+    if (!total) return;
+    a.currentTime = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * total;
+    if (a.paused) a.play().catch(() => {});
+    tickPlayer(true);
+  }
+  function stopPlayer() {
+    if (player.audio) { player.audio.pause(); player.audio.removeAttribute('src'); player.audio.load(); }
+    cancelAnimationFrame(player.raf);
+    player.id = null;
+    player.loading = null;
+  }
+  async function deleteStory(id) {
+    const st = (S.stories || []).find(x => x.id === id);
+    if (!st) return;
+    if (!(await confirmBox(`Delete “${st.title}”?`, 'The recording will be gone for everyone.', 'Delete'))) return;
+    try {
+      const b = db.batch();
+      for (let n = 0; n < (st.parts || 1); n++) b.delete(col('storyAudio').doc(`${id}_${n}`));
+      b.delete(col('stories').doc(id));
+      await b.commit();
+      if (player.id === id) stopPlayer();
+      if (S.storyUrls[id]) { URL.revokeObjectURL(S.storyUrls[id]); delete S.storyUrls[id]; }
+      S.stories = S.stories.filter(x => x.id !== id);
+      renderStories();
+      toast('Story deleted');
+    } catch (e) {
+      toast(denied(e) ? NEED_RULES : 'Couldn’t delete it. Please try again.', true);
+    }
+  }
+
+  // ---- recording ----
+  function openRecorder() {
+    stopPlayer();
+    paintPlayer();
+    resetRecorder();
+    $('#story-title').value = '';
+    rec.prompt = '';
+    $('#rec-prompts').innerHTML = STORY_PROMPTS.map(p => `<button type="button" data-action="rec-prompt" aria-pressed="false">${esc(p)}</button>`).join('');
+    $('#story-dialog').showModal();
+    $('#rec-btn').focus();
+  }
+  function setRecState(state) {
+    rec.state = state;
+    $('#rec-stage').dataset.state = state;
+    const btn = $('#rec-btn');
+    btn.hidden = state === 'review';
+    btn.innerHTML = icon(state === 'recording' ? 'stop' : 'mic');
+    btn.setAttribute('aria-label', state === 'recording' ? 'Stop recording' : 'Start recording');
+    $('#rec-review').hidden = state !== 'review';
+    $('#rec-hint').textContent = state === 'recording' ? 'Recording… tap to stop when you’re done.'
+      : state === 'review' ? 'Listen back, give it a title, and save it for the family.'
+        : 'Up to 10 minutes. Find a quiet spot and hold the phone close.';
+    $('#story-save').disabled = state !== 'review';
+  }
+  function pickMime() {
+    if (!window.MediaRecorder || !MediaRecorder.isTypeSupported) return '';
+    return ['audio/webm;codecs=opus', 'audio/mp4', 'audio/ogg;codecs=opus', 'audio/webm'].find(t => MediaRecorder.isTypeSupported(t)) || '';
+  }
+  async function startRecording() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) {
+      toast('This browser can’t record audio — try Safari or Chrome.', true);
+      return;
+    }
+    const btn = $('#rec-btn');
+    btn.disabled = true;
+    try {
+      rec.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    } catch (e) {
+      btn.disabled = false;
+      toast(e && e.name === 'NotAllowedError' ? 'Microphone access is off — allow it for this site to record.' : 'Couldn’t find a microphone.', true);
+      return;
+    }
+    btn.disabled = false;
+    if (!$('#story-dialog').open) { releaseMic(); return; }
+    const mime = pickMime();
+    try { rec.mr = new MediaRecorder(rec.stream, Object.assign({ audioBitsPerSecond: 32000 }, mime ? { mimeType: mime } : {})); }
+    catch (e) { rec.mr = new MediaRecorder(rec.stream); }
+    rec.chunks = []; rec.bytes = 0; rec.levels = []; rec.discard = false;
+    rec.mime = mime;
+    rec.mr.ondataavailable = ev => {
+      if (!ev.data || !ev.data.size) return;
+      rec.chunks.push(ev.data);
+      rec.bytes += ev.data.size;
+      if (rec.bytes > MAX_AUDIO && rec.mr.state === 'recording') { stopRecording(); toast('That’s as long as one story can be — we kept what you recorded.'); }
+    };
+    rec.mr.onstop = finishRecording;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) {
+      try {
+        rec.ctx = new AC();
+        rec.analyser = rec.ctx.createAnalyser();
+        rec.analyser.fftSize = 1024;
+        rec.ctx.createMediaStreamSource(rec.stream).connect(rec.analyser);
+        if (rec.ctx.state === 'suspended') rec.ctx.resume().catch(() => {});
+      } catch (e) { rec.analyser = null; }
+    }
+    rec.mr.start(1000);
+    rec.t0 = performance.now();
+    setRecState('recording');
+    rec.timer = setInterval(() => {
+      const s = (performance.now() - rec.t0) / 1000;
+      $('#rec-time').textContent = fmtDur(s);
+      if (s >= MAX_REC_S) stopRecording();
+    }, 250);
+    drawLive();
+  }
+  function stopRecording() {
+    if (rec.mr && rec.mr.state !== 'inactive') {
+      rec.duration = (performance.now() - rec.t0) / 1000;
+      rec.mr.stop();
+    }
+    clearInterval(rec.timer);
+    cancelAnimationFrame(rec.raf);
+  }
+  function releaseMic() {
+    if (rec.stream) rec.stream.getTracks().forEach(t => t.stop());
+    rec.stream = null;
+    if (rec.ctx) rec.ctx.close().catch(() => {});
+    rec.ctx = null;
+    rec.analyser = null;
+  }
+  function finishRecording() {
+    releaseMic();
+    if (rec.discard) { rec.discard = false; return; }
+    const type = (rec.mr && rec.mr.mimeType) || rec.mime || 'audio/webm';
+    rec.blob = new Blob(rec.chunks, { type });
+    rec.chunks = [];
+    rec.mime = /^audio\/[a-z0-9.+-]+(;\s?codecs=[A-Za-z0-9.,"+-]+)?$/.test(type) ? type : type.split(';')[0];
+    if (!/^audio\//.test(rec.mime)) rec.mime = 'audio/webm';
+    if (rec.blob.size > 3 * PART) { toast('That recording is too long to save — try a shorter one.', true); resetRecorder(); return; }
+    if (rec.duration < 1 || !rec.blob.size) { toast('That was too short — try again.', true); resetRecorder(); return; }
+    // squeeze the loudness readings into a small waveform to store with the story
+    const lv = rec.levels.length ? rec.levels : [0];
+    const out = [];
+    for (let i = 0; i < PEAKS; i++) {
+      const a = Math.floor((i * lv.length) / PEAKS), b = Math.max(a + 1, Math.floor(((i + 1) * lv.length) / PEAKS));
+      out.push(Math.max(...lv.slice(a, b)));
+    }
+    const max = Math.max(...out, 0.0001);
+    rec.peaks = btoa(String.fromCharCode(...out.map(v => Math.round(Math.min(1, v / max) * 255))));
+    rec.url = URL.createObjectURL(rec.blob);
+    setRecState('review');
+    drawPeaks();
+    if (!$('#story-title').value && rec.prompt) $('#story-title').value = rec.prompt.replace(/\?$/, '');
+    $('#story-title').focus();
+  }
+  function resetRecorder() {
+    if (rec.mr && rec.mr.state !== 'inactive') { rec.discard = true; stopRecording(); }
+    clearInterval(rec.timer);
+    cancelAnimationFrame(rec.raf);
+    releaseMic();
+    if (rec.audio) { rec.audio.pause(); rec.audio = null; }
+    if (rec.url) URL.revokeObjectURL(rec.url);
+    Object.assign(rec, { mr: null, chunks: [], bytes: 0, levels: [], blob: null, url: '', duration: 0, peaks: '' });
+    $('#rec-time').textContent = '0:00';
+    $('#rec-play').innerHTML = `${icon('play')}Listen back`;
+    setRecState('idle');
+    clearWave();
+  }
+  function waveCtx() {
+    const c = $('#rec-wave'), dpr = Math.min(2, window.devicePixelRatio || 1);
+    const w = c.clientWidth || 400, h = c.clientHeight || 90;
+    if (c.width !== Math.round(w * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
+    const ctx = c.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    return { ctx, w, h };
+  }
+  function clearWave() { waveCtx(); }
+  function bars(ctx, w, h, vals, color) {
+    const step = 5, n = Math.floor(w / step);
+    ctx.fillStyle = color;
+    vals.slice(-n).forEach((v, i, arr) => {
+      const bh = Math.max(3, Math.min(1, v) * (h - 8));
+      const x = w - (arr.length - i) * step;
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(x, (h - bh) / 2, 3, bh, 1.5); else ctx.rect(x, (h - bh) / 2, 3, bh);
+      ctx.fill();
+    });
+  }
+  function drawLive() {
+    if (rec.state !== 'recording') return;
+    let level = 0.04 + 0.03 * Math.random();
+    if (rec.analyser) {
+      const buf = new Float32Array(rec.analyser.fftSize);
+      rec.analyser.getFloatTimeDomainData(buf);
+      let sum = 0;
+      for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+      level = Math.min(1, Math.sqrt(sum / buf.length) * 4.5);
+    }
+    rec.levels.push(level);
+    const { ctx, w, h } = waveCtx();
+    bars(ctx, w, h, rec.levels.slice(-600).filter((_, i) => i % 3 === 0), getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#a94f2b');
+    rec.raf = requestAnimationFrame(drawLive);
+  }
+  function drawPeaks(progress) {
+    const { ctx, w, h } = waveCtx();
+    const vals = Array.from(atob(rec.peaks), ch => ch.charCodeAt(0) / 255);
+    const n = vals.length, gap = w / n;
+    const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#a94f2b';
+    const muted = getComputedStyle(document.documentElement).getPropertyValue('--line-2').trim() || '#ccc';
+    vals.forEach((v, i) => {
+      const bh = Math.max(3, v * (h - 8));
+      ctx.fillStyle = progress != null && i / n <= progress ? accent : (progress == null ? accent : muted);
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(i * gap + gap * 0.2, (h - bh) / 2, gap * 0.6, bh, 1.5); else ctx.rect(i * gap + gap * 0.2, (h - bh) / 2, gap * 0.6, bh);
+      ctx.fill();
+    });
+  }
+  function toggleListen() {
+    if (!rec.url) return;
+    if (!rec.audio) {
+      rec.audio = new Audio(rec.url);
+      rec.audio.addEventListener('ended', () => { $('#rec-play').innerHTML = `${icon('play')}Listen back`; drawPeaks(); });
+      rec.audio.addEventListener('timeupdate', () => { if (rec.audio) drawPeaks(rec.audio.currentTime / (rec.duration || 1)); });
+    }
+    if (rec.audio.paused) { rec.audio.play().catch(() => {}); $('#rec-play').innerHTML = `${icon('pause')}Pause`; }
+    else { rec.audio.pause(); $('#rec-play').innerHTML = `${icon('play')}Listen back`; }
+  }
+  $('#story-dialog').addEventListener('close', () => { if (rec.state !== 'saving') resetRecorder(); });
+  $('#story-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!rec.blob) { toast('Record your story first.', true); return; }
+    const title = $('#story-title').value.trim().replace(/\s+/g, ' ');
+    if (!title) { toast('Give your story a title.', true); $('#story-title').focus(); return; }
+    const btn = $('#story-save');
+    busy(btn, true, 'Saving…');
+    rec.state = 'saving';
+    try {
+      const bytes = new Uint8Array(await rec.blob.arrayBuffer());
+      const parts = [];
+      for (let i = 0; i < bytes.length; i += PART) parts.push(bytes.slice(i, i + PART));
+      const ref = col('stories').doc();
+      const story = { title: title.slice(0, 120), uid: S.user.uid, author: myName().slice(0, 80), createdAt: nowIso(),
+        duration: Math.min(900, Math.max(0.1, Math.round(rec.duration * 10) / 10)), mime: rec.mime.slice(0, 60), parts: parts.length, peaks: rec.peaks };
+      if (rec.prompt) story.prompt = rec.prompt.slice(0, 200);
+      const batch = db.batch();
+      batch.set(ref, story);
+      parts.forEach((p, n) => batch.set(col('storyAudio').doc(`${ref.id}_${n}`), { story: ref.id, n, data: firebase.firestore.Blob.fromUint8Array(p), uid: S.user.uid }));
+      await batch.commit();
+      S.storyUrls[ref.id] = rec.url;
+      rec.url = '';
+      S.stories = [Object.assign({ id: ref.id }, story)].concat(S.stories || []);
+      rec.state = 'review';
+      $('#story-dialog').close();
+      if (S.view === 'stories') renderStories(); else location.hash = 'stories';
+      toast('Your story is saved for the family');
+    } catch (err) {
+      rec.state = 'review';
+      toast(denied(err) ? NEED_RULES : 'Couldn’t save your story. Please try again.', true);
+    } finally {
+      busy(btn, false);
+    }
+  });
+
+  /* ===================== Time Capsules ===================== */
+  // Letters sealed until a chosen day. firestore.rules won't hand a letter to anyone —
+  // its writer included — before its openAt time, so the seal is real, not just hidden.
+  const fmtLong = ms => new Date(ms).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+  function spanText(ms) {
+    const days = Math.max(1, Math.round(ms / 864e5));
+    if (days < 45) return plural(days, 'day');
+    const months = Math.round(days / 30.44);
+    if (months < 12) return plural(months, 'month');
+    const y = Math.floor(months / 12), m = months % 12;
+    return plural(y, 'year') + (m ? `, ${plural(m, 'month')}` : '');
+  }
+  function untilText(ms) {
+    const d = ms - Date.now();
+    if (d <= 0) return 'now';
+    if (d < 864e5) return `in ${plural(Math.ceil(d / 3600e3), 'hour')}`;
+    return `in ${spanText(d)}`;
+  }
+  const capReady = c => c.openAt <= Date.now();
+  const capReadByMe = c => !!(c.openedBy && S.user && c.openedBy[S.user.uid]);
+  const capSeal = c => esc(initials(c.author || '?').slice(0, 1));
+  const peopleText = n => (n === 1 ? '1 person' : `${n} people`);
+
+  async function loadCapsules(force) {
+    if (S.capsules && !force) return S.capsules;
+    const snap = await col('capsules').orderBy('openAt').get();
+    S.capsules = snap.docs.map(d => Object.assign({ id: d.id }, d.data())).filter(c => typeof c.openAt === 'number');
+    paintCapsuleBadge();
+    scheduleCapsuleTick();
+    return S.capsules;
+  }
+  function paintCapsuleBadge() {
+    const n = (S.capsules || []).filter(c => capReady(c) && !capReadByMe(c)).length;
+    $$('[data-capsule-badge]').forEach(b => { b.hidden = !n; b.textContent = n || ''; });
+    renderHomeCapsule();
+  }
+  // If a capsule opens while the hub is open (say, at midnight), show it right away.
+  let capsuleTimer = 0;
+  function scheduleCapsuleTick() {
+    clearTimeout(capsuleTimer);
+    const next = (S.capsules || []).map(c => c.openAt).filter(t => t > Date.now()).sort((a, b) => a - b)[0];
+    if (!next || next - Date.now() > 864e5) return;
+    capsuleTimer = setTimeout(() => {
+      paintCapsuleBadge();
+      if (S.view === 'capsules') renderCapsules();
+      scheduleCapsuleTick();
+    }, next - Date.now() + 1500);
+  }
+  function renderHomeCapsule() {
+    const box = $('#home-capsule');
+    const ready = (S.capsules || []).filter(c => capReady(c) && !capReadByMe(c));
+    box.hidden = !ready.length;
+    if (!ready.length) { box.innerHTML = ''; return; }
+    const c = ready[0], created = Date.parse(c.createdAt);
+    const ago = isNaN(created) ? '' : ` ${spanText(c.openAt - created)} ago`;
+    box.innerHTML = `<div class="capsule-banner">
+      <span class="seal" aria-hidden="true">${capSeal(c)}</span>
+      <div><strong>${ready.length > 1 ? `${ready.length} time capsules are ready to open` : 'A time capsule is ready to open'}</strong>
+      <p>“${esc(c.title)}” — sealed by ${esc(firstName(c.author))}${esc(ago)}</p></div>
+      <button class="btn btn-accent" type="button" data-action="open-capsule" data-id="${esc(c.id)}">${icon('letter')}Open it</button>
+    </div>`;
+  }
+
+  async function openCapsules() {
+    if (!S.capsules) $('#capsules').innerHTML = skelRows(3);
+    try { await loadCapsules(true); }
+    catch (e) {
+      $('#capsules').innerHTML = denied(e) ? emptyHTML('lock', 'Time capsules need the latest security rules', 'Publish firestore.rules — see README.') : errorHTML('time capsules');
+      return;
+    }
+    if (S.view === 'capsules') renderCapsules();
+  }
+  function renderCapsules() {
+    const all = S.capsules || [];
+    if (!all.length) {
+      $('#capsules').innerHTML = emptyHTML('letter', 'No time capsules yet', 'Seal the first one — a letter to a grandchild, to next Thanksgiving’s table, or to your future self.',
+        `<button class="btn btn-accent btn-sm" type="button" data-action="new-capsule">${icon('letter')}Seal a time capsule</button>`);
+      return;
+    }
+    const ready = all.filter(c => capReady(c) && !capReadByMe(c));
+    const sealed = all.filter(c => !capReady(c));
+    const opened = all.filter(c => capReady(c) && capReadByMe(c)).reverse();
+    const section = (title, list) => (list.length ? `<section class="cap-section"><h2 class="cap-h">${title}<span>${list.length}</span></h2><div class="capsules">${list.map(capCard).join('')}</div></section>` : '');
+    $('#capsules').innerHTML = section('Ready to open', ready) + section('Sealed', sealed) + section('Opened', opened);
+  }
+  function capCard(c) {
+    const state = !capReady(c) ? 'sealed' : capReadByMe(c) ? 'opened' : 'ready';
+    const created = Date.parse(c.createdAt), total = c.openAt - created;
+    const pct = isNaN(created) || total <= 0 ? 0 : Math.max(0, Math.min(1000, Math.round(((Date.now() - created) / total) * 1000)));
+    const readers = Object.keys(c.openedBy || {}).filter(k => c.openedBy[k]).length;
+    const canDelete = (S.user && c.uid === S.user.uid) || isAdmin();
+    const when = state === 'sealed' ? `${icon('lock')}Opens ${esc(fmtLong(c.openAt))} · ${esc(untilText(c.openAt))}`
+      : state === 'ready' ? `${icon('sparkle')}Opened ${esc(fmtLong(c.openAt))} — waiting for you`
+        : `${icon('check')}Opened ${esc(fmtLong(c.openAt))}${readers ? ` · read by ${peopleText(readers)}` : ''}`;
+    return `<article class="capsule is-${state}${S.justSealed === c.id ? ' just-sealed' : ''}" data-capsule="${esc(c.id)}">
+      <div class="cap-art" aria-hidden="true"><span class="seal">${capSeal(c)}</span></div>
+      <div class="cap-body">
+        <h3>${esc(c.title)}</h3>
+        <p class="cap-who">From ${esc(c.author || 'Family member')}${c.to ? ` · for ${esc(c.to)}` : ''}${c.hasPhoto ? ` · <span class="nw">${icon('image')}photo inside</span>` : ''}</p>
+        <p class="cap-when">${when}</p>
+        ${state === 'sealed' ? `<progress class="cap-progress" max="1000" value="${pct}" aria-label="How much of the wait has passed"></progress>` : ''}
+        ${state !== 'sealed' ? `<div class="cap-actions"><button class="btn ${state === 'ready' ? 'btn-accent' : 'btn-ghost'} btn-sm" type="button" data-action="open-capsule" data-id="${esc(c.id)}">${state === 'ready' ? `${icon('letter')}Open it` : 'Read it again'}</button></div>` : ''}
+      </div>
+      ${canDelete ? `<button class="icon-btn cap-del" type="button" data-action="delete-capsule" data-id="${esc(c.id)}" aria-label="Delete “${esc(c.title)}”">${icon('trash')}</button>` : ''}
+    </article>`;
+  }
+
+  // ---- writing one ----
+  function openCapsuleForm() {
+    $('#capsule-form').reset();
+    S.capPhoto = '';
+    paintCapPhoto('');
+    const min = new Date(); min.setDate(min.getDate() + 1);
+    const max = new Date(); max.setFullYear(max.getFullYear() + 99);
+    $('#cap-date').min = isoDay(min);
+    $('#cap-date').max = isoDay(max);
+    $('#cap-presets').innerHTML = capPresets().map(([label, d]) =>
+      `<button type="button" data-action="cap-preset" data-day="${isoDay(d)}" aria-pressed="false">${esc(label)}</button>`).join('');
+    $('#cap-count').textContent = '';
+    paintCapHint();
+    $('#capsule-dialog').showModal();
+    $('#cap-title').focus();
+  }
+  function capPresets() {
+    const now = new Date(), y = now.getFullYear();
+    const inYears = n => { const d = new Date(now.getFullYear() + n, now.getMonth(), now.getDate()); return d; };
+    const list = [['In 1 year', inYears(1)], ['In 5 years', inYears(5)], ['In 10 years', inYears(10)], [`New Year’s ${y + 1}`, new Date(y + 1, 0, 1)]];
+    // Kids in the directory: "Sofia turns 18"
+    S.members.forEach(m => {
+      if (!DAY.test(m.birthday || '')) return;
+      const b = parseDay(m.birthday), d = new Date(b.getFullYear() + 18, b.getMonth(), b.getDate());
+      if (d > now && b < now) list.push([`${firstName(m.name)} turns 18`, d]);
+    });
+    return list.slice(0, 7);
+  }
+  function paintCapHint() {
+    const v = $('#cap-date').value;
+    $('#cap-hint').textContent = DAY.test(v)
+      ? `Opens ${fmtLong(parseDay(v).getTime())} — ${untilText(parseDay(v).getTime())}. Until then, nobody can read it.`
+      : 'Pick any day from tomorrow up to 100 years from now.';
+    $$('#cap-presets [data-day]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.day === v)));
+  }
+  function paintCapPhoto(src) {
+    $('#cap-photo-preview').innerHTML = okImg(src) ? `<img src="${src}" alt="">` : icon('image');
+    $('#cap-photo-remove').hidden = !okImg(src);
+  }
+  $('#cap-date').addEventListener('input', paintCapHint);
+  $('#cap-date').addEventListener('change', paintCapHint);
+  $('#cap-text').addEventListener('input', e => { const n = e.target.value.length; $('#cap-count').textContent = n > 15000 ? `${n.toLocaleString()} / 20,000` : ''; });
+  $('#cap-photo-input').addEventListener('change', async e => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    try { S.capPhoto = await compressImage(f, 1600, 0.82, 780000); paintCapPhoto(S.capPhoto); }
+    catch (err) { toast('That photo couldn’t be used — try another one.', true); }
+  });
+  $('#capsule-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const title = $('#cap-title').value.trim().replace(/\s+/g, ' ');
+    const to = $('#cap-to').value.trim().replace(/\s+/g, ' ');
+    const text = $('#cap-text').value.trim();
+    const day = $('#cap-date').value;
+    if (!title) { toast('Give your time capsule a name.', true); $('#cap-title').focus(); return; }
+    if (!text) { toast('Write your letter first.', true); $('#cap-text').focus(); return; }
+    if (!DAY.test(day) || parseDay(day).getTime() < Date.now() + 2 * 3600e3) { toast('Pick a day in the future for it to open.', true); $('#cap-date').focus(); return; }
+    const openAt = parseDay(day).getTime();
+    if (!(await confirmBox(`Seal it until ${fmtLong(openAt)}?`, 'Once it’s sealed, nobody can read or change it until that day — not even you.', 'Seal it', 'go'))) return;
+    const btn = $('#cap-save');
+    busy(btn, true, 'Sealing…');
+    try {
+      const ref = col('capsules').doc();
+      const cap = { title: title.slice(0, 120), uid: S.user.uid, author: myName().slice(0, 80), createdAt: nowIso(), openAt, hasPhoto: okImg(S.capPhoto) };
+      if (to) cap.to = to.slice(0, 120);
+      const letter = { text: text.slice(0, 20000), uid: S.user.uid };
+      if (okImg(S.capPhoto)) letter.photo = S.capPhoto;
+      const batch = db.batch();
+      batch.set(ref, cap);
+      batch.set(col('capsuleLetters').doc(ref.id), letter);
+      await batch.commit();
+      $('#capsule-dialog').close();
+      S.capPhoto = '';
+      S.justSealed = ref.id;
+      S.capsules = (S.capsules || []).concat([Object.assign({ id: ref.id }, cap)]).sort((a, b) => a.openAt - b.openAt);
+      paintCapsuleBadge();
+      if (S.view === 'capsules') renderCapsules(); else location.hash = 'capsules';
+      toast(`Sealed until ${fmtLong(openAt)}`);
+      setTimeout(() => { S.justSealed = null; }, 2500);
+    } catch (err) {
+      toast(denied(err) ? NEED_RULES : 'Couldn’t seal it. Please try again.', true);
+    } finally {
+      busy(btn, false);
+    }
+  });
+
+  // ---- opening one ----
+  async function openCapsule(id) {
+    const c = (S.capsules || []).find(x => x.id === id);
+    if (!c) return;
+    const d = $('#capsule-open');
+    const ceremony = !capReadByMe(c) && !REDUCED;
+    d.classList.remove('cracked', 'flap-open', 'risen', 'reading');
+    $('#co-letter').hidden = true;
+    $('#co-wait').hidden = true;
+    $('#co-envelope').hidden = !ceremony;
+    $('#co-seal').textContent = initials(c.author || '?').slice(0, 1);
+    d.showModal();
+    let snap;
+    try {
+      [snap] = await Promise.all([col('capsuleLetters').doc(id).get(), ceremony ? playCeremony(d) : null]);
+    } catch (e) {
+      $('#co-envelope').hidden = true;
+      $('#co-wait').hidden = false;
+      $('#co-wait').textContent = denied(e) && !capReady(c) ? 'Still sealed — come back when the day arrives.'
+        : denied(e) ? 'Almost — it opens any moment now. Try again in a minute.' : 'Couldn’t open it. Check your connection and try again.';
+      return;
+    }
+    if (!d.open) return;
+    const letter = snap.exists ? snap.data() : null;
+    if (!letter) { $('#co-envelope').hidden = true; $('#co-wait').hidden = false; $('#co-wait').textContent = 'This letter has gone missing.'; return; }
+    const created = Date.parse(c.createdAt);
+    $('#co-meta').textContent = `Sealed ${isNaN(created) ? '' : fmtLong(created) + ' · '}opened ${fmtLong(c.openAt)}`;
+    $('#co-title').textContent = c.title;
+    $('#co-to').textContent = c.to ? `For ${c.to}` : '';
+    $('#co-to').hidden = !c.to;
+    const photo = $('#co-photo');
+    photo.hidden = !okImg(letter.photo);
+    if (okImg(letter.photo)) photo.src = letter.photo; else photo.removeAttribute('src');
+    $('#co-text').innerHTML = String(letter.text || '').split(/\n{2,}/).map(p => `<p>${esc(p).replace(/\n/g, '<br>')}</p>`).join('');
+    $('#co-sign').textContent = initials(c.author || '?').slice(0, 1);
+    $('#co-sealed').textContent = `With love, ${c.author || 'family'}${isNaN(created) ? '' : ` — kept sealed for ${spanText(c.openAt - created)}`}`;
+    $('#co-envelope').hidden = true;
+    $('#co-letter').hidden = false;
+    d.classList.add('reading');
+    $('#co-letter').scrollTop = 0;
+    if (!capReadByMe(c)) {
+      if (ceremony) confetti();
+      c.openedBy = Object.assign({}, c.openedBy, { [S.user.uid]: true });
+      paintCapsuleBadge();
+      if (S.view === 'capsules') renderCapsules();
+      col('capsules').doc(id).update({ ['openedBy.' + S.user.uid]: true }).catch(() => {});
+    }
+  }
+  // The seal cracks, the flap lifts, the letter slides out.
+  function playCeremony(d) {
+    const steps = [[450, 'cracked'], [650, 'flap-open'], [750, 'risen'], [700, null]];
+    return new Promise(res => {
+      let i = 0;
+      (function next() {
+        if (i >= steps.length || !d.open) { res(); return; }
+        const [ms, cls] = steps[i++];
+        setTimeout(() => { if (cls) d.classList.add(cls); next(); }, ms);
+      })();
+    });
+  }
+  async function deleteCapsule(id) {
+    const c = (S.capsules || []).find(x => x.id === id);
+    if (!c) return;
+    const body = capReady(c) ? 'The letter will be gone for everyone.' : 'The sealed letter will be gone for good — nobody will ever read it.';
+    if (!(await confirmBox(`Delete “${c.title}”?`, body, 'Delete'))) return;
+    try {
+      const b = db.batch();
+      b.delete(col('capsuleLetters').doc(id));
+      b.delete(col('capsules').doc(id));
+      await b.commit();
+      S.capsules = S.capsules.filter(x => x.id !== id);
+      paintCapsuleBadge();
+      if (S.view === 'capsules') renderCapsules();
+      toast('Time capsule deleted');
+    } catch (e) {
+      toast(denied(e) ? NEED_RULES : 'Couldn’t delete it. Please try again.', true);
+    }
+  }
+
   const RENDER = {
     home: renderHome, photos: openPhotos, calendar: openCalendar, updates: openUpdates,
     directory: () => { renderDirectory(); if (!S.members.length) loadMembers().catch(() => { $('#people').innerHTML = errorHTML('the directory'); }); },
-    recipes: openRecipes, invite: openInvite, vault: openVault, memorial: openMemorial, profile: renderProfile
+    recipes: openRecipes, invite: openInvite, vault: openVault, memorial: openMemorial, profile: renderProfile,
+    globe: openGlobe, stories: openStories, capsules: openCapsules
   };
 
   /* ===================== Events (delegated) ===================== */
@@ -2285,7 +3332,7 @@
       case 'more': $('#more-sheet').showModal(); break;
       case 'retry': {
         if (!S.view) break;
-        const stale = { home: ['events', 'updates', 'recent'], calendar: ['events'], updates: ['updates'], vault: ['vault'], memorial: ['memorial', 'tributes', 'candles'], recipes: ['recipes'] }[S.view] || [];
+        const stale = { home: ['events', 'updates', 'recent'], calendar: ['events'], capsules: ['capsules'], stories: ['stories'], updates: ['updates'], vault: ['vault'], memorial: ['memorial', 'tributes', 'candles'], recipes: ['recipes'] }[S.view] || [];
         stale.forEach(k => { S[k] = null; });
         if (S.view === 'photos') S.photos.loaded = false;
         if (!S.members.length) loadMembers().catch(() => {});
@@ -2367,7 +3414,44 @@
       case 'light-candle': lightCandle(t); break;
       case 'delete-tribute': deleteTribute(id); break;
       case 'lock-vault': lockVault('Vault locked'); break;
+      case 'vault-bio': unlockWithBio(); break;
+      case 'vault-bio-on': enableBio(t); break;
+      case 'vault-bio-off': disableBio(); break;
       case 'manage-member': openMemberDialog(t.dataset.uid); break;
+      case 'new-story': openRecorder(); break;
+      case 'rec-toggle': if (rec.state === 'recording') stopRecording(); else if (rec.state === 'idle') startRecording(); break;
+      case 'rec-play': toggleListen(); break;
+      case 'rec-redo': resetRecorder(); break;
+      case 'rec-prompt':
+        rec.prompt = t.getAttribute('aria-pressed') === 'true' ? '' : t.textContent;
+        $$('#rec-prompts button').forEach(b => b.setAttribute('aria-pressed', String(b === t && !!rec.prompt)));
+        $('#rec-prompt').textContent = rec.prompt || 'Tap the button and start talking.';
+        break;
+      case 'story-play': playStory(id); break;
+      case 'story-seek': seekStory(id, e, t); break;
+      case 'delete-story': deleteStory(id); break;
+      case 'new-capsule': openCapsuleForm(); break;
+      case 'cap-preset': $('#cap-date').value = t.dataset.day; paintCapHint(); break;
+      case 'cap-photo-remove': S.capPhoto = ''; paintCapPhoto(''); break;
+      case 'open-capsule': openCapsule(id); break;
+      case 'delete-capsule': deleteCapsule(id); break;
+      case 'globe-place': if (S.globe.picking) stopPicking(); else startPicking(); break;
+      case 'globe-cancel': stopPicking(); break;
+      case 'globe-locate': locateMe(); break;
+      case 'globe-remove': savePlace(true); break;
+      case 'globe-focus': focusPeople([t.dataset.uid]); break;
+      case 'globe-pin': focusPeople(t.dataset.ids.split(',')); break;
+      case 'globe-hour': setGlobeOffset(Number(t.dataset.i) * 4); break;
+      case 'globe-now': setGlobeOffset(0); break;
+      case 'globe-spin': {
+        if (!S.globe.api) break;
+        const on = !S.globe.api.spinning;
+        S.globe.api.setSpin(on);
+        t.setAttribute('aria-pressed', String(on));
+        t.setAttribute('aria-label', on ? 'Pause spinning' : 'Spin the globe');
+        t.innerHTML = icon(on ? 'pause' : 'play');
+        break;
+      }
       case 'remove-member': removeMember(); break;
       case 'copy-invite-link': copyText(inviteLink(), 'Invite link copied — paste it in a text or email'); break;
       case 'copy-invite-code': copyText(S.invite.code, 'Invite code copied'); break;

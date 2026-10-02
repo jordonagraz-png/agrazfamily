@@ -7,7 +7,7 @@
 <meta name="description" content="The private family hub of the Agraz family. Members only.">
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#0c1c21">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com 'sha256-eIdx0ElkPYRgx1b8NxbKKPNmiLz/Xc4jz1PPcLiw/Ac='; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https://images.unsplash.com; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.firebaseapp.com; frame-src https://agrazfamily.firebaseapp.com https://*.google.com; worker-src 'self'; manifest-src 'self'; base-uri 'self'; form-action 'self'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com 'sha256-eIdx0ElkPYRgx1b8NxbKKPNmiLz/Xc4jz1PPcLiw/Ac='; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https://images.unsplash.com; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.firebaseapp.com; frame-src https://agrazfamily.firebaseapp.com https://*.google.com; media-src 'self' blob:; worker-src 'self'; manifest-src 'self'; base-uri 'self'; form-action 'self'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -144,12 +144,16 @@
       <a href="#photos" data-nav="photos"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#image"/></svg>Photos</a>
       <a href="#calendar" data-nav="calendar"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#calendar"/></svg>Calendar</a>
       <a href="#updates" data-nav="updates"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#chat"/></svg>Updates</a>
+      <a href="#globe" data-nav="globe"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#earth"/></svg>Family Globe</a>
+      <p class="side-label">Keepsakes</p>
+      <a href="#stories" data-nav="stories"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#mic"/></svg>Voice Stories</a>
+      <a href="#capsules" data-nav="capsules"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#letter"/></svg>Time Capsules<span class="badge" data-capsule-badge hidden></span></a>
       <a href="#recipes" data-nav="recipes"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#book"/></svg>Recipes</a>
+      <a href="#memorial" data-nav="memorial"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#candle"/></svg>In Memory</a>
       <p class="side-label">Private</p>
       <a href="#directory" data-nav="directory"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#users"/></svg>Directory</a>
       <a href="#invite" data-nav="invite"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#user-plus"/></svg>Invite family<span class="badge" data-pending-badge hidden></span></a>
       <a href="#vault" data-nav="vault"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#key"/></svg>Family Vault</a>
-      <a href="#memorial" data-nav="memorial"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#candle"/></svg>In Memory</a>
       <p class="side-label">Links</p>
       <a href="#" data-link="tree" target="_blank" rel="noopener noreferrer"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#tree"/></svg>Family Tree<svg class="i ext" aria-hidden="true"><use href="/assets/icons.svg#external"/></svg></a>
       <button type="button" data-action="jarvis"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#cpu"/></svg>JARVIS<span class="pill">AI</span><svg class="i ext" aria-hidden="true"><use href="/assets/icons.svg#external"/></svg></button>
@@ -202,6 +206,7 @@
           </div>
         </div>
         <div id="home-bday" hidden></div>
+        <div id="home-capsule" hidden></div>
         <div class="dash">
           <article class="card span-2">
             <header class="card-head"><h2 class="card-title">Coming up</h2><a class="card-link" href="#calendar">Calendar <svg class="i" aria-hidden="true"><use href="/assets/icons.svg#arrow-r"/></svg></a></header>
@@ -310,6 +315,83 @@
         <div class="feed" id="feed"></div>
       </section>
 
+      <!-- ============ Family Globe ============ -->
+      <section class="view view-wide" id="view-globe" data-view="globe" aria-labelledby="globe-title" hidden>
+        <header class="view-head">
+          <div><p class="eyebrow plain">Wherever we are</p><h1 class="view-title" id="globe-title">Family Globe</h1></div>
+          <button class="btn" type="button" data-action="globe-place" id="globe-place-btn"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#locate"/></svg><span>Put me on the globe</span></button>
+        </header>
+        <div class="globe-wrap">
+          <div class="globe-stage" id="globe-stage">
+            <canvas id="globe-canvas" tabindex="0" role="img" aria-label="A globe showing where the family lives and where it’s day or night right now. Drag or use the arrow keys to turn it."></canvas>
+            <div class="globe-pins" id="globe-pins"></div>
+            <div class="globe-hud">
+              <span class="globe-live" id="globe-live"><span class="live-dot" aria-hidden="true"></span><span id="globe-live-text">Live daylight</span></span>
+              <button class="icon-btn globe-spin" type="button" data-action="globe-spin" id="globe-spin" aria-label="Pause spinning" aria-pressed="true"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#pause"/></svg></button>
+            </div>
+            <p class="globe-status" id="globe-status" hidden></p>
+            <form class="globe-pick" id="globe-pick" novalidate hidden>
+              <p class="globe-pick-title" id="globe-pick-title">Tap the globe where you live</p>
+              <button class="btn btn-sm btn-outline-light" type="button" data-action="globe-locate" id="globe-locate"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#locate"/></svg>Use my location</button>
+              <label class="sr-only" for="globe-label">Place name</label>
+              <input class="input" id="globe-label" maxlength="60" placeholder="What should we call it? e.g. Miami, FL" autocomplete="off">
+              <p class="globe-pick-note"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#shield"/></svg>Rounded to about 7 miles — never your street. Only family can see it.</p>
+              <div class="globe-pick-actions">
+                <button class="link-btn" type="button" data-action="globe-remove" id="globe-remove" hidden>Take me off the globe</button>
+                <button class="btn btn-sm btn-ghost-light" type="button" data-action="globe-cancel">Cancel</button>
+                <button class="btn btn-sm btn-accent" type="submit" id="globe-save" disabled>Save my spot</button>
+              </div>
+            </form>
+          </div>
+          <aside class="globe-side" aria-label="Family clocks">
+            <div class="card gt">
+              <div class="gt-head">
+                <h2 class="card-title"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#clock"/></svg>Family clocks</h2>
+                <button class="link-btn" type="button" data-action="globe-now" id="globe-now" hidden>Back to now</button>
+              </div>
+              <label class="gt-label" for="globe-time">Slide through the next day <output id="globe-time-label" for="globe-time">Now</output></label>
+              <input class="gt-range" type="range" id="globe-time" min="0" max="96" value="0" step="1">
+              <div class="gt-strip" id="globe-strip" aria-hidden="true"></div>
+              <p class="gt-best" id="globe-best"></p>
+            </div>
+            <ul class="clocks" id="globe-clocks"></ul>
+            <p class="muted gt-missing" id="globe-missing" hidden></p>
+          </aside>
+        </div>
+      </section>
+
+      <!-- ============ Voice Stories ============ -->
+      <section class="view" id="view-stories" data-view="stories" aria-labelledby="stories-title" hidden>
+        <header class="view-head">
+          <div><p class="eyebrow plain">In our own voices</p><h1 class="view-title" id="stories-title">Voice Stories</h1></div>
+          <button class="btn" type="button" data-action="new-story"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#mic"/></svg>Record a story</button>
+        </header>
+        <div class="story-intro">
+          <div class="si-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          <div>
+            <h2>Some things should be heard, not read.</h2>
+            <p>Grandma telling how she came to Miami. Dad’s terrible jokes. A toast, a lullaby, a laugh. Voices are the first thing we forget — keep them here, for the whole family, forever.</p>
+          </div>
+        </div>
+        <div class="stories" id="stories"></div>
+      </section>
+
+      <!-- ============ Time Capsules ============ -->
+      <section class="view" id="view-capsules" data-view="capsules" aria-labelledby="capsules-title" hidden>
+        <header class="view-head">
+          <div><p class="eyebrow plain">Letters to the future</p><h1 class="view-title" id="capsules-title">Time Capsules</h1></div>
+          <button class="btn" type="button" data-action="new-capsule"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#letter"/></svg>Seal a time capsule</button>
+        </header>
+        <div class="capsule-intro">
+          <span class="seal seal-lg" aria-hidden="true">A</span>
+          <div>
+            <h2>Write it today. Open it years from now.</h2>
+            <p>Write a letter, add a photo, and choose the day it opens. Until then it’s sealed — <strong>not even you can read it</strong>. The seal is kept by Google’s servers, not just this page, so nobody can peek early.</p>
+          </div>
+        </div>
+        <div id="capsules"></div>
+      </section>
+
       <!-- ============ Recipes ============ -->
       <section class="view" id="view-recipes" data-view="recipes" aria-labelledby="recipes-title" hidden>
         <header class="view-head">
@@ -369,6 +451,8 @@
           <div class="vault-lock-icon"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#lock"/></svg></div>
           <h2>The vault is locked</h2>
           <p class="muted">Enter your password to open it. For safety it locks itself again after 5 minutes without activity.</p>
+          <button class="btn btn-lg btn-block btn-accent vault-bio" type="button" data-action="vault-bio" id="vault-bio" hidden><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#fingerprint"/></svg><span id="vault-bio-label">Unlock with Face ID</span></button>
+          <p class="or-line" id="vault-or" hidden><span>or use your password</span></p>
           <input type="text" class="sr-only" id="vault-user" autocomplete="username" tabindex="-1" aria-hidden="true">
           <label class="sr-only" for="vault-pass">Your password</label>
           <div class="pass-wrap">
@@ -379,6 +463,7 @@
           <p class="form-msg" id="vault-msg" role="alert"></p>
         </form>
         <div id="vault-content" hidden>
+        <div class="bio-offer" id="vault-bio-offer" hidden></div>
         <div class="notice">
           <svg class="i" aria-hidden="true"><use href="/assets/icons.svg#shield"/></svg>
           <p><strong>Only signed-in family members can see the vault.</strong> Notes stay hidden until you tap them. Please don’t store bank passwords or full Social Security numbers here.</p>
@@ -517,6 +602,9 @@
 <dialog class="sheet" id="more-sheet" aria-label="More">
   <div class="sheet-grip" aria-hidden="true"></div>
   <nav class="sheet-nav">
+    <a href="#globe"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#earth"/></svg>Family Globe</a>
+    <a href="#stories"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#mic"/></svg>Voice Stories</a>
+    <a href="#capsules"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#letter"/></svg>Time Capsules<span class="badge" data-capsule-badge hidden></span></a>
     <a href="#recipes"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#book"/></svg>Recipes</a>
     <a href="#directory"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#users"/></svg>Directory</a>
     <a href="#invite"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#user-plus"/></svg>Invite family<span class="badge" data-pending-badge hidden></span></a>
@@ -652,6 +740,78 @@
       <button class="btn btn-accent" type="submit" id="md-save">Save</button>
     </footer>
   </form>
+</dialog>
+
+<dialog class="modal recorder" id="story-dialog" aria-labelledby="story-dialog-title">
+  <form method="dialog" id="story-form" novalidate>
+    <header class="modal-head"><h2 id="story-dialog-title">Record a story</h2><button class="icon-btn" type="button" data-close aria-label="Close"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#x"/></svg></button></header>
+    <div class="field">
+      <span class="label">Need a place to start?</span>
+      <div class="chips rec-chips" id="rec-prompts" role="group" aria-label="Story starters"></div>
+    </div>
+    <div class="rec-stage" id="rec-stage" data-state="idle">
+      <p class="rec-prompt" id="rec-prompt">Tap the button and start talking.</p>
+      <canvas class="rec-wave" id="rec-wave" aria-hidden="true"></canvas>
+      <p class="rec-time" id="rec-time">0:00</p>
+      <button class="rec-btn" type="button" data-action="rec-toggle" id="rec-btn" aria-label="Start recording"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#mic"/></svg></button>
+      <p class="rec-hint" id="rec-hint">Up to 10 minutes. Find a quiet spot and hold the phone close.</p>
+      <div class="rec-review" id="rec-review" hidden>
+        <button class="btn btn-ghost btn-sm" type="button" data-action="rec-play" id="rec-play"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#play"/></svg>Listen back</button>
+        <button class="btn btn-ghost btn-sm" type="button" data-action="rec-redo"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#refresh"/></svg>Record again</button>
+      </div>
+    </div>
+    <div class="field"><label class="label" for="story-title">Give it a title</label><input class="input" id="story-title" maxlength="120" placeholder="e.g. How Grandma and Grandpa met" required></div>
+    <footer class="modal-foot"><button class="btn btn-ghost" type="button" data-close>Cancel</button><button class="btn btn-accent" type="submit" id="story-save" disabled><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#upload"/></svg>Save story</button></footer>
+  </form>
+</dialog>
+
+<dialog class="modal capsule-write" id="capsule-dialog" aria-labelledby="capsule-dialog-title">
+  <form method="dialog" id="capsule-form" novalidate>
+    <header class="modal-head"><h2 id="capsule-dialog-title">Seal a time capsule</h2><button class="icon-btn" type="button" data-close aria-label="Close"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#x"/></svg></button></header>
+    <div class="field"><label class="label" for="cap-title">Name it</label><input class="input" id="cap-title" maxlength="120" placeholder="e.g. For Sofia on her 18th birthday" required></div>
+    <div class="field"><label class="label" for="cap-to">Who’s it for? <span class="opt">optional</span></label><input class="input" id="cap-to" maxlength="120" placeholder="e.g. Sofia — or the whole family"></div>
+    <div class="field"><label class="label" for="cap-text">Your letter <span class="opt" id="cap-count"></span></label><textarea class="textarea letter-paper" id="cap-text" maxlength="20000" rows="7" placeholder="Dear future us…" required></textarea></div>
+    <div class="field">
+      <span class="label">A photo to tuck inside <span class="opt">optional</span></span>
+      <div class="rf-photo">
+        <div class="rf-photo-preview" id="cap-photo-preview"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#image"/></svg></div>
+        <label class="btn btn-ghost btn-sm" for="cap-photo-input"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#image"/></svg>Choose photo</label>
+        <button class="btn btn-ghost btn-sm" type="button" data-action="cap-photo-remove" id="cap-photo-remove" hidden>Remove</button>
+        <input type="file" id="cap-photo-input" accept="image/*" class="sr-only">
+      </div>
+    </div>
+    <div class="field">
+      <label class="label" for="cap-date">Opens on</label>
+      <input class="input" type="date" id="cap-date" required>
+      <div class="chips cap-presets" id="cap-presets" role="group" aria-label="Quick picks"></div>
+      <p class="hint" id="cap-hint">Pick any day from tomorrow up to 100 years from now.</p>
+    </div>
+    <footer class="modal-foot"><button class="btn btn-ghost" type="button" data-close>Cancel</button><button class="btn btn-accent" type="submit" id="cap-save"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#lock"/></svg>Seal it</button></footer>
+  </form>
+</dialog>
+
+<dialog class="capsule-open" id="capsule-open" aria-labelledby="co-title">
+  <button class="icon-btn co-close" type="button" data-close aria-label="Close"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#x"/></svg></button>
+  <div class="co-stage" id="co-stage">
+    <div class="envelope" id="co-envelope" aria-hidden="true">
+      <div class="env-back"></div>
+      <div class="env-paper"></div>
+      <div class="env-front"></div>
+      <div class="env-flap"></div>
+      <span class="seal seal-env" id="co-seal"></span>
+    </div>
+    <article class="co-letter" id="co-letter" hidden>
+      <header class="co-head">
+        <p class="co-meta" id="co-meta"></p>
+        <h2 id="co-title"></h2>
+        <p class="co-to" id="co-to"></p>
+      </header>
+      <img class="co-photo" id="co-photo" alt="" hidden>
+      <div class="co-text" id="co-text"></div>
+      <footer class="co-foot"><span class="seal seal-sm" id="co-sign" aria-hidden="true"></span><p id="co-sealed"></p></footer>
+    </article>
+    <p class="co-wait" id="co-wait" hidden></p>
+  </div>
 </dialog>
 
 <dialog class="modal modal-sm" id="confirm-dialog" aria-labelledby="confirm-title">

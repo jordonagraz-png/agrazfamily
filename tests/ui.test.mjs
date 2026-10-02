@@ -9,11 +9,14 @@ const SLOW = Number(process.env.SLOW) || 1; // CI runners can be slower: SLOW=2 
 const MOCK = readFileSync(new URL('./mock-firebase.js', import.meta.url), 'utf8');
 const server = await start(0);
 const BASE = `http://127.0.0.1:${server.address().port}`;
-const browser = await chromium.launch();
+// Fake microphone for the Voice Stories recorder.
+const browser = await chromium.launch({ args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--autoplay-policy=no-user-gesture-required'] });
+const LOCAL = BASE.replace('127.0.0.1', 'localhost'); // WebAuthn needs a domain name, not an IP
 let pass = 0, fail = 0;
 const ok = (cond, name) => { if (cond) { pass++; console.log('  ok  ', name); } else { fail++; console.log('  FAIL', name); } };
 
-async function open(path, mock = {}, ctxOpts = {}) {
+async function open(path, mock = {}, opts = {}) {
+  const { localhost, webauthn, ...ctxOpts } = opts;
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 860 }, serviceWorkers: 'block', acceptDownloads: true, ...ctxOpts });
   await ctx.addInitScript(m => {
     window.__MOCK = m;
@@ -22,7 +25,7 @@ async function open(path, mock = {}, ctxOpts = {}) {
   }, mock);
   await ctx.route('**/*', route => {
     const url = route.request().url();
-    if (url.startsWith(BASE)) return route.continue();
+    if (url.startsWith(BASE) || url.startsWith(LOCAL)) return route.continue();
     if (url.startsWith('https://www.gstatic.com/firebasejs/')) {
       return route.fulfill({ contentType: 'text/javascript', body: url.includes('firebase-app-compat') ? MOCK : '/* stub */' });
     }
@@ -32,7 +35,13 @@ async function open(path, mock = {}, ctxOpts = {}) {
   page.errors = [];
   page.on('pageerror', e => page.errors.push(e.message));
   if (ctxOpts.clockTime) await page.clock.install({ time: ctxOpts.clockTime });
-  await page.goto(BASE + path, { waitUntil: 'domcontentloaded' });
+  if (webauthn) {
+    // A virtual Face ID / fingerprint sensor that always recognizes you.
+    const cdp = await ctx.newCDPSession(page);
+    await cdp.send('WebAuthn.enable');
+    await cdp.send('WebAuthn.addVirtualAuthenticator', { options: { protocol: 'ctap2', transport: 'internal', hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true } });
+  }
+  await page.goto((localhost ? LOCAL : BASE) + path, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(SLOW * 500);
   return page;
 }
@@ -448,6 +457,195 @@ try {
     await go(mem, 'directory');
     ok(await mem.$$eval('[data-action=manage-member]', e => e.length) === 0, 'members can’t manage other members');
     await done(mem, 'member');
+  }
+
+  console.log('— family globe');
+  {
+    const p = await open('/family/#globe', { signedIn: true, placed: true });
+    await p.waitForTimeout(SLOW * 1600);
+    ok(await p.evaluate(() => !!window.AgrazGlobe), 'the globe loads on demand');
+    ok(await p.evaluate(() => {
+      const c = document.getElementById('globe-canvas'), d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+      let lit = 0; for (let i = 3; i < d.length; i += 4 * 61) if (d[i] > 0) lit++;
+      return lit > 1000;
+    }), 'the Earth is drawn with live daylight');
+    ok(await p.$$eval('.gpin', e => e.length) === 3, 'family pins: Miami (3 of us), Austin and Madrid');
+    ok(await p.$$eval('#globe-clocks .clock', e => e.length) === 5, 'a clock for everyone on the globe');
+    ok((await p.textContent('#globe-clocks')).includes('Madrid, Spain'), 'clocks say where each person is');
+    ok((await p.textContent('#globe-clocks')).includes('mi away'), '…and how far they are from you');
+    ok((await p.textContent('#globe-missing')).includes('Sofia'), 'lists who isn’t on the globe yet');
+    ok((await p.textContent('#globe-best')).includes('Best time for a family call'), 'finds the best time for a family call');
+    ok(await p.$$eval('#globe-strip .gt-cell', e => e.length) === 24, 'shows who’s awake hour by hour');
+    const madridNow = () => p.evaluate(() => new Date().toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZone: 'Europe/Madrid' }));
+    const before = await madridNow(), shown = await p.textContent('.clock[data-uid=u3] .clock-time b'), after = await madridNow();
+    ok(shown === before || shown === after, 'Daniel’s clock shows the time in Madrid');
+    await p.evaluate(() => { const r = document.getElementById('globe-time'); r.value = '48'; r.dispatchEvent(new Event('input', { bubbles: true })); });
+    await p.waitForTimeout(SLOW * 200);
+    ok((await p.textContent('#globe-time-label')) !== 'Now', 'slide forward in time');
+    ok((await p.textContent('.clock[data-uid=u3] .clock-time b')) !== shown, '…and everyone’s clocks move with it');
+    ok(await p.evaluate(() => document.getElementById('globe-live').classList.contains('travel')), '…and so does the daylight');
+    await p.click('#globe-now');
+    ok((await p.textContent('#globe-time-label')) === 'Now', 'back to now');
+    await p.click('.clock[data-uid=u3]');
+    await p.waitForTimeout(SLOW * 300);
+    ok(await p.evaluate(() => document.querySelector('.gpin[data-ids="u3"]').classList.contains('is-active')), 'choosing someone highlights their pin');
+    await p.click('#globe-spin');
+    ok(await p.getAttribute('#globe-spin', 'aria-pressed') === 'false', 'the spin can be paused');
+    await p.click('#globe-place-btn');
+    ok(!(await p.isHidden('#globe-remove')), 'you can take yourself off the globe');
+    await p.click('#globe-remove');
+    await p.waitForTimeout(SLOW * 500);
+    ok(await store(p, () => window.__store.users.u1.place === null), '…and your spot is removed');
+    await done(p, 'globe');
+
+    const q = await open('/family/#globe', { signedIn: true }, { geolocation: { latitude: 25.76168, longitude: -80.19179 }, permissions: ['geolocation'] });
+    await q.waitForTimeout(SLOW * 1600);
+    ok((await q.textContent('#globe-place-btn')).includes('Put me on the globe'), 'invites you to put yourself on the globe');
+    await q.click('#globe-spin');
+    await q.click('#globe-place-btn');
+    ok(await q.isDisabled('#globe-save'), 'can’t save before choosing a spot');
+    const box = await (await q.$('#globe-canvas')).boundingBox();
+    await q.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    await q.waitForTimeout(SLOW * 150);
+    ok((await q.textContent('#globe-pick-title')).startsWith('Your spot:'), 'tap the globe to pick your spot');
+    await q.click('#globe-locate');
+    await q.waitForTimeout(SLOW * 500);
+    ok((await q.textContent('#globe-pick-title')).includes('25.8°N, 80.2°W'), '“Use my location” finds you (rounded)');
+    await q.fill('#globe-label', 'Miami, FL');
+    await q.click('#globe-save');
+    await q.waitForTimeout(SLOW * 600);
+    const place = await store(q, () => window.__store.users.u1.place);
+    ok(place && place.label === 'Miami, FL' && place.lat === 25.8 && place.lng === -80.2 && !!place.tz, 'your spot is saved, rounded, with your time zone');
+    ok(await q.$$eval('#globe-clocks .clock', e => e.length) === 5, 'you join the family clocks');
+    ok((await q.textContent('#globe-place-btn')).includes('Move my pin'), '…and can move your pin later');
+    await done(q, 'globe picking');
+  }
+
+  console.log('— time capsules');
+  {
+    const p = await open('/family/#home', { signedIn: true });
+    await p.waitForTimeout(SLOW * 1200);
+    ok(!(await p.isHidden('#home-capsule')), 'home announces a time capsule that’s ready');
+    ok(await p.evaluate(() => [...document.querySelectorAll('[data-capsule-badge]')].some(b => !b.hidden && b.textContent === '1')), 'the menu shows one waiting');
+    await go(p, 'capsules');
+    await p.waitForTimeout(SLOW * 300);
+    ok(await p.$$eval('#capsules .capsule', e => e.length) === 3, 'all capsules are listed');
+    ok(await p.$$eval('#capsules .capsule.is-sealed', e => e.length) === 2, 'two are still sealed');
+    ok((await p.textContent('#capsules')).includes('in 4 years'), 'sealed ones count down to their day');
+    ok(await p.$$eval('#capsules .is-sealed [data-action=open-capsule]', e => e.length) === 0, 'sealed capsules can’t be opened');
+    ok(await p.evaluate(async () => { try { await firebase.firestore().collection('capsuleLetters').doc('k1').get(); return false; } catch (e) { return e.code === 'permission-denied'; } }), 'a sealed letter can’t be fetched early');
+    await p.click('#capsules [data-action=open-capsule][data-id=k2]');
+    await p.waitForTimeout(SLOW * 3000);
+    ok((await p.textContent('#co-text')).includes('Look how far we’ve come'), 'opening it reveals the letter');
+    ok(await p.evaluate(() => !document.getElementById('co-photo').hidden), '…and the photo tucked inside');
+    ok((await p.textContent('#co-sealed')).includes('kept sealed for'), 'says how long it was sealed');
+    ok(await store(p, () => window.__store.capsules.k2.openedBy.u1 === true), 'remembers that you read it');
+    await p.keyboard.press('Escape');
+    await p.waitForTimeout(SLOW * 200);
+    ok(await p.evaluate(() => [...document.querySelectorAll('[data-capsule-badge]')].every(b => b.hidden)), 'the badge clears once you’ve read it');
+    ok(await p.$$eval('#capsules .capsule.is-opened', e => e.length) === 1, 'it moves to “Opened”');
+
+    await p.click('.view-head [data-action=new-capsule]');
+    await p.fill('#cap-title', 'For the grandkids');
+    await p.fill('#cap-text', 'Dear ones, this is what 2026 was like.');
+    ok((await p.textContent('#cap-presets')).includes('Sofia turns 18'), 'suggests a child’s 18th birthday');
+    await p.click('#cap-presets [data-day]');
+    ok((await p.textContent('#cap-hint')).includes('in 1 year'), 'quick picks set the opening day');
+    await p.click('#cap-save');
+    await p.waitForTimeout(SLOW * 300);
+    ok((await p.textContent('#confirm-title')).includes('Seal it until'), 'asks before sealing it for good');
+    await p.click('#confirm-ok');
+    await p.waitForTimeout(SLOW * 900);
+    const made = await store(p, () => {
+      const id = Object.keys(window.__store.capsules).find(k => window.__store.capsules[k].title === 'For the grandkids');
+      return id ? { cap: window.__store.capsules[id], letter: window.__store.capsuleLetters[id] } : null;
+    });
+    ok(!!made && !!made.letter && made.letter.text.includes('2026') && made.cap.openAt > Date.now() + 300 * 864e5 && made.cap.uid === 'u1', 'the capsule and its letter are sealed together');
+    ok(await p.$$eval('#capsules .capsule.is-sealed', e => e.length) === 3, 'it joins the sealed capsules');
+    await p.click('#capsules [data-action=delete-capsule][data-id=k2]');
+    await p.click('#confirm-ok');
+    await p.waitForTimeout(SLOW * 600);
+    ok(await store(p, () => !window.__store.capsules.k2 && !window.__store.capsuleLetters.k2), 'you can delete your own capsule (letter and all)');
+    await done(p, 'time capsules');
+
+    const mem = await open('/family/#capsules', { signedIn: true, admin: false });
+    await mem.waitForTimeout(SLOW * 1200);
+    ok(await mem.$$eval('[data-action=delete-capsule]', e => e.map(b => b.dataset.id).join()) === 'k2', 'members can only delete their own capsules');
+    await done(mem, 'capsules (member)');
+  }
+
+  console.log('— voice stories');
+  {
+    const p = await open('/family/#stories', { signedIn: true }, { permissions: ['microphone'] });
+    await p.waitForTimeout(SLOW * 1200);
+    ok(await p.$$eval('#stories .story', e => e.length) === 3, 'stories are listed');
+    ok(await p.$$eval('#stories .wave-base svg rect', e => e.length) === 3 * 96, 'each story shows its waveform');
+    await p.click('[data-action=story-play][data-id=st1]');
+    await p.waitForTimeout(SLOW * 1200);
+    ok(await p.evaluate(() => document.querySelector('.story-play[data-id=st1]').classList.contains('is-playing')), 'tap play and the story plays');
+    ok((await p.textContent('[data-story-time=st1]')).includes(' / '), 'shows how far along it is');
+    await p.click('[data-action=story-play][data-id=st1]');
+    await p.waitForTimeout(SLOW * 200);
+    ok(!(await p.evaluate(() => document.querySelector('.story-play[data-id=st1]').classList.contains('is-playing'))), 'tap again to pause');
+    await p.click('[data-action=heart][data-col=stories][data-id=st2]');
+    await p.waitForTimeout(SLOW * 300);
+    ok(await store(p, () => window.__store.stories.st2.hearts.u1 === true), 'send a heart');
+
+    await p.click('.view-head [data-action=new-story]');
+    await p.click('#rec-prompts button');
+    ok((await p.textContent('#rec-prompt')).includes('How did you two meet?'), 'story starters help you begin');
+    await p.click('#rec-btn');
+    await p.waitForTimeout(2600);
+    ok(await p.evaluate(() => document.getElementById('rec-stage').dataset.state) === 'recording', 'records from the microphone');
+    ok((await p.textContent('#rec-time')) !== '0:00', 'with a running timer');
+    await p.click('#rec-btn');
+    await p.waitForTimeout(SLOW * 800);
+    ok(await p.evaluate(() => document.getElementById('rec-stage').dataset.state) === 'review', 'stop, then listen back');
+    ok(!(await p.isDisabled('#story-save')), 'ready to save');
+    await p.fill('#story-title', 'A test story');
+    await p.click('#story-save');
+    await p.waitForTimeout(SLOW * 1000);
+    const saved = await store(p, () => {
+      const id = Object.keys(window.__store.stories).find(k => window.__store.stories[k].title === 'A test story');
+      return id ? { st: window.__store.stories[id], audio: window.__store.storyAudio[id + '_0'], id } : null;
+    });
+    ok(!!saved && !!saved.audio && saved.st.duration >= 2 && /^audio\//.test(saved.st.mime) && saved.st.peaks.length > 20 && saved.st.prompt === 'How did you two meet?', 'the recording is saved with its waveform and prompt');
+    ok((await p.textContent('#stories .story:first-child h3')) === 'A test story', 'the new story appears at the top');
+    await p.click('#stories .story:first-child [data-action=delete-story]');
+    await p.click('#confirm-ok');
+    await p.waitForTimeout(SLOW * 600);
+    ok(await store(p, () => !Object.values(window.__store.stories).some(s => s.title === 'A test story') && !Object.keys(window.__store.storyAudio).some(k => !/^st\d_/.test(k))), 'you can delete your own story (audio and all)');
+    await done(p, 'voice stories');
+
+    const mem = await open('/family/#stories', { signedIn: true, admin: false });
+    await mem.waitForTimeout(SLOW * 1200);
+    ok(await mem.$$eval('[data-action=delete-story]', e => e.length) === 0, 'members can’t delete other people’s stories');
+    await done(mem, 'stories (member)');
+  }
+
+  console.log('— vault quick unlock (Face ID / fingerprint)');
+  {
+    const p = await open('/family/#vault', { signedIn: true }, { localhost: true, webauthn: true });
+    await p.waitForTimeout(SLOW * 900);
+    ok(await p.isHidden('#vault-bio'), 'no quick unlock until you turn it on');
+    await p.fill('#vault-pass', 'password123');
+    await p.click('#vault-unlock');
+    await p.waitForTimeout(SLOW * 600);
+    ok((await p.textContent('#vault-bio-offer')).includes('Unlock faster'), 'offers quick unlock on this device');
+    await p.click('[data-action=vault-bio-on]');
+    await p.waitForTimeout(SLOW * 800);
+    ok((await p.textContent('#vault-bio-offer')).includes('Quick unlock is on'), 'quick unlock is set up with a passkey');
+    await p.click('[data-action=lock-vault]');
+    await p.waitForTimeout(SLOW * 300);
+    ok(!(await p.isHidden('#vault-bio')), 'the locked vault offers quick unlock');
+    await p.click('#vault-bio');
+    await p.waitForTimeout(SLOW * 800);
+    ok(!(await p.isHidden('#vault-content')), 'Face ID / fingerprint opens the vault');
+    await p.click('[data-action=vault-bio-off]');
+    await p.click('[data-action=lock-vault]');
+    await p.waitForTimeout(SLOW * 300);
+    ok(await p.isHidden('#vault-bio'), 'quick unlock can be turned off again');
+    await done(p, 'quick unlock');
   }
 
   console.log('— install prompt + sign out');
