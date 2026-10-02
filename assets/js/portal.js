@@ -3697,7 +3697,7 @@
     S.tree = { status: 'ready', meta, model, ix: T().index(model), photos: prev.photos || {}, research: prev.research || {}, view: prev.view || 'family', history: [], relCache: new Map(), memorialThumb: prev.memorialThumb || '', ghosts: new Map(),
       counts: model.people.reduce((c, p) => { c.records += (p.src || []).length; c.media += (p.md || []).length; return c; }, { records: 0, media: 0 }) };
     S.tree.focus = treeStart();
-    loadTreePhotos();
+    S.tree.photosLoaded = loadTreePhotos();
   }
   const treeMe = () => (S.tree && S.tree.ix && S.me && S.me.treeId && S.tree.ix.get(S.me.treeId) ? S.me.treeId : null);
   function treeStart() {
@@ -4471,6 +4471,7 @@
       const newer = t.status !== 'ready' || (t.meta.v || 1) < (data.tree.v || 1);
       const placeSrc = data.places || (data.research && data.research.places);
       const places = placeSrc && typeof placeSrc === 'object' ? Object.entries(placeSrc).filter(([id, x]) => /^place-[a-z0-9-]{1,32}$/.test(id) && x && okImg(x.img) && x.img.length <= 90000) : [];
+      if (S.tree && S.tree.photosLoaded) { try { await S.tree.photosLoaded; } catch (e) {} } // know which photos are already there
       const missingPlaces = places.filter(([id]) => !(S.tree && S.tree.photos && S.tree.photos[id]));
       const hadResearch = t.research && Object.keys(t.research).length;
       if (!newer && (hadResearch || !data.research) && !missingPlaces.length) { toast('The family tree is already up to date'); return; }
