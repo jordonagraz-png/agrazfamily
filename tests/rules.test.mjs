@@ -47,7 +47,8 @@ await t('stranger cannot list members', getDocs(collection(eve, 'users')), false
 await t('stranger cannot read vault', getDoc(doc(eve, 'vault/n1')), false);
 await t('stranger cannot read recipes', getDocs(collection(eve, 'recipes')), false);
 await t('stranger may check own (missing) member doc', getDoc(doc(eve, 'users/eve')), true);
-await t('nobody can read the invite code', getDoc(doc(alice, 'config/invite')), false);
+await t('members cannot read the invite code', getDoc(doc(bob, 'config/invite')), false);
+await t('outsiders cannot read the invite code', getDoc(doc(eve, 'config/invite')), false);
 await t('cannot self-create member doc without join', setDoc(doc(eve, 'users/eve'), newMember()), false);
 await t('wrong invite code rejected', setDoc(doc(eve, 'joins/eve'), { code: 'agraz2025', createdAt: 'x' }), false);
 await t('cannot write a join for someone else', setDoc(doc(eve, 'joins/mallory'), { code: 'seashell', createdAt: 'x' }), false);
@@ -122,6 +123,21 @@ await t('cannot delete someone else\'s memory', deleteDoc(doc(bob, 'tributes/t1'
 await t('light a candle', setDoc(doc(bob, 'candles/bob'), { name: 'Bob', litAt: 'x' }), true);
 await t('cannot light a candle for someone else', setDoc(doc(bob, 'candles/alice'), { name: 'Alice', litAt: 'x' }), false);
 await t('members see candles', getDocs(collection(bob, 'candles')), true);
+
+console.log('— invite settings (admins)');
+await t('admin reads the invite code', getDoc(doc(alice, 'config/invite')), true);
+await t('admin changes the invite code', setDoc(doc(alice, 'config/invite'), { code: 'coral-tide-4821', requireApproval: false }), true);
+await t('old code stops working', setDoc(doc(as('gus', 'gus@x.com'), 'joins/gus'), { code: 'seashell', createdAt: 'x' }), false);
+await t('new code works', setDoc(doc(as('hal', 'hal@x.com'), 'joins/hal'), { code: 'coral-tide-4821', createdAt: 'x' }), true);
+await t('admin turns on approval', updateDoc(doc(alice, 'config/invite'), { requireApproval: true }), true);
+await t('code must be 6+ characters', setDoc(doc(alice, 'config/invite'), { code: 'abc', requireApproval: true }), false);
+await t('code must be letters, numbers, dashes', setDoc(doc(alice, 'config/invite'), { code: 'bad code!', requireApproval: true }), false);
+await t('invite settings reject extra fields', setDoc(doc(alice, 'config/invite'), { code: 'coral-tide-4821', requireApproval: true, owner: 'x' }), false);
+await t('non-admin cannot change the code', setDoc(doc(bob, 'config/invite'), { code: 'bobs-own-code', requireApproval: false }), false);
+await t('admin cannot touch other config docs', setDoc(doc(alice, 'config/other'), { code: 'whatever1' }), false);
+await t('nobody can delete invite settings', deleteDoc(doc(alice, 'config/invite')), false);
+await env.withSecurityRulesDisabled(async c => { await deleteDoc(doc(c.firestore(), 'config/invite')); });
+await t('admin can create the invite code from the hub', setDoc(doc(alice, 'config/invite'), { code: 'first-code-2026', requireApproval: false }), true);
 
 console.log('— approval required');
 await seed({ requireApproval: true });

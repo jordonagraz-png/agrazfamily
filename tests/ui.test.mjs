@@ -317,6 +317,77 @@ try {
     await done(p, 'vault');
   }
 
+  console.log('— invite family');
+  {
+    const p = await open('/family/#invite', { signedIn: true }, { permissions: ['clipboard-read', 'clipboard-write'] });
+    await p.waitForTimeout(SLOW * 900);
+    const link = await p.inputValue('#invite-link');
+    ok(link.endsWith('/family/#join?code=seashell'), 'admin sees the invite link with the code built in');
+    ok(await p.$$eval('#invite-qr svg path', e => e.length) === 1, 'QR code drawn for in-person invites');
+    ok((await p.textContent('.side-nav a[href="#invite"] [data-pending-badge]')).trim() === '1', 'Invite menu item shows people waiting');
+    await p.click('[data-action=copy-invite-link]');
+    await p.waitForTimeout(SLOW * 200);
+    ok(await p.evaluate(() => navigator.clipboard.readText()) === link, 'Copy link puts the invite link on the clipboard');
+    const sms = await p.getAttribute('.share-row a[href^="sms:"]', 'href');
+    ok(sms.includes(encodeURIComponent(link)), 'Text message button carries the link');
+    ok((await p.getAttribute('.share-row a[href^="mailto:"]', 'href')).includes('subject='), 'Email button has a subject and message');
+    await p.click('[data-action=copy-invite-message]');
+    await p.waitForTimeout(SLOW * 200);
+    ok((await p.evaluate(() => navigator.clipboard.readText())).includes('Invite code: seashell'), 'Copy invite message includes the link and code');
+    await p.check('#invite-approval');
+    await p.waitForTimeout(SLOW * 400);
+    ok(await store(p, () => window.__store.config.invite.requireApproval === true), 'approval switch saves');
+    ok((await p.textContent('.invite-how')).includes('You approve them'), '"How it works" reflects approval');
+    await p.click('#invite-body [data-action=approve-member][data-uid=u7]');
+    await p.waitForTimeout(SLOW * 800);
+    ok(await store(p, () => window.__store.users.u7.approved === true), 'approve a waiting member right from the Invite page');
+    await p.click('[data-action=new-invite-code]');
+    await p.click('#confirm-ok');
+    await p.waitForTimeout(SLOW * 500);
+    const code = await store(p, () => window.__store.config.invite.code);
+    ok(/^[a-z]+-[a-z]+-\d{4}$/.test(code) && code !== 'seashell', `"Make a new code" creates a friendly code (${code})`);
+    ok((await p.inputValue('#invite-link')).endsWith(`#join?code=${code}`), 'invite link updates with the new code');
+    await p.click('[data-action=custom-invite-code]');
+    await p.fill('#custom-code', 'abc');
+    await p.press('#custom-code', 'Enter');
+    await p.waitForTimeout(SLOW * 300);
+    ok(await store(p, () => window.__store.config.invite.code) === code, 'too-short custom code is refused');
+    await p.fill('#custom-code', 'agraz-sunday-dinner');
+    await p.press('#custom-code', 'Enter');
+    await p.waitForTimeout(SLOW * 500);
+    ok(await store(p, () => window.__store.config.invite.code) === 'agraz-sunday-dinner', 'choose your own invite code');
+    await go(p, 'directory');
+    ok(await p.isVisible('#view-directory a[href="#invite"]'), 'Directory has an "Invite family" button');
+    await done(p, 'invite (admin)');
+
+    const first = await open('/family/#invite', { signedIn: true, noInvite: true });
+    await first.waitForTimeout(SLOW * 900);
+    await first.click('[data-action=create-invite]');
+    await first.waitForTimeout(SLOW * 500);
+    ok(await store(first, () => /^[a-z]+-[a-z]+-\d{4}$/.test(window.__store.config.invite.code) && window.__store.config.invite.requireApproval === true), 'first-time setup: create the invite code from the hub');
+    ok(await first.$$eval('#invite-qr svg', e => e.length) === 1, 'invite link + QR appear right after setup');
+    await done(first, 'invite (setup)');
+
+    const member = await open('/family/#invite', { signedIn: true, admin: false });
+    await member.waitForTimeout(SLOW * 900);
+    const body = await member.textContent('#invite-body');
+    ok(!body.includes('seashell'), 'non-admins never see the invite code');
+    ok(body.includes('role') && body.includes('admin'), 'without any admin, the page explains how to become one');
+    await done(member, 'invite (member)');
+
+    const guest = await open('/family/#join?code=seashell', { signedIn: false, newUser: true });
+    ok(await guest.inputValue('#join-code') === 'seashell', 'invite link fills in the code for the new person');
+    ok((await guest.textContent('#auth-sub')).includes('You’ve been invited'), 'invite link greets them');
+    await guest.fill('#join-name', 'Invited Cousin');
+    await guest.fill('#join-email', 'invited@example.com');
+    await guest.fill('#join-pass', 'longenough1');
+    await guest.click('#form-join button[type=submit]');
+    await guest.waitForTimeout(SLOW * 1200);
+    ok(await state(guest) === 'app', 'they join with just name, email and password');
+    ok(!guest.url().includes('code='), 'the code is cleared from the address bar after joining');
+    await done(guest, 'invite link');
+  }
+
   console.log('— install prompt + sign out');
   {
     const ua = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';

@@ -1,6 +1,6 @@
 /* Test double for the Firebase compat SDK subset used by assets/js/portal.js.
    Loaded by tests/ui.test.mjs in place of https://www.gstatic.com/firebasejs/…/firebase-app-compat.js.
-   Options (set window.__MOCK before load): signedIn, newUser, empty, bdayToday, admin, requireApproval.
+   Options (set window.__MOCK before load): signedIn, newUser, empty, bdayToday, admin, requireApproval, noInvite.
    Optional window.__IMG = { photos: [...dataUrls], memorial: [...], av1 } to use real photos. */
 (function () {
   const M = window.__MOCK || {};
@@ -95,6 +95,7 @@
   if (!store.users.u1.role) delete store.users.u1.role;
   if (M.empty) ['events', 'updates', 'memories', 'vault', 'memorial', 'recipes', 'tributes', 'candles', 'comments'].forEach(k => { store[k] = {}; });
   if (M.newUser) delete store.users.u1;
+  if (M.noInvite) delete store.config.invite;
 
   let current = M.signedIn ? Object.assign({}, ME) : null;
   const listeners = [];
@@ -138,6 +139,8 @@
     throw new Error('mock: unsupported op ' + w.op);
   };
   const member = () => current && store.users[current.uid] && store.users[current.uid].approved !== false;
+  const admin = () => member() && store.users[current.uid].role === 'admin';
+  const invite = () => store.config.invite || {};
   function Query(c, o = { wheres: [] }) {
     const next = patch => Query(c, Object.assign({}, o, patch));
     return {
@@ -162,15 +165,17 @@
             if (!current) return fail('permission-denied');
             if (c === 'joins' && id !== current.uid) return fail('permission-denied');
             if (c === 'users' && id !== current.uid && !member()) return fail('permission-denied');
+            if (c === 'config' && !(admin() && id === 'invite')) return fail('permission-denied');
             if (c !== 'users' && c !== 'joins' && !member()) return fail('permission-denied');
             return delay(snapDoc(c, id));
           },
           set(data) {
-            if (c === 'joins' && (store.joins[id] || data.code !== store.config.invite.code)) return fail('permission-denied');
+            if (c === 'joins' && (store.joins[id] || !invite().code || data.code !== invite().code)) return fail('permission-denied');
             if (c === 'users' && !store.users[id]) {
               if (!store.joins[id]) return fail('permission-denied');
-              if (data.approved !== false && store.config.invite.requireApproval) return fail('permission-denied');
+              if (data.approved !== false && invite().requireApproval) return fail('permission-denied');
             }
+            if (c === 'config' && !(admin() && id === 'invite' && /^[A-Za-z0-9-]{6,64}$/.test(data.code || ''))) return fail('permission-denied');
             store[c][id] = clone(data);
             return delay();
           },

@@ -23,15 +23,15 @@ invite code check onto the server, so two quick steps are needed in the
 1. **Publish the rules.** Firestore Database → **Rules** → paste the contents
    of [`firestore.rules`](firestore.rules) → **Publish**.
    *(or `firebase deploy --only firestore:rules`)*
-2. **Set the invite code.** Firestore Database → **Data** → **Start collection**
-   - Collection ID: `config`
-   - Document ID: `invite`
-   - Field: `code` (string) = your new family invite code
+2. **Make yourself an admin (once).** Firestore Database → **Data** → `users`
+   → your document → **Add field** `role` (string) = `admin`.
+3. **Open the hub → Invite family** and tap **Create invite code**. From then
+   on, invites, codes and approvals are all managed on that page.
 
-   Pick a **new** code. The old code was visible in the old site's source, so
-   treat it as public.
+The old code (`agraz2025`) was visible in the old site's source, so use the new
+one the Invite page creates.
 
-Until both are done, existing members can still sign in, but **new people
+Until steps 1–3 are done, existing members can still sign in, but **new people
 can't join** (they'll see "That invite code isn't right") and the newer
 features (Vault, profiles, recipes, RSVPs, hearts, comments, guestbook,
 candles) show "needs the latest security rules".
@@ -47,19 +47,23 @@ Also worth a two-minute look:
 - **Authentication → Settings → Authorized domains** should include
   `www.agrazfamily.com`.
 
-## Managing the family
+## Managing the family — the **Invite family** page
 
-- **Invite someone:** send them to `agrazfamily.com/family/#join` with the
-  invite code.
-- **Change the invite code:** edit `config/invite → code`. Existing members
-  are unaffected.
-- **Make yourself an admin:** in the `users` collection, open your own
-  document and add a field `role` (string) = `admin`.
-- **Require approval for new members (recommended):** once you're an admin,
-  add `requireApproval` (boolean) = `true` to `config/invite`. New people who
-  join with the code wait on a "You're almost in" screen; admins see them at
-  the top of the **Directory** (with a badge in the menu) and tap
-  **Approve** or **Decline**.
+Everything lives in the hub under **Invite family** (sidebar, the phone's
+**More** menu, and the Directory):
+
+- **Invite someone:** tap **Share…** (phones), **Text message**, **Email**, or
+  **Copy link**. The link has the code built in
+  (`agrazfamily.com/family/#join?code=…`), so they only add their name, email
+  and a password. Together in person? Let them scan the **QR code**.
+- **Change the invite code:** **Make a new code** or **Choose my own**. Old
+  links and codes stop working; everyone who already joined stays in.
+- **Approve new members (recommended):** turn on **Approve new members before
+  they get in**. New people wait on a "You're almost in" screen; you approve
+  them right on the Invite page or in the Directory (a badge shows how many
+  are waiting).
+- **More admins:** add `role` = `admin` to their `users` document in the
+  console. Only admins can see or change the invite code.
 - **Remove someone:** admins can decline/remove from the site, or delete their
   document in the `users` collection. To block them for good, also disable
   their account under Authentication → Users.
@@ -84,6 +88,8 @@ Also worth a two-minute look:
   tab. *Don't store bank passwords or full SSNs.*
 - **In Memory** — the memorial for Hector: the family's photos, **light a
   candle**, and a guestbook of shared memories
+- **Invite family** — share an invite link (code built in) by text, email or
+  QR code, change the code, and approve new members
 - **My Profile** — photo, contact details, light/dark theme, password reset,
   and the per-device JARVIS address
 - Links to the **Ancestry family tree** and **JARVIS**
@@ -159,7 +165,7 @@ for the emulator). To publish rules from the command line: `npm run deploy:rules
 |---|---|
 | Everyone gets "That invite code isn't right" | Rules not published, or `config/invite` missing — see setup above |
 | "Needs the latest security rules" / "isn't set up yet" | Publish the latest `firestore.rules` |
-| A new member is stuck on "You're almost in" | An admin approves them in the Directory (or set `approved` to `true` on their `users` doc) |
-| Nobody can approve new members | Add `role: "admin"` to your own `users` doc |
+| A new member is stuck on "You're almost in" | Approve them on the **Invite family** page (or in the Directory) |
+| The Invite page says "ask a family admin" | Add `role: "admin"` to your own `users` doc (one time) |
 | JARVIS opens the wrong address | My Profile → Preferences → JARVIS address (saved per device) |
 | Forgot password | "Forgot password?" on the sign-in screen emails a reset link |

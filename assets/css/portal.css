@@ -638,6 +638,55 @@ dialog::backdrop { background: rgba(7, 17, 20, .55); backdrop-filter: blur(4px);
 .vault-lock .pass-wrap { text-align: left; }
 .vault-lock .form-msg { margin-top: 0; min-height: 20px; }
 
+/* ---------- invite family ---------- */
+.invite-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 20px; }
+.invite-hero { display: grid; gap: 18px; background: linear-gradient(150deg, var(--surface) 40%, var(--accent-soft)); }
+.invite-hero-head { display: flex; gap: 14px; align-items: flex-start; }
+.invite-hero-head p { margin-top: 4px; }
+.copy-field { display: flex; gap: 8px; }
+.copy-field .input { flex: 1; min-width: 0; font-size: var(--fs-sm); background: var(--surface-2); color: var(--ink-2); text-overflow: ellipsis; }
+.share-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.share-btn { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 16px; border-radius: var(--r-pill); border: 1px solid var(--line-2); background: var(--surface); font-size: var(--fs-sm); font-weight: 600; color: var(--ink); transition: background-color .2s, border-color .2s, transform .2s var(--ease); }
+.share-btn:hover { border-color: var(--ink-3); transform: translateY(-1px); }
+.share-btn .i { width: 17px; height: 17px; color: var(--sea); }
+.share-btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.share-btn.primary .i { color: inherit; }
+.invite-qr { display: grid; justify-items: center; align-content: center; gap: 14px; text-align: center; }
+.qr-box { width: min(210px, 100%); aspect-ratio: 1; border-radius: 18px; overflow: hidden; background: #fff; box-shadow: var(--shadow-md); border: 1px solid var(--line); }
+.qr-box svg { width: 100%; height: 100%; }
+.invite-qr p { display: grid; gap: 2px; font-size: var(--fs-sm); }
+.code-row { display: flex; align-items: center; gap: 8px; padding: 12px 12px 12px 18px; border-radius: var(--r-md); background: var(--surface-2); border: 1px dashed var(--line-2); margin-bottom: 12px; }
+.invite-code { flex: 1; min-width: 0; font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: clamp(1.05rem, .95rem + .5vw, 1.3rem); font-weight: 600; letter-spacing: .04em; overflow-wrap: anywhere; color: var(--ink); }
+.code-row .icon-btn { color: var(--sea); }
+.small { font-size: var(--fs-sm); }
+.code-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.custom-code { margin-top: 12px; max-width: none; }
+.switch-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; cursor: pointer; }
+.switch-row > span:first-child { display: grid; gap: 3px; }
+.switch-row small { font-size: var(--fs-sm); }
+.switch { position: relative; flex: none; width: 52px; height: 30px; }
+.switch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.switch-ui { position: absolute; inset: 0; border-radius: var(--r-pill); background: var(--line-2); transition: background-color .25s; pointer-events: none; }
+.switch-ui::after { content: ""; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 2px 6px rgba(0, 0, 0, .2); transition: transform .3s var(--ease-out); }
+.switch input:checked + .switch-ui { background: var(--sea); }
+.switch input:checked + .switch-ui::after { transform: translateX(22px); }
+.switch input:focus-visible + .switch-ui { outline: 2px solid var(--focus); outline-offset: 3px; }
+.invite-pending { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
+.invite-pending-title { display: flex; align-items: center; gap: 8px; font-size: var(--fs-sm); font-weight: 600; color: var(--gold); }
+.invite-pending-title .i { width: 16px; height: 16px; }
+.invite-none { margin-top: 14px; font-size: var(--fs-sm); }
+.invite-how { grid-column: 1 / -1; }
+.steps { list-style: none; counter-reset: s; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 16px; }
+.steps li { counter-increment: s; display: grid; gap: 4px; padding-top: 50px; position: relative; }
+.steps li::before { content: counter(s); position: absolute; top: 0; left: 0; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); font-family: var(--font-display); font-size: 1.15rem; font-weight: 500; }
+.steps li span { font-size: var(--fs-sm); color: var(--ink-3); }
+.invite-setup, .invite-member { max-width: 620px; display: grid; gap: 14px; justify-items: start; }
+.invite-setup h2 { font-family: var(--font-display); font-weight: 400; font-size: 1.8rem; letter-spacing: -.02em; }
+.invite-member .copy-field { width: 100%; }
+.invite-member .notice { margin: 4px 0 0; }
+.fam-invite { display: inline-flex; align-items: center; gap: 8px; margin-top: 16px; font-size: var(--fs-sm); font-weight: 600; color: var(--sea); }
+.fam-invite .i { width: 17px; height: 17px; }
+
 /* print just the open recipe */
 @media print {
   body.printing-recipe > *:not(#recipe-dialog) { display: none !important; }
@@ -747,6 +796,12 @@ dialog::backdrop { background: rgba(7, 17, 20, .55); backdrop-filter: blur(4px);
   .rsvp { gap: 8px; }
   .comment-del { opacity: 1; }
   .tributes { columns: 1; }
+  .invite-grid { grid-template-columns: 1fr; }
+  .steps { grid-template-columns: 1fr; gap: 14px; }
+  .steps li { padding: 4px 0 0 52px; min-height: 38px; }
+  .copy-field { flex-direction: column; }
+  .share-row .share-btn { flex: 1 1 calc(50% - 8px); justify-content: center; }
+  .view-head .head-actions .btn-ghost { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

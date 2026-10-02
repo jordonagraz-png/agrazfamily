@@ -16,7 +16,7 @@ rules_version = '2';
 //    approval (approved != false).
 //  • That doc can only be created after you've written joins/{your uid} with
 //    the correct invite code, which is checked HERE against config/invite
-//    (a doc no browser can read).
+//    (a doc only family admins can read — from the hub's Invite page).
 //  • If config/invite has requireApproval: true, new members start with
 //    approved: false and an admin (users/{uid}.role == "admin", set in the
 //    console) approves them in the Directory.
@@ -66,9 +66,16 @@ service cloud.firestore {
         && (!(request.auth.uid in after) || after[request.auth.uid] in allowed);
     }
 
-    // ---- Private settings (invite code, approval switch). Console only. ----
+    // ---- Invite settings: the invite code + approval switch. ----
+    // Only family admins can see or change them (from the hub's Invite page).
     match /config/{doc} {
-      allow read, write: if false;
+      allow get: if doc == 'invite' && isAdmin();
+      allow create, update: if doc == 'invite' && isAdmin()
+                    && request.resource.data.keys().hasOnly(['code', 'requireApproval'])
+                    && str(request.resource.data.code, 6, 64)
+                    && request.resource.data.code.matches('[A-Za-z0-9-]+')
+                    && request.resource.data.get('requireApproval', false) is bool;
+      allow list, delete: if false;
     }
 
     // ---- Join requests: proves you know the invite code. Write-once, unreadable. ----

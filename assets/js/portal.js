@@ -33,10 +33,10 @@
   const VAULT_AWAY_MS = 60e3; // …or after the tab has been in the background this long
   const NEED_RULES = 'This needs the latest security rules — see README.';
 
-  const VIEWS = ['home', 'photos', 'calendar', 'updates', 'recipes', 'directory', 'vault', 'memorial', 'profile'];
+  const VIEWS = ['home', 'photos', 'calendar', 'updates', 'recipes', 'directory', 'invite', 'vault', 'memorial', 'profile'];
   const ALIASES = { memories: 'photos', events: 'calendar' };
-  const TITLES = { home: 'Home', photos: 'Photos', calendar: 'Calendar', updates: 'Updates', recipes: 'Recipes', directory: 'Directory', vault: 'Family Vault', memorial: 'In Memory', profile: 'My Profile' };
-  const SECONDARY = ['recipes', 'directory', 'vault', 'memorial', 'profile'];
+  const TITLES = { home: 'Home', photos: 'Photos', calendar: 'Calendar', updates: 'Updates', recipes: 'Recipes', directory: 'Directory', invite: 'Invite family', vault: 'Family Vault', memorial: 'In Memory', profile: 'My Profile' };
+  const SECONDARY = ['recipes', 'directory', 'invite', 'vault', 'memorial', 'profile'];
   const RECIPE_CATS = { mains: 'Mains', sides: 'Sides', desserts: 'Desserts', breakfast: 'Breakfast', drinks: 'Drinks', other: 'Other' };
   const CATS = {
     emergency: { label: 'Emergency', icon: 'siren' },
@@ -203,7 +203,7 @@
     comments: {}, openThreads: new Set(), lbThread: false,
     recipes: null, recipeCat: 'all', openRecipe: null, editingRecipe: null, recipePhoto: undefined,
     tributes: null, candles: null, otd: null, addcal: null, prefillPost: '', installEvt: null,
-    vaultOpen: false, lastActive: Date.now(), hiddenAt: 0
+    vaultOpen: false, lastActive: Date.now(), hiddenAt: 0, invite: undefined
   };
   const myName = () => (S.me && S.me.name) || (S.user && (S.user.displayName || S.user.email)) || 'Family member';
 
@@ -225,11 +225,22 @@
     $('#tab-login').setAttribute('aria-selected', String(mode === 'login'));
     $('#tab-join').setAttribute('aria-selected', String(mode === 'join'));
     if (mode === 'reset') $('#reset-email').value = $('#login-email').value;
+    const invited = inviteCodeFromLink();
+    if (invited && (mode === 'join' || mode === 'finish')) {
+      $('#join-code').value = invited;
+      $('#finish-code').value = invited;
+      if (mode === 'join') $('#auth-sub').textContent = 'You’ve been invited! Your code is already filled in — just add your details.';
+    }
     authMsg('');
     if (canHover && document.body.dataset.state === 'auth') {
       const first = $(`#form-${mode} input`);
       if (first) first.focus();
     }
+  }
+  // Invite links look like /family/#join?code=coral-tide-4821 (the hash never reaches a server).
+  function inviteCodeFromLink() {
+    const m = location.hash.match(/^#join\?(.*)$/);
+    return m ? (new URLSearchParams(m[1]).get('code') || '').trim() : '';
   }
   function authMsg(text, ok) {
     const m = $('#auth-msg');
@@ -391,7 +402,7 @@
       const wasAuth = document.body.dataset.state === 'auth';
       resetData();
       setScreen('auth');
-      if (!wasAuth || !$('#form-finish').hidden || !$('#form-pending').hidden) authMode(location.hash === '#join' ? 'join' : 'login');
+      if (!wasAuth || !$('#form-finish').hidden || !$('#form-pending').hidden) authMode(location.hash.startsWith('#join') ? 'join' : 'login');
       return;
     }
     try {
@@ -444,7 +455,7 @@
     Object.assign(S, {
       me: null, members: [], byUid: {}, view: null, events: null, updates: null, vault: null, memorial: null, recent: null,
       vaultCat: 'all', avatarDraft: undefined, pending: [], comments: {}, lbThread: false, recipes: null, recipeCat: 'all',
-      openRecipe: null, tributes: null, candles: null, otd: null, addcal: null, prefillPost: '', vaultOpen: false
+      openRecipe: null, tributes: null, candles: null, otd: null, addcal: null, prefillPost: '', vaultOpen: false, invite: undefined
     });
     S.openThreads.clear();
     S.photos = { items: [], last: null, done: false, loading: false, loaded: false, rendered: 0 };
@@ -453,7 +464,7 @@
     clearStaging('memorial');
     // Don't leave private content in the page after signing out.
     ['#home-upcoming', '#home-family', '#home-photos', '#home-updates', '#home-bday', '#home-otd-strip', '#photo-grid', '#cal-grid', '#cal-agenda', '#feed',
-      '#people', '#pending-panel', '#notes', '#vault-filters', '#memorial-grid', '#tributes', '#candle-row', '#recipes', '#recipe-filters', '#lb-thread'].forEach(s => { const el = $(s); if (el) el.innerHTML = ''; });
+      '#people', '#pending-panel', '#notes', '#vault-filters', '#memorial-grid', '#tributes', '#candle-row', '#recipes', '#recipe-filters', '#lb-thread', '#invite-body'].forEach(s => { const el = $(s); if (el) el.innerHTML = ''; });
     ['#home-bday', '#home-otd', '#pending-panel'].forEach(s => { $(s).hidden = true; });
     paintPendingBadge();
     $('#memorial-cover').innerHTML = icon('candle');
@@ -472,7 +483,7 @@
   }
   window.addEventListener('hashchange', () => {
     if (S.me) route();
-    else if (document.body.dataset.state === 'auth' && location.hash === '#join') authMode('join');
+    else if (document.body.dataset.state === 'auth' && location.hash.startsWith('#join')) authMode('join');
   });
 
   function show(v) {
@@ -506,6 +517,7 @@
     else if (S.view === 'calendar' && S.events) { renderCalendar(); renderAgenda(); }
     else if (S.view === 'updates' && S.updates) renderFeed();
     else if (S.view === 'memorial') { if (S.tributes) renderGuestbook(); if (S.candles) renderCandles(); }
+    else if (S.view === 'invite') renderInvite();
   }
   async function loadEvents(force) {
     if (S.events && !force) return S.events;
@@ -675,6 +687,7 @@
       <div class="fam-stack">${S.members.slice(0, 7).map(m => avatarHTML(m, 44)).join('')}</div>
       <p class="fam-count">${S.members.length}<small>${S.members.length === 1 ? 'family member' : 'family members'} in the hub</small></p>
       ${bdays.length ? `<div class="bdays"><h3>Next birthdays</h3>${bdays.map(b => `<div class="bday-row">${avatarHTML(S.byUid[b.uid], 28)}<strong>${esc(S.byUid[b.uid].name || '')}</strong><span>${esc(relDay(b.date))}</span></div>`).join('')}</div>` : ''}
+      <a class="fam-invite" href="#invite">${icon('user-plus')}Invite family</a>
       ${missing.length ? `<div class="nudge">${icon('sparkle')}<span>Add your ${esc(missing.slice(0, 2).join(' and '))} so the family can reach — and celebrate — you. <a href="#profile">Update profile</a></span></div>` : ''}`;
   }
   function renderHomePhotos() {
@@ -1389,8 +1402,10 @@
     const el = $('#pending-panel');
     if (!isAdmin() || !S.pending.length) { el.hidden = true; el.innerHTML = ''; return; }
     el.hidden = false;
-    el.innerHTML = `<div class="pending-head"><span class="sc-icon sc-gold">${icon('hourglass')}</span><div><strong>Waiting for your approval</strong><p class="muted">${plural(S.pending.length, 'person')} joined with the invite code. Approve the people you know.</p></div></div>`
-      + S.pending.map(m => `<div class="pending-row">${avatarHTML(m, 44)}<div class="pending-who"><strong>${esc(m.name || 'New member')}</strong><small>${esc(m.email || '')}${m.joinedDate ? ` · joined ${esc(timeAgo(m.joinedDate))}` : ''}</small></div><div class="pending-actions"><button class="btn btn-ghost btn-sm" type="button" data-action="decline-member" data-uid="${esc(m.uid)}">Decline</button><button class="btn btn-accent btn-sm" type="button" data-action="approve-member" data-uid="${esc(m.uid)}">${icon('check')}Approve</button></div></div>`).join('');
+    el.innerHTML = `<div class="pending-head"><span class="sc-icon sc-gold">${icon('hourglass')}</span><div><strong>Waiting for your approval</strong><p class="muted">${plural(S.pending.length, 'person')} joined with the invite code. Approve the people you know.</p></div></div>` + pendingRowsHTML();
+  }
+  function pendingRowsHTML() {
+    return S.pending.map(m => `<div class="pending-row">${avatarHTML(m, 44)}<div class="pending-who"><strong>${esc(m.name || 'New member')}</strong><small>${esc(m.email || '')}${m.joinedDate ? ` · joined ${esc(timeAgo(m.joinedDate))}` : ''}</small></div><div class="pending-actions"><button class="btn btn-ghost btn-sm" type="button" data-action="decline-member" data-uid="${esc(m.uid)}">Decline</button><button class="btn btn-accent btn-sm" type="button" data-action="approve-member" data-uid="${esc(m.uid)}">${icon('check')}Approve</button></div></div>`).join('');
   }
   async function decideMember(uid, approve, btn) {
     const m = S.pending.find(x => x.uid === uid);
@@ -1602,10 +1617,16 @@
     }
   }
   document.addEventListener('submit', e => {
+    if (e.target.id === 'custom-code-form') { e.preventDefault(); saveCustomCode(); return; }
     const f = e.target.closest && e.target.closest('.comment-form');
     if (!f) return;
     e.preventDefault();
     postComment(f);
+  });
+  document.addEventListener('change', e => {
+    if (e.target.id === 'invite-approval') {
+      saveInvite({ requireApproval: e.target.checked }, e.target.checked ? 'New members will wait for your approval' : 'New members get in right away');
+    }
   });
 
   /* ===================== Birthdays ===================== */
@@ -1972,10 +1993,179 @@
     else if (S.vaultOpen && S.hiddenAt && Date.now() - S.hiddenAt > VAULT_AWAY_MS) lockVault('The vault locked while you were away');
   });
 
+  /* ===================== Invite family ===================== */
+  const CODE_WORDS = ['coral', 'tide', 'shell', 'dune', 'harbor', 'breeze', 'pier', 'sunset', 'lagoon', 'reef', 'anchor', 'sail',
+    'palm', 'wave', 'salt', 'pelican', 'marina', 'island', 'sandy', 'seaside', 'starfish', 'surf', 'cove', 'beacon',
+    'driftwood', 'current', 'horizon', 'mango', 'citrus', 'hibiscus', 'gull', 'dolphin', 'tropic', 'sunrise', 'shore', 'bay',
+    'kelp', 'pearl', 'compass', 'canoe', 'oyster', 'sea', 'glow', 'calm', 'golden', 'amber', 'azure', 'jade'];
+  function newInviteCode() {
+    const r = new Uint32Array(3);
+    crypto.getRandomValues(r);
+    return `${CODE_WORDS[r[0] % CODE_WORDS.length]}-${CODE_WORDS[r[1] % CODE_WORDS.length]}-${1000 + (r[2] % 9000)}`;
+  }
+  const inviteLink = () => `${location.origin}/family/#join?code=${encodeURIComponent((S.invite && S.invite.code) || '')}`;
+  const inviteMessage = () => `You’re invited to the Agraz Family Hub — our private family website for photos, plans and staying close.\n\nTap to join (your invite code is filled in for you):\n${inviteLink()}\n\nInvite code: ${S.invite.code}`;
+  async function copyText(text, okMsg) {
+    try { await navigator.clipboard.writeText(text); toast(okMsg); }
+    catch (e) { toast('Couldn’t copy on this device — press and hold the text to copy it instead.', true); }
+  }
+  async function shareInvite() {
+    try { await navigator.share({ title: 'Join the Agraz Family Hub', text: 'You’re invited to the Agraz Family Hub — our private family website. Tap the link to join; your invite code is filled in for you.', url: inviteLink() }); }
+    catch (e) { /* the share sheet was closed */ }
+  }
+  async function loadInvite(force) {
+    if (S.invite !== undefined && !force) return S.invite;
+    try {
+      const snap = await col('config').doc('invite').get();
+      S.invite = snap.exists ? Object.assign({ requireApproval: false }, snap.data()) : null;
+    } catch (e) {
+      S.invite = denied(e) ? 'denied' : 'error';
+    }
+    return S.invite;
+  }
+  async function saveInvite(patch, okMsg) {
+    const cur = S.invite && typeof S.invite === 'object' ? S.invite : {};
+    const next = { code: cur.code || '', requireApproval: !!cur.requireApproval };
+    Object.assign(next, patch);
+    try {
+      await col('config').doc('invite').set(next);
+      S.invite = next;
+      if (okMsg) toast(okMsg);
+    } catch (e) {
+      toast(denied(e) ? NEED_RULES : 'Couldn’t save. Please try again.', true);
+    }
+    if (S.view === 'invite') renderInvite();
+  }
+  function saveCustomCode() {
+    const code = $('#custom-code').value.trim();
+    if (!/^[A-Za-z0-9-]{6,64}$/.test(code)) { toast('Use at least 6 letters, numbers or dashes (no spaces).', true); $('#custom-code').focus(); return; }
+    saveInvite({ code }, 'Invite code updated — share the new link');
+  }
+  function openInvite() {
+    if (!isAdmin()) { renderInvite(); return; }
+    if (S.invite === undefined) {
+      $('#invite-body').innerHTML = skelRows(3);
+      loadInvite().then(() => { if (S.view === 'invite') renderInvite(); });
+    } else {
+      renderInvite();
+    }
+  }
+  function renderInvite() {
+    const el = $('#invite-body');
+    if (!isAdmin()) {
+      const admins = S.members.filter(m => m.role === 'admin');
+      el.innerHTML = `<article class="card invite-member">
+        <span class="sc-icon sc-accent">${icon('user-plus')}</span>
+        <h2 class="card-title">Know someone who should be here?</h2>
+        <p class="muted">Send them the sign-up page. They’ll also need the family invite code — ${admins.length ? `ask ${esc(joinNames(admins.map(m => firstName(m.name))))}` : 'ask a family admin'}, who can send them a link with the code built in.</p>
+        <div class="copy-field"><input class="input" readonly value="${esc(`${location.origin}/family/#join`)}" aria-label="Sign-up page"><button class="btn" type="button" data-action="copy-join-link">${icon('copy')}Copy link</button></div>
+        ${admins.length ? '' : `<div class="notice">${icon('key')}<p><strong>Setting this up?</strong> The site owner becomes an admin once in the Firebase console: Firestore Database → <b>users</b> → your document → add a field <b>role</b> = <b>admin</b>. Then this page lets you create invite links, QR codes and approvals.</p></div>`}
+      </article>`;
+      return;
+    }
+    if (S.invite === 'denied' || S.invite === 'error') {
+      el.innerHTML = S.invite === 'denied'
+        ? emptyHTML('lock', 'Invites need the latest security rules', 'Publish firestore.rules in the Firebase console (see README), then come back to this page.')
+        : errorHTML('invite settings');
+      return;
+    }
+    if (!S.invite || !S.invite.code) {
+      el.innerHTML = `<article class="card invite-setup">
+        <span class="sc-icon sc-accent">${icon('user-plus')}</span>
+        <h2>Create your family invite code</h2>
+        <p class="muted">New members need a code to join. We’ll make a friendly one — you can change it any time. New members will wait for your approval (you can turn that off).</p>
+        <button class="btn btn-accent btn-lg" type="button" data-action="create-invite">${icon('sparkle')}Create invite code</button>
+      </article>`;
+      return;
+    }
+    const link = inviteLink();
+    const req = !!S.invite.requireApproval;
+    const msg = inviteMessage();
+    const pendingBlock = S.pending.length
+      ? `<div class="invite-pending"><p class="invite-pending-title">${icon('hourglass')}${plural(S.pending.length, 'person')} waiting for you</p>${pendingRowsHTML()}</div>`
+      : (req ? '<p class="muted invite-none">No one is waiting right now.</p>' : '');
+    el.innerHTML = `<div class="invite-grid">
+      <article class="card invite-hero">
+        <div class="invite-hero-head">
+          <span class="sc-icon sc-accent">${icon('user-plus')}</span>
+          <div><h2 class="card-title">Your family invite link</h2><p class="muted">One tap takes them to sign up with the code already filled in. Share it only with family.</p></div>
+        </div>
+        <div class="copy-field"><input class="input" id="invite-link" readonly value="${esc(link)}" aria-label="Invite link"><button class="btn" type="button" data-action="copy-invite-link">${icon('copy')}Copy link</button></div>
+        <div class="share-row">
+          ${navigator.share ? `<button class="share-btn primary" type="button" data-action="share-invite">${icon('share')}Share…</button>` : ''}
+          <a class="share-btn" href="${esc(`sms:?&body=${encodeURIComponent(msg)}`)}">${icon('chat')}Text message</a>
+          <a class="share-btn" href="${esc(`mailto:?subject=${encodeURIComponent('You’re invited to the Agraz Family Hub')}&body=${encodeURIComponent(msg)}`)}">${icon('mail')}Email</a>
+          <button class="share-btn" type="button" data-action="copy-invite-message">${icon('copy')}Copy invite message</button>
+        </div>
+      </article>
+      <article class="card invite-qr">
+        <div class="qr-box" id="invite-qr" role="img" aria-label="QR code for the invite link"></div>
+        <p><strong>Together in person?</strong><span class="muted">Have them point their phone’s camera here.</span></p>
+      </article>
+      <article class="card invite-code-card">
+        <header class="card-head"><h2 class="card-title">Invite code</h2></header>
+        <div class="code-row"><span class="invite-code" id="invite-code">${esc(S.invite.code)}</span><button class="icon-btn" type="button" data-action="copy-invite-code" aria-label="Copy invite code">${icon('copy')}</button></div>
+        <p class="muted small">For anyone typing the address themselves. Changing it stops old links and codes from working — everyone who already joined stays in.</p>
+        <div class="code-actions">
+          <button class="btn btn-ghost btn-sm" type="button" data-action="new-invite-code">${icon('sparkle')}Make a new code</button>
+          <button class="btn btn-ghost btn-sm" type="button" data-action="custom-invite-code">${icon('pencil')}Choose my own</button>
+        </div>
+        <form class="inline-form custom-code" id="custom-code-form" hidden>
+          <label class="sr-only" for="custom-code">New invite code</label>
+          <input class="input" id="custom-code" maxlength="64" placeholder="e.g. agraz-sunday-dinner" autocomplete="off" autocapitalize="off" spellcheck="false">
+          <button class="btn btn-sm" type="submit">Save</button>
+        </form>
+      </article>
+      <article class="card invite-approval">
+        <header class="card-head"><h2 class="card-title">Approval</h2></header>
+        <label class="switch-row" for="invite-approval">
+          <span><strong>Approve new members before they get in</strong><small class="muted">Recommended. If the link ever gets passed around, nobody gets in without you.</small></span>
+          <span class="switch"><input type="checkbox" id="invite-approval" role="switch"${req ? ' checked' : ''}><span class="switch-ui" aria-hidden="true"></span></span>
+        </label>
+        ${pendingBlock}
+      </article>
+      <article class="card invite-how">
+        <h2 class="card-title">How it works</h2>
+        <ol class="steps">
+          <li><strong>Send the link</strong><span>By text or email — or let them scan the QR code.</span></li>
+          <li><strong>They create an account</strong><span>Name, email and a password. The code is already filled in.</span></li>
+          <li><strong>${req ? 'You approve them' : 'They’re in'}</strong><span>${req ? 'Tap Approve here or in the Directory. They’ll get in right away.' : 'They see the family hub straight away.'}</span></li>
+        </ol>
+      </article>
+    </div>`;
+    renderQr(link);
+  }
+  let qrLib;
+  function loadQrLib() {
+    if (window.qrcode) return Promise.resolve();
+    if (!qrLib) {
+      qrLib = new Promise((resolve, reject) => {
+        const sc = document.createElement('script');
+        sc.src = '/assets/js/vendor/qrcode.js';
+        sc.onload = resolve;
+        sc.onerror = () => { qrLib = null; reject(new Error('qr')); };
+        document.head.appendChild(sc);
+      });
+    }
+    return qrLib;
+  }
+  async function renderQr(text) {
+    try { await loadQrLib(); } catch (e) { const card = $('.invite-qr'); if (card) card.hidden = true; return; }
+    const box = $('#invite-qr');
+    if (!box || S.view !== 'invite') return;
+    const qr = window.qrcode(0, 'M');
+    qr.addData(text);
+    qr.make();
+    const n = qr.getModuleCount();
+    let d = '';
+    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) d += `M${c} ${r}h1v1h-1z`;
+    box.innerHTML = `<svg viewBox="-4 -4 ${n + 8} ${n + 8}" shape-rendering="crispEdges" aria-hidden="true"><rect x="-4" y="-4" width="${n + 8}" height="${n + 8}" fill="#fff"/><path d="${d}" fill="#10252b"/></svg>`;
+  }
+
   const RENDER = {
     home: renderHome, photos: openPhotos, calendar: openCalendar, updates: openUpdates,
     directory: () => { renderDirectory(); if (!S.members.length) loadMembers().catch(() => { $('#people').innerHTML = errorHTML('the directory'); }); },
-    recipes: openRecipes, vault: openVault, memorial: openMemorial, profile: renderProfile
+    recipes: openRecipes, invite: openInvite, vault: openVault, memorial: openMemorial, profile: renderProfile
   };
 
   /* ===================== Events (delegated) ===================== */
@@ -1985,8 +2175,8 @@
     if (t.hasAttribute('data-close')) { t.closest('dialog').close(); return; }
     if (t.dataset.auth) {
       authMode(t.dataset.auth);
-      if (t.dataset.auth === 'join') history.replaceState(null, '', '#join');
-      else if (location.hash === '#join') history.replaceState(null, '', location.pathname);
+      if (t.dataset.auth === 'join') { if (!location.hash.startsWith('#join')) history.replaceState(null, '', '#join'); }
+      else if (location.hash.startsWith('#join')) history.replaceState(null, '', location.pathname);
       return;
     }
     if (t.dataset.themeSet) { setTheme(t.dataset.themeSet); return; }
@@ -2088,6 +2278,23 @@
       case 'light-candle': lightCandle(t); break;
       case 'delete-tribute': deleteTribute(id); break;
       case 'lock-vault': lockVault('Vault locked'); break;
+      case 'copy-invite-link': copyText(inviteLink(), 'Invite link copied — paste it in a text or email'); break;
+      case 'copy-invite-code': copyText(S.invite.code, 'Invite code copied'); break;
+      case 'copy-invite-message': copyText(inviteMessage(), 'Invite message copied — paste it anywhere'); break;
+      case 'copy-join-link': copyText(`${location.origin}/family/#join`, 'Link copied'); break;
+      case 'share-invite': shareInvite(); break;
+      case 'create-invite': saveInvite({ code: newInviteCode(), requireApproval: true }, 'Your invite code is ready'); break;
+      case 'new-invite-code':
+        if (await confirmBox('Make a new invite code?', 'Links and codes you’ve already sent will stop working. Everyone who has joined stays in.', 'Make new code')) {
+          saveInvite({ code: newInviteCode() }, 'New invite code ready — share the new link');
+        }
+        break;
+      case 'custom-invite-code': {
+        const f = $('#custom-code-form');
+        f.hidden = !f.hidden;
+        if (!f.hidden) $('#custom-code').focus();
+        break;
+      }
       case 'reset-self':
         try { await auth.sendPasswordResetEmail(S.user.email); toast(`Reset link sent to ${S.user.email}`); }
         catch (err) { toast('Couldn’t send the email. Please try again later.', true); }

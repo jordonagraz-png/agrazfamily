@@ -146,7 +146,8 @@
       <a href="#updates" data-nav="updates"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#chat"/></svg>Updates</a>
       <a href="#recipes" data-nav="recipes"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#book"/></svg>Recipes</a>
       <p class="side-label">Private</p>
-      <a href="#directory" data-nav="directory"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#users"/></svg>Directory<span class="badge" data-pending-badge hidden></span></a>
+      <a href="#directory" data-nav="directory"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#users"/></svg>Directory</a>
+      <a href="#invite" data-nav="invite"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#user-plus"/></svg>Invite family<span class="badge" data-pending-badge hidden></span></a>
       <a href="#vault" data-nav="vault"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#key"/></svg>Family Vault</a>
       <a href="#memorial" data-nav="memorial"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#candle"/></svg>In Memory</a>
       <p class="side-label">Links</p>
@@ -330,7 +331,10 @@
       <section class="view" id="view-directory" data-view="directory" aria-labelledby="directory-title" hidden>
         <header class="view-head">
           <div><p class="eyebrow plain">Members only</p><h1 class="view-title" id="directory-title">Family Directory</h1></div>
-          <a class="btn btn-ghost" href="#profile"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#pencil"/></svg>Edit my details</a>
+          <div class="head-actions">
+            <a class="btn btn-ghost" href="#profile"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#pencil"/></svg>Edit my details</a>
+            <a class="btn" href="#invite"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#user-plus"/></svg>Invite family</a>
+          </div>
         </header>
         <div class="pending card" id="pending-panel" hidden></div>
         <div class="toolbar">
@@ -342,6 +346,14 @@
           <span class="muted" id="dir-count"></span>
         </div>
         <div class="people" id="people"></div>
+      </section>
+
+      <!-- ============ Invite ============ -->
+      <section class="view" id="view-invite" data-view="invite" aria-labelledby="invite-title" hidden>
+        <header class="view-head">
+          <div><p class="eyebrow plain">Grow the family</p><h1 class="view-title" id="invite-title">Invite family</h1></div>
+        </header>
+        <div id="invite-body"></div>
       </section>
 
       <!-- ============ Vault ============ -->
@@ -505,7 +517,8 @@
   <div class="sheet-grip" aria-hidden="true"></div>
   <nav class="sheet-nav">
     <a href="#recipes"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#book"/></svg>Recipes</a>
-    <a href="#directory"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#users"/></svg>Directory<span class="badge" data-pending-badge hidden></span></a>
+    <a href="#directory"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#users"/></svg>Directory</a>
+    <a href="#invite"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#user-plus"/></svg>Invite family<span class="badge" data-pending-badge hidden></span></a>
     <a href="#vault"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#key"/></svg>Family Vault</a>
     <a href="#memorial"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#candle"/></svg>In Memory</a>
     <a href="#profile"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#user"/></svg>My Profile</a>
