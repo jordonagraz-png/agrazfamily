@@ -110,6 +110,13 @@ Everything lives in the hub under **Invite family** (sidebar, the phone's
   you're related — "your 2nd great-grandmother", "your first cousin once
   removed", "husband of your aunt". Photos come from the tree itself, from
   members' profile photos, and Hector's from the In Memory page
+- **A hub that feels alive** — the welcome photo is a living picture: the sea
+  rolls, sunlight glitters on the water, the sun's glow breathes and stars
+  twinkle at night (a WebGL shader over the time-of-day photo, with a simpler
+  fallback). The greeting writes itself in letter by letter and the name
+  catches the light. The sidebar highlight glides between pages, cards rise
+  into view, lean toward the pointer and glow under it, and confetti marks the
+  good moments. All of it holds still for people who turn motion off
 - **Game Night** — two games made for the family, playable on phones and
   computers: **Gaviota**, a one-button flying game (guide a seagull between
   pier pilings as the sun sets and night falls), and **La Nevería**, a
@@ -251,6 +258,7 @@ assets/js/public.js   Public site interactions
 assets/js/portal.js   Family Hub app (Firebase Auth + Firestore)
 assets/js/globe.js    Family Globe renderer (canvas, no libraries; loaded on demand)
 assets/js/tree.js     Family tree engine: reads Ancestry exports, works out relationships
+assets/js/livephoto.js The living welcome photo: a WebGL cinemagraph (rolling sea, glitter, stars)
 assets/js/games/      Game Night: gull.js (Gaviota), neveria.js (La Nevería), loaded on demand
 assets/data/land.bin  Land mask for the globe (5 KB, from Natural Earth — public domain)
 assets/icons.svg      Icon set + logo mark

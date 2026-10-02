@@ -549,6 +549,7 @@
       if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
     });
     document.title = `${TITLES[v]} — Agraz Family Hub`;
+    moveInk();
     const sheet = $('#more-sheet');
     if (sheet.open) sheet.close();
     if (changed) window.scrollTo(0, 0);
@@ -585,7 +586,9 @@
 
   if (MOTION && window.matchMedia('(hover: hover)').matches) {
     // A soft light follows the pointer across cards.
-    let spotEl = null, last = null, raf = 0;
+    let spotEl = null, tiltEl = null, last = null, raf = 0;
+    document.addEventListener('pointerleave', () => { if (tiltEl) tiltEl.classList.remove('tilting'); tiltEl = null; });
+    $$('.dash > .card, .shortcut').forEach(el => el.classList.add('tilt'));
     const plain = new WeakMap();
     document.addEventListener('pointermove', e => {
       last = e;
@@ -597,6 +600,15 @@
         if (el && !plain.get(el)) el = null;
         if (spotEl && spotEl !== el) spotEl.classList.remove('spot-on');
         spotEl = el;
+        const tl = last.target instanceof Element ? last.target.closest('.tilt') : null;
+        if (tiltEl && tiltEl !== tl) tiltEl.classList.remove('tilting');
+        tiltEl = tl && !tl.classList.contains('rv') ? tl : null;
+        if (tiltEl) {
+          const q = tiltEl.getBoundingClientRect(), max = q.width > 520 ? 1.6 : 3.2;
+          tiltEl.style.setProperty('--ry', (((last.clientX - q.left) / q.width - 0.5) * 2 * max).toFixed(2) + 'deg');
+          tiltEl.style.setProperty('--rx', (((last.clientY - q.top) / q.height - 0.5) * -2 * max).toFixed(2) + 'deg');
+          tiltEl.classList.add('tilting');
+        }
         if (!el) return;
         const r = el.getBoundingClientRect();
         el.style.setProperty('--sx', Math.round(last.clientX - r.left) + 'px');
@@ -612,6 +624,58 @@
       hero.style.setProperty('--my', ((e.clientY - r.top) / r.height * 2 - 1).toFixed(3));
     });
     hero.addEventListener('pointerleave', () => { hero.style.setProperty('--mx', '0'); hero.style.setProperty('--my', '0'); });
+  }
+
+  // The sidebar highlight glides to the current page.
+  const ink = MOTION ? document.createElement('span') : null;
+  if (ink) { ink.className = 'nav-ink'; ink.setAttribute('aria-hidden', 'true'); $('.side-nav').prepend(ink); root.classList.add('has-ink'); }
+  function moveInk() {
+    if (!ink) return;
+    const a = $('.side-nav a[aria-current="page"]');
+    if (!a || !a.offsetHeight) { ink.classList.remove('on'); return; }
+    ink.style.transform = `translateY(${a.offsetTop}px)`;
+    ink.style.height = a.offsetHeight + 'px';
+    if (!ink.classList.contains('on')) { ink.style.transition = 'none'; void ink.offsetWidth; ink.style.transition = ''; ink.classList.add('on'); }
+  }
+  window.addEventListener('resize', () => moveInk());
+
+  // As the page scrolls, the greeting drifts up and softens.
+  if (MOTION) {
+    let sraf = 0;
+    window.addEventListener('scroll', () => {
+      if (sraf || S.view !== 'home') return;
+      sraf = requestAnimationFrame(() => {
+        sraf = 0;
+        const y = Math.min(400, window.scrollY), w = $('.welcome');
+        w.style.setProperty('--scroll', y + 'px');
+        w.style.setProperty('--fade', (Math.min(1, y / 420) * 0.55).toFixed(3));
+      });
+    }, { passive: true });
+  }
+
+  // The welcome photo comes alive: the sea rolls, light glitters on the water (assets/js/livephoto.js).
+  let live = null, liveLib = null;
+  function liveHero() {
+    if (!MOTION || live || navigator.webdriver) return;
+    const bg = $('.welcome-bg'), cs = getComputedStyle(bg), rs = getComputedStyle(root);
+    const src = (cs.backgroundImage.match(/url\("?([^")]+)"?\)/) || [])[1];
+    if (!src || !/^https:\/\/images\.unsplash\.com\//.test(src)) return;
+    const pos = cs.backgroundPosition.split(/\s+/).map(v => (/%$/.test(v) ? parseFloat(v) / 100 : 0.5));
+    const num = (k, d) => { const n = parseFloat(rs.getPropertyValue(k)); return Number.isFinite(n) ? n : d; };
+    live = 'loading';
+    if (!liveLib) {
+      liveLib = new Promise((resolve, reject) => {
+        const sc = document.createElement('script');
+        sc.src = '/assets/js/livephoto.js' + ASSET_V;
+        sc.onload = resolve;
+        sc.onerror = reject;
+        document.head.appendChild(sc);
+      });
+    }
+    liveLib.then(() => {
+      live = window.AgrazLive.mount(bg, { src, posX: pos[0], posY: pos[1] === undefined ? 0.5 : pos[1], horizon: num('--tod-horizon', 0.5), seaEnd: num('--tod-sea-end', 1),
+        calm: num('--tod-calm', 1), glitter: num('--tod-glitter', 1), stars: num('--tod-stars', 0), sunRays: num('--tod-rays', 0) });
+    }).catch(() => { live = null; });
   }
 
   // A little burst of confetti from a button, for the good moments.
@@ -792,9 +856,13 @@
   function renderHome() {
     const h = new Date().getHours();
     const part = h < 5 ? 'evening' : h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening';
-    // each word rises into place (see .welcome-title .w)
-    const word = html => `<span class="w"><span>${html}</span></span>`;
-    $('#home-title').innerHTML = [word('Good'), word(`${part},`), word(`<em>${esc(firstName(myName()))}</em>`)].join(' ');
+    // each letter drifts into place (see .welcome-title .ch); screen readers get the plain sentence
+    const name = firstName(myName()), letters = w => [...w].map(ch => `<span class="ch">${esc(ch)}</span>`).join('');
+    const title = $('#home-title');
+    title.setAttribute('aria-label', `Good ${part}, ${name}`);
+    title.innerHTML = `<span aria-hidden="true"><span class="wd">${letters('Good')}</span> <span class="wd">${letters(part + ',')}</span> <em class="wd">${letters(name)}</em></span>`;
+    $$('.ch', title).forEach((el, i) => el.style.setProperty('--i', i));
+    liveHero();
     $('#home-date').textContent = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
     $('#home-sub').textContent = 'Here’s what’s happening in the family.';
     renderHomeFamily();
@@ -4498,7 +4566,7 @@
   function renderLobby() {
     $('#games-lobby').innerHTML = GAMES.map(g => {
       const best = myBest(g.id), top = boardOf(g.id)[0];
-      return `<article class="game-card card gc-${g.id}">
+      return `<article class="game-card card tilt gc-${g.id}">
         <button class="gc-art" type="button" data-action="game-play" data-game="${g.id}" aria-label="Play ${esc(g.title)}">${GAME_ART[g.id]}<span class="gc-play">${icon('play')}</span></button>
         <div class="gc-body">
           <p class="gc-kind">${esc(g.kind)}</p>
