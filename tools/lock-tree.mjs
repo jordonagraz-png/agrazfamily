@@ -28,5 +28,5 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const { bin, key } = lockTree({ kind: 'agraz-tree', v: 1, tree, research });
   writeFileSync(new URL('../assets/data/tree-import.bin', import.meta.url), bin);
   console.log(`${tree.people.length} people, ${tree.families.length} families${research ? `, research for ${Object.keys(research.people || {}).length}` : ''} → assets/data/tree-import.bin (${Math.round(bin.length / 1024)} KB)`);
-  console.log(`Private link: https://agrazfamily.com/family/#tree?key=${key}`);
+  console.log(`Private link: https://www.agrazfamily.com/family/#tree?key=${key}`);
 }
