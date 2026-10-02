@@ -35,7 +35,7 @@
     bar.textContent = 'Continue to the Family Hub →';
     try {
       var css = new CSSStyleSheet();
-      css.replaceSync('.hub-continue{position:fixed;left:50%;bottom:22px;z-index:60;transform:translate(-50%,0);box-shadow:0 18px 40px -16px rgba(0,0,0,.55);animation:hubContinueIn .9s cubic-bezier(.16,1,.3,1) 1.6s both}@keyframes hubContinueIn{from{opacity:0;transform:translate(-50%,16px)}}@media(prefers-reduced-motion:reduce){.hub-continue{animation:none}}');
+      css.replaceSync('.hub-continue{position:fixed;right:18px;bottom:18px;z-index:80;box-shadow:0 18px 40px -16px rgba(0,0,0,.55);animation:hubContinueIn .9s cubic-bezier(.16,1,.3,1) 1.6s both}@keyframes hubContinueIn{from{opacity:0;transform:translateY(16px)}}@media(prefers-reduced-motion:reduce){.hub-continue{animation:none}}');
       document.adoptedStyleSheets = document.adoptedStyleSheets.concat(css);
     } catch (e) {}
     document.body.appendChild(bar);
