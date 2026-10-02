@@ -91,6 +91,16 @@ Everything lives in the hub under **Invite family** (sidebar, the phone's
   not even an admin — can change or remove the owner from the site.
 - Only admins and the owner can see or change the invite code.
 
+## The front porch comes first
+
+Every way into the hub passes through the public site once per visit (per
+browser tab): opening any `/family/…` link first shows the public page, with
+the page you were heading for carried in the address's `#enter=…` part (which
+never reaches a server) and cleared from the address bar on arrival. Every
+**Family Login** button then leads on to that page, and a quiet "Continue to
+the Family Hub" waits at the foot. One-tap tree links and invite links survive
+the detour. After that, the hub opens directly for the rest of the visit.
+
 ## What's in the Family Hub
 
 - **Home** — greeting, what's coming up, birthdays, recent photos and updates,
