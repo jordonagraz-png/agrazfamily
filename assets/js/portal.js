@@ -22,7 +22,9 @@
     messagingSenderId: '50763592692',
     appId: '1:50763592692:web:d8e1cad550d2b1ff1b3fa1'
   };
-  const ANCESTRY_URL = 'https://www.ancestry.com/family-tree/tree/191301314/family?cfpid=182483266401';
+  // The tree's home person (Hector) in the family's Ancestry export — used only to recognise him
+  // in the imported tree. The hub never links out to Ancestry.
+  const HOME_PID = '182483266401';
   // JARVIS runs on the family network. Its address is saved per device (My Profile →
   // Preferences) so a private hostname is never published in this public file.
   const JARVIS_DEFAULT = 'http://localhost:8765/index.html';
@@ -3498,9 +3500,8 @@
   /* ===================== Family Tree ===================== */
   // The tree is imported once from an Ancestry export (by an admin) and lives in the private
   // database: tree/meta + tree/part0…, read by /assets/js/tree.js (loaded on demand).
-  const ANCESTRY_TREE = (ANCESTRY_URL.match(/tree\/(\d+)/) || [])[1] || '';
   // The tree's home person — Hector, whom the In Memory page honours — gets the memorial photo.
-  const HOME_PERSON = 'I' + ((ANCESTRY_URL.match(/cfpid=(\d+)/) || [])[1] || '');
+  const HOME_PERSON = 'I' + HOME_PID;
   let treeLib = null;
   function loadTreeLib() {
     if (window.AgrazTree) return Promise.resolve();
@@ -3827,14 +3828,12 @@
     if (p.L || S.tree.ix.parents(p.id).length) return '';
     const q = encodeURIComponent, by = p.b && p.b.y, dy = p.d && p.d.y, place = p.b && p.b.p ? p.b.p.split(',').slice(-2).join(',').trim() : '';
     const fs = `https://www.familysearch.org/search/record/results?q.givenName=${q(p.g || '')}&q.surname=${q(p.s || '')}${by ? `&q.birthLikeDate.from=${by - 2}&q.birthLikeDate.to=${by + 2}` : ''}${place ? `&q.birthLikePlace=${q(place)}` : ''}`;
-    const an = `https://www.ancestry.com/search/?name=${q(p.g || '')}_${q(p.s || '')}${by ? `&birth=${by}` : ''}${dy ? `&death=${dy}` : ''}`;
     const fg = `https://www.findagrave.com/memorial/search?firstname=${q((p.g || '').split(' ')[0])}&lastname=${q(p.s || '')}${by ? `&birthyear=${by}` : ''}${dy ? `&deathyear=${dy}` : ''}`;
     const [gf, gm] = ghostParents(p.id);
     return `<section class="story-card roots-card"><h3>${icon('search')}Where this branch begins</h3>
       <p>The tree doesn’t have ${esc(firstName(p.n))}’s parents yet${by ? ` — ${p.x === 'F' ? 'she' : p.x === 'M' ? 'he' : 'they'} ${p.x ? 'is' : 'are'} the earliest person known on this branch, born ${by}` : ''}.${gf || gm ? ' The research found possible parents — they’re shown dashed in Ancestors.' : ''}</p>
       <div class="roots-links">
         <a class="btn btn-sm btn-ghost-light" href="${esc(fs)}" target="_blank" rel="noopener noreferrer">${icon('external')}Search FamilySearch</a>
-        <a class="btn btn-sm btn-ghost-light" href="${esc(an)}" target="_blank" rel="noopener noreferrer">${icon('external')}Search Ancestry</a>
         <a class="btn btn-sm btn-ghost-light" href="${esc(fg)}" target="_blank" rel="noopener noreferrer">${icon('external')}Search Find a Grave</a>
       </div></section>`;
   }
@@ -3997,8 +3996,6 @@
     const age = !p.L && p.b && p.b.y && p.d && p.d.y ? p.d.y - p.b.y : null;
     const own = t.photos[pid];
     const canPhoto = !!S.user;
-    const num = /^I\d+$/.test(pid) ? pid.slice(1) : '';
-    const treeNo = t.meta.treeId || ANCESTRY_TREE;
     $('#tree-panel').innerHTML = `
       <div class="tp-hero${photo ? ' has-photo' : ''}">
         ${photo ? `<img class="tp-img" src="${photo}" alt="${esc(p.n)}">` : `<span class="tp-mono">${esc(initials(p.n))}</span>`}
@@ -4015,13 +4012,12 @@
         ${group('Children', ix.children(pid))}
         ${group('Brothers &amp; sisters', ix.siblings(pid))}
         ${p.nt ? `<section class="tp-group tp-notes"><h3>${icon('note')}Notes</h3><p class="tp-nt">${esc(p.nt)}</p></section>` : ''}
-        ${mediaHTML(p, treeNo, num)}
+        ${mediaHTML(p)}
         ${recordsHTML(p)}
         ${researchHTML(pid)}
         <div class="tp-actions">
           ${!me ? `<button class="btn btn-sm btn-ghost" type="button" data-action="tree-me" data-pid="${esc(pid)}">${icon('user')}This is me</button>`
           : me === pid ? `<button class="link-btn" type="button" data-action="tree-unme">That’s not me</button>` : ''}
-          ${num && treeNo ? `<a class="link-btn" href="https://www.ancestry.com/family-tree/person/tree/${encodeURIComponent(treeNo)}/person/${num}/facts" target="_blank" rel="noopener noreferrer">${icon('external')}Open on Ancestry</a>` : ''}
           ${own && (own.uid === S.user.uid || isAdmin()) ? `<button class="link-btn danger-link" type="button" data-action="tree-photo-remove" data-pid="${esc(pid)}">Remove photo</button>` : ''}
         </div>
         ${p.L ? `<p class="tp-note">${icon('shield')}Living relative — only the birth year is kept here.</p>` : ''}
@@ -4032,17 +4028,16 @@
   const MEDIA_KIND = { portrait: ['image', 'Photo'], photo: ['image', 'Photo'], document: ['note', 'Document'], headstone: ['candle', 'Headstone'],
     story: ['book', 'Story'], immigration: ['globe', 'Immigration'], place: ['pin', 'Place'], other: ['image', 'Item'], file: ['note', 'File'] };
   const more = (items, n, label) => (items.length > n ? `<button class="link-btn tp-more" type="button" data-action="tp-more">${icon('chev-d')}Show all ${items.length} ${label}</button>` : '');
-  function mediaHTML(p, treeNo, num) {
+  function mediaHTML(p) {
     if (!p.md) return '';
-    const gallery = num && treeNo ? `https://www.ancestry.com/family-tree/person/tree/${encodeURIComponent(treeNo)}/person/${num}/gallery` : '';
     const rows = p.md.map((m, i) => {
-      const k = MEDIA_KIND[m.k] || MEDIA_KIND.other, link = safeUrl(m.u) || gallery;
-      return `<li class="tmedia${i >= 4 ? ' tp-extra' : ''}"><span class="tm-ico">${icon(k[0])}</span><div><p>${link ? extLink(link, m.t) : esc(m.t)}${m.m ? ' <span class="conf h">Main photo</span>' : ''}</p><small>${esc(k[1])}${safeUrl(m.u) ? ' · saved from the web' : gallery ? ' · on Ancestry' : ''}</small>${m.d ? `<p class="tm-about">${esc(m.d)}</p>` : ''}</div></li>`;
+      const k = MEDIA_KIND[m.k] || MEDIA_KIND.other, link = safeUrl(m.u);
+      return `<li class="tmedia${i >= 4 ? ' tp-extra' : ''}"><span class="tm-ico">${icon(k[0])}</span><div><p>${link ? extLink(link, m.t) : esc(m.t)}${m.m ? ' <span class="conf h">Main photo</span>' : ''}</p><small>${esc(k[1])}${link ? ' · saved from the web' : ' · in the family’s Ancestry tree'}</small>${m.d ? `<p class="tm-about">${esc(m.d)}</p>` : ''}</div></li>`;
     }).join('');
     const pics = p.md.filter(m => /portrait|photo|headstone|place|other/.test(m.k)).length;
     return `<section class="tp-group tp-docs"><h3>${icon('image')}Photos &amp; documents<span>${p.md.length}</span></h3>
       <ul class="rlist">${rows}</ul>${more(p.md, 4, 'photos & documents')}
-      ${pics && !S.tree.photos[p.id] ? `<p class="tp-note">${icon('sparkle')}<span>The pictures themselves live on Ancestry. Open one, download it, then tap <b>Add a photo</b> above — or drop a whole folder into <b>Add photos</b> and each is matched to the right person.</span></p>` : ''}
+      ${pics && !S.tree.photos[p.id] ? `<p class="tp-note">${icon('sparkle')}<span>The pictures themselves are kept in the family’s Ancestry tree. Download them there, then tap <b>Add a photo</b> above — or drop a whole folder into <b>Add photos</b> and each is matched to the right person.</span></p>` : ''}
     </section>`;
   }
   const RECORD_ICON = [[/census/i, 'users'], [/death|burial|grave|cemetery|funeral/i, 'candle'], [/birth|baptism|christening/i, 'cake'], [/marriage/i, 'heart'],
@@ -4052,7 +4047,7 @@
     if (!p.src) return '';
     const rows = p.src.map((r, i) => {
       const ico = (RECORD_ICON.find(([re]) => re.test(r.t)) || [0, 'book'])[1];
-      const links = [r.a ? `<a href="https://www.ancestry.com/discoveryui-content/view/${esc(r.a)}" target="_blank" rel="noopener noreferrer">View the record</a>` : '', safeUrl(r.u) ? extLink(r.u, /newspapers\.com/.test(r.u) ? 'See the newspaper' : 'Open the page') : ''].filter(Boolean).join(' · ');
+      const links = safeUrl(r.u) ? extLink(r.u, /newspapers\.com/.test(r.u) ? 'See the newspaper' : 'Open the page') : '';
       return `<li class="trec${i >= 5 ? ' tp-extra' : ''}"><span class="tm-ico">${icon(ico)}</span><div><p>${esc(r.t)}</p>${r.p ? `<small>${esc(r.p)}</small>` : ''}${r.e || links ? `<small>${r.e ? `Shows: ${esc(r.e)}` : ''}${r.e && links ? ' · ' : ''}${links}</small>` : ''}</div></li>`;
     }).join('');
     return `<section class="tp-group tp-records"><h3>${icon('book')}Records<span>${p.src.length}</span></h3><ul class="rlist">${rows}</ul>${more(p.src, 5, 'records')}</section>`;
@@ -4081,7 +4076,8 @@
     book: ['book', 'Book'], photo: ['image', 'Photo'], portrait: ['image', 'Portrait'], other: ['external', 'Record'] };
   const FACT = { birth: 'Born', death: 'Died', burial: 'Buried', marriage: 'Married', residence: 'Lived', occupation: 'Work', immigration: 'Arrived', military: 'Served', biography: 'Story', other: 'Note' };
   const CONF = { h: ['h', 'Confirmed'], m: ['m', 'Likely'], l: ['l', 'Possible'] };
-  const safeUrl = u => (/^https:\/\/[^\s"'<>]+$/.test(String(u || '')) ? String(u) : '');
+  // https only — and never Ancestry (the family asked for no links out to it).
+  const safeUrl = u => (/^https:\/\/[^\s"'<>]+$/.test(String(u || '')) && !/^https:\/\/([^/]+\.)?ancestry\.[a-z.]+(\/|$)/i.test(String(u)) ? String(u) : '');
   const extLink = (u, text) => (safeUrl(u) ? `<a href="${esc(safeUrl(u))}" target="_blank" rel="noopener noreferrer">${esc(text || 'Source')}</a>` : esc(text || ''));
   function researchHTML(pid) {
     const r = S.tree.research && S.tree.research[pid];
@@ -4827,7 +4823,6 @@
   ['dragover', 'drop'].forEach(ev => window.addEventListener(ev, e => { if (!e.target.closest || !e.target.closest('[data-drop]')) e.preventDefault(); }));
 
   // Links + misc
-  $$('[data-link="tree"]').forEach(a => { a.href = ANCESTRY_URL; });
   paintThemeSeg();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
 })();

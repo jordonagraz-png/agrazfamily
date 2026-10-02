@@ -106,8 +106,7 @@ Everything lives in the hub under **Invite family** (sidebar, the phone's
   (grandparents → parents → you and your partner → children, joined by
   flowing lines; tap anyone to glide the tree around them), an **ancestor
   fan** six generations deep, a profile for everyone (dates, places, where
-  they lived, parents, partners, children, siblings, a link to the same
-  person on Ancestry), and search. Tap **This is me** and every card says how
+  they lived, parents, partners, children, siblings), and search. Tap **This is me** and every card says how
   you're related — "your 2nd great-grandmother", "your first cousin once
   removed", "husband of your aunt". Photos come from the tree itself, from
   members' profile photos, and Hector's from the In Memory page
@@ -149,7 +148,8 @@ Everything lives in the hub under **Invite family** (sidebar, the phone's
   QR code, change the code, and approve new members
 - **My Profile** — photo, contact details, light/dark theme, password reset,
   and the per-device JARVIS address
-- Links to the **Ancestry family tree** and **JARVIS**
+- A link to **JARVIS**. The hub never links out to Ancestry; the family tree
+  lives inside the hub
 - **Follows the sun** — the homepage hero and the hub's photos change with
   the time of day (first light, midday, golden hour, and a starry night)
 - **Install as an app** — phones get a one-time tip to add the hub to their
@@ -187,10 +187,9 @@ Delete the `.bin` once the tree is in.
 
 **Everything in the export:** besides names, dates and places, each profile
 lists the person's **records** (every source citation in the export, such as
-census, birth, marriage, death, border crossings and newspapers, each linked to
-the record on Ancestry), their **photos & documents** (titles, kinds and
-descriptions, with links to the person's Ancestry gallery or the saved web
-clipping), notes, cause of death and other recorded names. Under the chart,
+census, birth, marriage, death, border crossings and newspapers, with what
+each one shows and a link to any newspaper clipping), their **photos &
+documents** (titles, kinds and descriptions, and saved web clippings), notes, cause of death and other recorded names. Under the chart,
 **Life & times** weaves their life events (arrivals, military service, moves,
 marriages, children) together with the history around them, chosen by where
 they lived (Mexico, the U.S., Germany, Britain, Spain…). **The line down to you**

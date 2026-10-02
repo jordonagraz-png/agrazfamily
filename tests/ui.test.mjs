@@ -726,7 +726,7 @@ try {
     await a.waitForTimeout(SLOW * 400);
     const panel = await a.textContent('#tree-panel');
     ok(panel.includes('Your father') && panel.includes('3 Apr 1950 · Chicago, Illinois, USA') && panel.includes('Married 1986') && panel.includes('Divorced'), 'profile: relationship, birth, marriages');
-    ok((await a.getAttribute('#tree-panel a[href*="ancestry.com"][href$="/facts"]', 'href')).endsWith('/tree/191301314/person/182483266401/facts'), 'opens the same person on Ancestry');
+    ok(!(await a.$('a[href*="ancestry."]')), 'nothing in the hub links out to Ancestry');
     await a.fill('#tree-search', 'carm');
     await a.waitForTimeout(SLOW * 200);
     await a.click('#tree-results [data-pid="I4"]');
@@ -792,7 +792,7 @@ try {
     ok(arch.includes('From the archives') && arch.includes('Likely') && arch.includes('Differs from the tree') && arch.includes('Possible father') && arch.includes('Tomas Agraz'), 'profiles show records, facts with confidence, and possible new ancestors');
     ok((await a.getAttribute('#tree-panel .rdoc a', 'href')) === 'https://www.findagrave.com/memorial/123', 'documents link to their source');
     ok(!!(await a.$('.tcard.is-focus .tc-badge')), 'cards with records found get a badge');
-    ok(!!(await a.$('#tree-panel .tp-records a[href="https://www.ancestry.com/discoveryui-content/view/12345:6224"]')) && (await a.textContent('#tree-panel .tp-records')).includes('1930 United States Federal Census'), 'profiles list every record from the export, linked to the record on Ancestry');
+    ok((await a.textContent('#tree-panel .tp-records')).includes('1930 United States Federal Census') && !!(await a.$('#tree-panel .tp-records a[href="https://www.newspapers.com/clip/1/mateo-agraz-born/"]')) && !(await a.$('#tree-panel a[href*="ancestry."]')), 'profiles list every record from the export, with newspaper links but no links out to Ancestry');
     ok((await a.textContent('#tree-panel .tp-docs')).includes('Mateo naturalization papers') && (await a.textContent('#tree-panel .tp-docs')).includes('Certificate of naturalization'), 'and every photo and document, with its description');
     const story = await a.textContent('#tree-story');
     ok(story.includes('Life & times') && story.includes('Arrival') && story.includes('Ellis Island opens to immigrants') && story.includes('Mateo was 2'), 'under the chart: their life & times, woven with the history around them');
