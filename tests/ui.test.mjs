@@ -692,7 +692,7 @@ try {
     const TR = globalThis.AgrazTree;
     const GED = readFileSync(new URL('./fixtures/sample-tree.ged', import.meta.url), 'utf8');
     const model = TR.parse(GED);
-    const treeDocs = { meta: { v: 1, name: model.name, treeId: model.treeId, source: model.source, people: model.people.length, families: model.families.length, portraits: model.portraits, earliest: model.earliest, generations: model.generations, parts: 1, importedAt: new Date().toISOString(), importedBy: 'Jordon Agraz' }, part0: TR.chunk(model)[0] };
+    const treeDocs = { meta: { v: model.v, name: model.name, treeId: model.treeId, source: model.source, people: model.people.length, families: model.families.length, portraits: model.portraits, earliest: model.earliest, generations: model.generations, parts: 1, importedAt: new Date().toISOString(), importedBy: 'Jordon Agraz' }, part0: TR.chunk(model)[0] };
     const dir = join(tmpdir(), 'agraz-tree-test');
     mkdirSync(dir, { recursive: true });
     const zipPath = join(dir, 'Sample Family Tree.zip');
@@ -726,7 +726,7 @@ try {
     await a.waitForTimeout(SLOW * 400);
     const panel = await a.textContent('#tree-panel');
     ok(panel.includes('Your father') && panel.includes('3 Apr 1950 · Chicago, Illinois, USA') && panel.includes('Married 1986') && panel.includes('Divorced'), 'profile: relationship, birth, marriages');
-    ok((await a.getAttribute('#tree-panel a[href*="ancestry.com"]', 'href')).endsWith('/tree/191301314/person/182483266401/facts'), 'opens the same person on Ancestry');
+    ok((await a.getAttribute('#tree-panel a[href*="ancestry.com"][href$="/facts"]', 'href')).endsWith('/tree/191301314/person/182483266401/facts'), 'opens the same person on Ancestry');
     await a.fill('#tree-search', 'carm');
     await a.waitForTimeout(SLOW * 200);
     await a.click('#tree-results [data-pid="I4"]');
@@ -792,6 +792,22 @@ try {
     ok(arch.includes('From the archives') && arch.includes('Likely') && arch.includes('Differs from the tree') && arch.includes('Possible father') && arch.includes('Tomas Agraz'), 'profiles show records, facts with confidence, and possible new ancestors');
     ok((await a.getAttribute('#tree-panel .rdoc a', 'href')) === 'https://www.findagrave.com/memorial/123', 'documents link to their source');
     ok(!!(await a.$('.tcard.is-focus .tc-badge')), 'cards with records found get a badge');
+    ok(!!(await a.$('#tree-panel .tp-records a[href="https://www.ancestry.com/discoveryui-content/view/12345:6224"]')) && (await a.textContent('#tree-panel .tp-records')).includes('1930 United States Federal Census'), 'profiles list every record from the export, linked to the record on Ancestry');
+    ok((await a.textContent('#tree-panel .tp-docs')).includes('Mateo naturalization papers') && (await a.textContent('#tree-panel .tp-docs')).includes('Certificate of naturalization'), 'and every photo and document, with its description');
+    const story = await a.textContent('#tree-story');
+    ok(story.includes('Life & times') && story.includes('Arrival') && story.includes('Ellis Island opens to immigrants') && story.includes('Mateo was 2'), 'under the chart: their life & times, woven with the history around them');
+    ok(story.includes('From Mateo down to you') && story.includes('Where this branch begins') && !!(await a.$('#tree-story a[href^="https://www.familysearch.org/search/record/results?"]')), 'the line from them down to you, and where to search for parents nobody has found');
+    await a.click('[data-action=tree-view][data-v=fan]');
+    await a.waitForTimeout(SLOW * 700);
+    ok(!!(await a.$('.fan-seg.ghost')) && (await a.textContent('.fan-legend')).includes('Possible'), 'possible ancestors from the research fill the fan, dashed');
+    await a.click('.fan-seg.ghost', { force: true });
+    await a.waitForTimeout(SLOW * 300);
+    ok((await a.textContent('#tree-panel')).includes('Possible father of Mateo Agraz'), 'tap one to see why the research thinks so');
+    await a.click('#tree-panel [data-action=tree-focus]');
+    await a.waitForTimeout(SLOW * 400);
+    await a.click('[data-action=tree-view][data-v=family]');
+    await a.waitForTimeout(SLOW * 500);
+    ok(!!(await a.$('.tcard.ghost[data-slot="p0"]')), 'and the family chart shows them as dashed parent cards');
     await done(a, 'family tree (owner)');
 
     const mbr = await open('/family/#tree', { signedIn: true, admin: false, treeDocs, memberTreeIds: { u2: 'I10' } });
@@ -823,6 +839,20 @@ try {
     ok(got.research && got.research.people.I1.rel[0].of === 'Mateo Agraz', 'possible ancestors remember whose parent they’d be');
     ok((await tap.textContent('.tcard.is-focus')).includes('Hector Agraz') && !(await tap.$('#tree-file')), 'the tree opens straight away — no file to choose');
     await done(tap, 'family tree (one-tap link)');
+
+    // An older saved reading of the tree is replaced by the fuller one; research stays.
+    const oldTree = JSON.parse(JSON.stringify(treeDocs));
+    oldTree.meta.v = 1;
+    oldTree.research = { people: { I1: { note: 'kept' } }, count: 1, createdAt: '2026-01-01', by: 'Jordon Agraz' };
+    const upg = await open(`/family/#tree?key=${locked.key}`, { signedIn: true, role: 'owner', treeDocs: oldTree }, { lockedTree: locked.bin });
+    await upg.waitForTimeout(SLOW * 1500);
+    const up = await store(upg, () => ({ v: window.__store.tree.meta.v, res: window.__store.tree.research }));
+    ok(up.v === 2 && up.res && up.res.people.I1 && (await upg.textContent('#toast')).includes('The family tree is in') && (await upg.textContent('.tree-stats')).includes('records'), 'the link upgrades an older saved tree to the full harvest', up);
+    await done(upg, 'family tree (link upgrades the tree)');
+    const same = await open(`/family/#tree?key=${locked.key}`, { signedIn: true, role: 'owner', treeDocs: Object.assign(JSON.parse(JSON.stringify(treeDocs)), { research: { people: { I1: { note: 'x' } }, count: 1 } }) }, { lockedTree: locked.bin });
+    await same.waitForTimeout(SLOW * 1300);
+    ok((await same.textContent('#toast')).includes('already up to date'), 'opening it again changes nothing');
+    await done(same, 'family tree (link, already up to date)');
 
     const wrong = await open(`/family/#tree?key=${'A'.repeat(43)}`, { signedIn: true, role: 'owner' }, { lockedTree: locked.bin });
     await wrong.waitForTimeout(SLOW * 1200);

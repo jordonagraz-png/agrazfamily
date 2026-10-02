@@ -72,7 +72,8 @@
   const lines = v => String(v || '').split(/\r?\n/).map(x => x.trim()).filter(Boolean);
 
   function initials(name) {
-    const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+    // Letters only — Ancestry names can carry notes like "(6GG)" or "Dn.".
+    const parts = String(name || '').replace(/\([^)]*\)/g, ' ').trim().split(/\s+/).filter(w => /^\p{L}/u.test(w));
     if (!parts.length) return '?';
     return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase();
   }
@@ -159,6 +160,11 @@
 
   /* ===================== Theme ===================== */
   const root = document.documentElement;
+  // Motion: things rise into view, light follows the pointer, the welcome photo drifts.
+  // Everything holds still for reduced motion; automated test browsers skip the waiting.
+  const MOTION = !REDUCED && 'IntersectionObserver' in window;
+  if (MOTION) root.classList.add('motion');
+  if (MOTION && navigator.webdriver) root.classList.add('motion-instant');
   function effectiveTheme() {
     return root.getAttribute('data-theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
   }
@@ -528,6 +534,8 @@
   }
   function showNow(v) {
     const changed = S.view !== v;
+    revealUntil = performance.now() + 1800;
+    requestAnimationFrame(tagReveals);
     if (changed && S.view === 'globe') { stopPicking(); if (S.globe.api) S.globe.api.stop(); }
     if (changed && S.view === 'stories' && player.audio) player.audio.pause();
     S.view = v;
@@ -541,6 +549,97 @@
     if (sheet.open) sheet.close();
     if (changed) window.scrollTo(0, 0);
     RENDER[v]();
+  }
+
+  /* ===================== Motion ===================== */
+  // Cards and list items rise into place the first time they scroll into view after a page
+  // opens (not on every refresh of the data, so nothing flickers while you use it).
+  const REVEAL = '.view .card, .shortcut, #home-upcoming > *, #photo-grid > *, #feed > *, #recipes > *, #stories > *, #capsules > *, #people > *, #memorial-grid > *, #tributes > *, #cal-agenda > *';
+  let revealUntil = 0;
+  const revealed = new WeakSet();
+  const rio = MOTION ? new IntersectionObserver(entries => {
+    let i = 0;
+    entries.forEach(e => {
+      if (!e.isIntersecting) return;
+      const el = e.target, d = Math.min(i++, 7) * 70;
+      rio.unobserve(el);
+      el.style.setProperty('--rv-d', d + 'ms');
+      el.classList.add('rv-in');
+      setTimeout(() => { el.classList.remove('rv', 'rv-in'); el.style.removeProperty('--rv-d'); }, 1000 + d);
+    });
+  }, { rootMargin: '0px 0px -4% 0px' }) : null;
+  function tagReveals() {
+    if (!rio || performance.now() > revealUntil) return;
+    $$(REVEAL).forEach(el => {
+      if (revealed.has(el) || el.closest('[hidden]')) return;
+      revealed.add(el);
+      el.classList.add('rv');
+      rio.observe(el);
+    });
+  }
+  if (rio) new MutationObserver(() => { if (performance.now() < revealUntil) requestAnimationFrame(tagReveals); }).observe($('.main'), { childList: true, subtree: true });
+
+  if (MOTION && window.matchMedia('(hover: hover)').matches) {
+    // A soft light follows the pointer across cards.
+    let spotEl = null, last = null, raf = 0;
+    const plain = new WeakMap();
+    document.addEventListener('pointermove', e => {
+      last = e;
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        let el = last.target instanceof Element ? last.target.closest('.card, .shortcut') : null;
+        if (el && !plain.has(el)) plain.set(el, getComputedStyle(el).backgroundImage === 'none');
+        if (el && !plain.get(el)) el = null;
+        if (spotEl && spotEl !== el) spotEl.classList.remove('spot-on');
+        spotEl = el;
+        if (!el) return;
+        const r = el.getBoundingClientRect();
+        el.style.setProperty('--sx', Math.round(last.clientX - r.left) + 'px');
+        el.style.setProperty('--sy', Math.round(last.clientY - r.top) + 'px');
+        el.classList.add('spot-on');
+      });
+    }, { passive: true });
+    // The welcome photo and its gulls drift against each other as the pointer moves.
+    const hero = $('.welcome');
+    hero.addEventListener('pointermove', e => {
+      const r = hero.getBoundingClientRect();
+      hero.style.setProperty('--mx', ((e.clientX - r.left) / r.width * 2 - 1).toFixed(3));
+      hero.style.setProperty('--my', ((e.clientY - r.top) / r.height * 2 - 1).toFixed(3));
+    });
+    hero.addEventListener('pointerleave', () => { hero.style.setProperty('--mx', '0'); hero.style.setProperty('--my', '0'); });
+  }
+
+  // A little burst of confetti from a button, for the good moments.
+  function celebrate(from) {
+    if (!MOTION || navigator.webdriver) return;
+    const c = document.createElement('canvas'), W = window.innerWidth, H = window.innerHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
+    c.className = 'burst';
+    c.width = W * dpr; c.height = H * dpr;
+    c.style.width = W + 'px'; c.style.height = H + 'px';
+    document.body.appendChild(c);
+    const ctx = c.getContext('2d');
+    ctx.scale(dpr, dpr);
+    const r = from && from.getBoundingClientRect ? from.getBoundingClientRect() : { left: W / 2, top: H / 2, width: 0, height: 0 };
+    const ox = r.left + r.width / 2, oy = r.top + r.height / 2;
+    const COLORS = ['#e58c63', '#f2c3a1', '#c9933f', '#2b6b66', '#7fc7be', '#f4ede2'];
+    const bits = Array.from({ length: 80 }, () => {
+      const a = -Math.PI / 2 + (Math.random() - 0.5) * 2.4, v = 5 + Math.random() * 8;
+      return { x: ox, y: oy, vx: Math.cos(a) * v, vy: Math.sin(a) * v, s: 3 + Math.random() * 4, rot: Math.random() * 6, vr: (Math.random() - 0.5) * 0.4, c: COLORS[(Math.random() * COLORS.length) | 0], sq: Math.random() < 0.6 };
+    });
+    const t0 = performance.now();
+    (function frame(now) {
+      const t = now - t0;
+      ctx.clearRect(0, 0, W, H);
+      ctx.globalAlpha = Math.max(0, 1 - t / 1700);
+      bits.forEach(b => {
+        b.vy += 0.3; b.vx *= 0.985; b.x += b.vx; b.y += b.vy; b.rot += b.vr;
+        ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.rot); ctx.fillStyle = b.c;
+        if (b.sq) ctx.fillRect(-b.s, -b.s / 2.5, b.s * 2, b.s / 1.25); else { ctx.beginPath(); ctx.arc(0, 0, b.s / 1.6, 0, 7); ctx.fill(); }
+        ctx.restore();
+      });
+      if (t < 1700) requestAnimationFrame(frame); else c.remove();
+    })(t0);
   }
 
   /* ===================== Data ===================== */
@@ -689,7 +788,9 @@
   function renderHome() {
     const h = new Date().getHours();
     const part = h < 5 ? 'evening' : h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening';
-    $('#home-title').innerHTML = `Good ${part}, <em>${esc(firstName(myName()))}</em>`;
+    // each word rises into place (see .welcome-title .w)
+    const word = html => `<span class="w"><span>${html}</span></span>`;
+    $('#home-title').innerHTML = [word('Good'), word(`${part},`), word(`<em>${esc(firstName(myName()))}</em>`)].join(' ');
     $('#home-date').textContent = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
     $('#home-sub').textContent = 'Here’s what’s happening in the family.';
     renderHomeFamily();
@@ -1507,7 +1608,7 @@
     repaint();
     try {
       await col('events').doc(id).update({ ['rsvp.' + S.user.uid]: v });
-      if (v === 'yes' && prev[S.user.uid] !== 'yes') toast('You’re going — see you there!');
+      if (v === 'yes' && prev[S.user.uid] !== 'yes') { toast('You’re going — see you there!'); celebrate($$('[data-action="rsvp"]').find(x => x.dataset.id === id && x.dataset.v === v)); }
     } catch (e) {
       ev.rsvp = prev;
       repaint();
@@ -3429,7 +3530,8 @@
   }
   function setTreeModel(meta, model) {
     const prev = S.tree || {};
-    S.tree = { status: 'ready', meta, model, ix: T().index(model), photos: prev.photos || {}, research: prev.research || {}, view: prev.view || 'family', history: [], relCache: new Map(), memorialThumb: prev.memorialThumb || '' };
+    S.tree = { status: 'ready', meta, model, ix: T().index(model), photos: prev.photos || {}, research: prev.research || {}, view: prev.view || 'family', history: [], relCache: new Map(), memorialThumb: prev.memorialThumb || '', ghosts: new Map(),
+      counts: model.people.reduce((c, p) => { c.records += (p.src || []).length; c.media += (p.md || []).length; return c; }, { records: 0, media: 0 }) };
     S.tree.focus = treeStart();
     loadTreePhotos();
   }
@@ -3524,6 +3626,7 @@
             </span>
           </div>
           <div class="tree-canvas" id="tree-canvas"></div>
+          <div class="tree-story" id="tree-story"></div>
         </div>
         <aside class="tree-panel card" id="tree-panel" aria-live="polite"></aside>
       </div>`;
@@ -3536,6 +3639,7 @@
     if (!t || t.status !== 'ready' || !$('#tree-canvas')) return;
     const draw = () => {
       if (t.view === 'fan') renderFan(); else renderFamily();
+      renderStory();
       renderPanel();
       const back = $('#tree-back');
       if (back) back.hidden = !t.history.length;
@@ -3545,6 +3649,7 @@
   function treeFocus(pid) {
     const t = S.tree;
     if (!t || !t.ix.get(pid)) return;
+    t.ghost = null;
     if (pid !== t.focus) { t.history.push(t.focus); if (t.history.length > 50) t.history.shift(); t.focus = pid; }
     $('#tree-results').hidden = true;
     $('#tree-search').setAttribute('aria-expanded', 'false');
@@ -3563,6 +3668,7 @@
       ${stat(m.people.length, 'relatives')}${stat(m.generations || 0, 'generations')}
       ${m.earliest ? `<div class="ts"><b>${m.earliest}</b><span>earliest birth</span></div>` : ''}
       ${stat(photos, 'with photos', 'ts-photos')}
+      ${t.counts.records ? stat(t.counts.records, 'records') : ''}${t.counts.media ? stat(t.counts.media, 'photos &amp; documents') : ''}
       <p class="ts-source">${icon('tree')}${esc(m.name || 'Family tree')} · from ${esc(t.meta.source || 'Ancestry')}${t.meta.importedAt ? ` · updated ${esc(fmtDate(t.meta.importedAt))}` : ''}${isAdmin() ? ' · <button class="link-btn" type="button" data-action="tree-update">Update</button> · <label class="link-btn" for="research-file">Add research</label><input type="file" id="research-file" accept=".json,application/json" class="sr-only">' : ''}</p>
     </div>`;
   }
@@ -3598,7 +3704,9 @@
 
   // ---- the family chart: grandparents, parents, the person and their partners, children ----
   function personCard(pid, size, slot, used) {
-    const t = S.tree, p = pid && t.ix.get(pid);
+    const t = S.tree, p = pid && t.ix.get(pid), g = pid && !p && t.ghosts.get(pid);
+    if (g) return `<button type="button" class="tcard ${size} ghost" data-action="tree-ghost" data-gid="${esc(pid)}" data-slot="${slot}" aria-label="Possible ${esc(g.r)}: ${esc(g.n)}">
+      <span class="tc-photo"><span class="tc-mono">${esc(initials(g.n))}</span></span><span class="tc-name">${esc(g.n)}</span><span class="tc-years">${esc(lifeOf(g)) || '&nbsp;'}</span><span class="tc-rel">Possible ${esc(g.r)}</span></button>`;
     if (!p) return `<div class="tcard ${size} unknown" data-slot="${slot}" aria-hidden="true"><span class="tc-photo">${icon('user')}</span><span class="tc-name">Not in the tree</span></div>`;
     const photo = photoFor(pid), rel = relShort(relOf(pid));
     const vt = used && !used.has(pid) ? (used.add(pid), vtName(pid)) : '';
@@ -3617,9 +3725,137 @@
     ps.forEach(x => { if (x !== fa && x !== mo) { if (!fa) fa = x; else if (!mo) mo = x; } });
     return [fa, mo];
   }
+
+  // ---- possible ancestors: parents the research found that aren't in the tree yet ----
+  // Research lists them per person ({ r: 'father', n, b, d, of }); `of` says whose parent they'd
+  // be, which lets a chain of them climb several generations above the last person in the tree.
+  const NAME_SKIP = new Set(['de', 'del', 'la', 'las', 'los', 'y', 'van', 'von', 'der', 'the', 'and', 'possibly', 'his', 'her', 'iii', 'jr', 'sr']);
+  const nameTokens = s => T().fold(String(s || '').replace(/\([^)]*\)/g, ' ')).split(' ').filter(w => w.length > 2 && !NAME_SKIP.has(w));
+  // Same person if the first names agree and enough of the rest does too.
+  function sameName(a, b) {
+    const A = nameTokens(a), B = nameTokens(b);
+    if (!A.length || !B.length || !B.includes(A[0]) || !A.includes(B[0])) return false;
+    const k = A.filter(w => B.includes(w)).length;
+    return k >= Math.min(2, A.length, B.length);
+  }
+  function ghostParents(id) {
+    const t = S.tree, real = t.ix.get(id), g = t.ghosts.get(id);
+    const owner = real ? id : g && g.owner, r = owner && t.research[owner];
+    if (!r || !r.rel || (real && real.L)) return [null, null];
+    const who = real ? real.n : g.n;
+    const pick = role => {
+      const i = r.rel.findIndex((x, j) => x.r === role && (!g || j !== g.i) && (real ? !x.of || sameName(x.of, who) : x.of && sameName(x.of, who)));
+      if (i < 0) return null;
+      const gid = `g:${owner}:${i}`;
+      if (!t.ghosts.has(gid)) t.ghosts.set(gid, Object.assign({ id: gid, owner, i, child: id }, r.rel[i]));
+      return gid;
+    };
+    return [pick('father'), pick('mother')];
+  }
+  function parentPairX(id) {
+    if (!id) return [null, null];
+    if (!S.tree.ix.get(id)) return ghostParents(id);
+    const pp = parentPair(id);
+    if (pp[0] && pp[1]) return pp;
+    const gp = ghostParents(id);
+    return [pp[0] || gp[0], pp[1] || gp[1]];
+  }
+  const personOf = id => S.tree.ix.get(id) || S.tree.ghosts.get(id);
+  const lifeOf = p => (!p ? '' : p.owner ? [p.b, p.d].filter(Boolean).join('–') : T().lifespan(p));
+  function treeChip(id, note) {
+    const q = S.tree.ix.get(id), ph = photoFor(id), r = relShort(relOf(id));
+    return `<button class="tchip" type="button" data-action="tree-focus" data-pid="${esc(id)}">${ph ? `<img src="${ph}" alt="">` : `<span class="tc-mono">${esc(initials(q.n))}</span>`}<span><b>${esc(q.n)}</b><small>${esc([note, T().lifespan(q), r].filter(Boolean).join(' · '))}</small></span></button>`;
+  }
+
+  // ---- the story under the chart: life & times, and the line between this person and you ----
+  function lifeTimes(p) {
+    const ix = S.tree.ix, first = firstName(p.n);
+    const by = p.b && p.b.y, dy = p.d && p.d.y, now = new Date().getFullYear();
+    if (!by) return '';
+    const to = dy || (p.L ? now : Math.min(now, by + 90));
+    const items = [];
+    const add = (y, what, kind) => { if (y && what) items.push({ y, what, kind }); };
+    add(by, `Born${!p.L && p.b.p ? ` in ${p.b.p}` : ''}`, 'me');
+    if (!p.L) {
+      ix.unions(p.id).forEach(u => { const m = u.fam.m, sp = u.spouse && ix.get(u.spouse); if (m && m.y) add(m.y, `Married${sp ? ` ${sp.n}` : ''}${m.p ? ` in ${m.p}` : ''}`, 'me'); });
+      ix.children(p.id).forEach(c => { const q = ix.get(c); if (q && q.b && q.b.y) add(q.b.y, `${q.x === 'F' ? 'Daughter' : q.x === 'M' ? 'Son' : 'Child'} ${firstName(q.n)} born`, 'kid'); });
+      const seenRes = new Set();
+      (p.ev || []).forEach(e => {
+        if (!e.y) return;
+        if (e.k === 'Residence') { if (seenRes.has(e.p) || seenRes.size >= 4) return; seenRes.add(e.p); add(e.y, `Living in ${e.p}`, 'me'); return; }
+        add(e.y, `${e.k}${e.v ? `: ${e.v}` : ''}${e.p ? ` · ${e.p}` : ''}`, 'me');
+      });
+      if (dy) add(dy, `Died${p.d.p ? ` in ${p.d.p}` : ''}`, 'me');
+    }
+    T().world(T().regionsOf(p), by + 1, to, p.L ? 6 : 7).forEach(w => add(w.y, w.what, 'world'));
+    items.sort((a, b) => a.y - b.y || (a.kind === 'world') - (b.kind === 'world'));
+    if (items.length < 2) return '';
+    const rows = items.slice(0, 18).map(it => {
+      const age = it.y - by;
+      return `<li class="lt-${it.kind}"><b>${it.y}</b><div><p>${esc(it.what)}</p>${it.kind === 'world' && age >= 0 ? `<small>${esc(first)} was ${age}</small>` : it.kind !== 'world' && age > 0 ? `<small>age ${age}</small>` : ''}</div></li>`;
+    }).join('');
+    return `<section class="story-card"><h3>${icon('sunrise')}Life &amp; times<span>${esc(lifeOf(p) || '')}</span></h3><ol class="lt">${rows}</ol></section>`;
+  }
+  // The shortest line of parents and children between two people (through a shared ancestor if need be).
+  function lineBetween(a, b) {
+    const ix = S.tree.ix;
+    const ups = from => { const prev = new Map([[from, null]]), q = [from]; while (q.length) { const x = q.shift(); ix.parents(x).forEach(pp => { if (!prev.has(pp)) { prev.set(pp, x); q.push(pp); } }); } return prev; };
+    const A = ups(a), B = ups(b);
+    let best = null, bestLen = Infinity;
+    A.forEach((_, x) => { if (!B.has(x)) return; let n = 0; for (let y = x; y; y = A.get(y)) n++; for (let y = x; y; y = B.get(y)) n++; if (n < bestLen) { bestLen = n; best = x; } });
+    if (!best) return null;
+    const toA = []; for (let y = best; y; y = A.get(y)) toA.push(y);
+    const toB = []; for (let y = best; y; y = B.get(y)) toB.push(y);
+    return { top: best, path: [...toA.reverse(), ...toB.slice(1)] };
+  }
+  function lineHTML(p) {
+    const me = treeMe(), other = me || HOME_PERSON;
+    if (!S.tree.ix.get(other) || other === p.id) return '';
+    const line = lineBetween(p.id, other);
+    if (!line || line.path.length < 2) return '';
+    const who = me ? 'you' : firstName(S.tree.ix.get(other).n), n = line.path.length;
+    let ids = line.path;
+    const cut = ids.length > 12 ? ids.length - 9 : 0;
+    if (cut) ids = [...ids.slice(0, 5), null, ...ids.slice(-4)];
+    const steps = ids.map(id => (id ? `<li${id === line.top && line.top !== p.id && line.top !== other ? ' class="ln-top"' : ''}>${treeChip(id, id === line.top && line.top !== p.id && line.top !== other ? 'shared ancestor' : '')}</li>` : `<li class="ln-more"><span>${cut} more generation${cut === 1 ? '' : 's'}</span></li>`)).join('');
+    const title = line.top === p.id ? `From ${esc(firstName(p.n))} down to ${esc(who)}` : line.top === other ? `From ${esc(who)} down to ${esc(firstName(p.n))}` : `How ${esc(firstName(p.n))} and ${esc(who)} connect`;
+    return `<section class="story-card"><h3>${icon('pedigree')}${title}<span>${n} people</span></h3><ol class="line">${steps}</ol></section>`;
+  }
+  function findParentsHTML(p) {
+    if (p.L || S.tree.ix.parents(p.id).length) return '';
+    const q = encodeURIComponent, by = p.b && p.b.y, dy = p.d && p.d.y, place = p.b && p.b.p ? p.b.p.split(',').slice(-2).join(',').trim() : '';
+    const fs = `https://www.familysearch.org/search/record/results?q.givenName=${q(p.g || '')}&q.surname=${q(p.s || '')}${by ? `&q.birthLikeDate.from=${by - 2}&q.birthLikeDate.to=${by + 2}` : ''}${place ? `&q.birthLikePlace=${q(place)}` : ''}`;
+    const an = `https://www.ancestry.com/search/?name=${q(p.g || '')}_${q(p.s || '')}${by ? `&birth=${by}` : ''}${dy ? `&death=${dy}` : ''}`;
+    const fg = `https://www.findagrave.com/memorial/search?firstname=${q((p.g || '').split(' ')[0])}&lastname=${q(p.s || '')}${by ? `&birthyear=${by}` : ''}${dy ? `&deathyear=${dy}` : ''}`;
+    const [gf, gm] = ghostParents(p.id);
+    return `<section class="story-card roots-card"><h3>${icon('search')}Where this branch begins</h3>
+      <p>The tree doesn’t have ${esc(firstName(p.n))}’s parents yet${by ? ` — ${p.x === 'F' ? 'she' : p.x === 'M' ? 'he' : 'they'} ${p.x ? 'is' : 'are'} the earliest person known on this branch, born ${by}` : ''}.${gf || gm ? ' The research found possible parents — they’re shown dashed in Ancestors.' : ''}</p>
+      <div class="roots-links">
+        <a class="btn btn-sm btn-ghost-light" href="${esc(fs)}" target="_blank" rel="noopener noreferrer">${icon('external')}Search FamilySearch</a>
+        <a class="btn btn-sm btn-ghost-light" href="${esc(an)}" target="_blank" rel="noopener noreferrer">${icon('external')}Search Ancestry</a>
+        <a class="btn btn-sm btn-ghost-light" href="${esc(fg)}" target="_blank" rel="noopener noreferrer">${icon('external')}Search Find a Grave</a>
+      </div></section>`;
+  }
+  function renderStory() {
+    const box = $('#tree-story'), t = S.tree;
+    if (!box) return;
+    const p = t.ix.get(t.focus);
+    box.innerHTML = p ? [findParentsHTML(p), lifeTimes(p), lineHTML(p)].join('') : '';
+    box.hidden = !box.innerHTML.trim();
+  }
+  // No ancestors at all (not even possible ones): the fan gives way to a portrait of where the line starts.
+  function renderRoots() {
+    const t = S.tree, p = t.ix.get(t.focus), photo = photoFor(t.focus);
+    $('#tree-canvas').innerHTML = `<div class="roots">
+      <div class="roots-medal">${photo ? `<img src="${photo}" alt="">` : `<span>${esc(initials(p.n))}</span>`}</div>
+      <h3>${esc(p.n)}</h3><p class="roots-years">${esc(T().lifespan(p) || (p.L ? 'Living' : ''))}</p>
+      <p class="roots-lede">${p.L ? 'No parents are in the tree for this living relative yet.' : `The earliest known ${esc(p.s || 'person')} on this branch. Their parents are still a mystery — the search links below are a good place to start.`}</p>
+      <div class="roots-rings" aria-hidden="true"><i></i><i></i><i></i></div>
+    </div>`;
+  }
   function renderFamily() {
     const t = S.tree, ix = t.ix, f = t.focus, used = new Set();
-    const P = parentPair(f), G = [...parentPair(P[0]), ...parentPair(P[1])];
+    const P = parentPairX(f), G = [...parentPairX(P[0]), ...parentPairX(P[1])];
     const unions = ix.unions(f);
     const groups = unions.map((u, k) => ({ k, spouse: u.spouse && ix.get(u.spouse) ? u.spouse : null, kids: u.fam.c.filter(c => ix.get(c)) })).filter(g => g.spouse || g.kids.length);
     const gp = (id, i) => (P[i < 2 ? 0 : 1] ? personCard(id, 'sm', 'g' + i, used) : `<div class="tcard sm void" data-slot="g${i}"></div>`);
@@ -3677,12 +3913,17 @@
 
   // ---- the ancestor fan: up to six generations around the chosen person ----
   function renderFan() {
-    const t = S.tree, ix = t.ix, GENS = 6, cx = 380, cy = 380;
-    const R = [72, 134, 188, 238, 282, 320, 352];
+    const t = S.tree, ix = t.ix, cx = 380, cy = 380;
     const RAD = Math.PI / 180, F = n => n.toFixed(1);
     const at = (r, a) => [cx + r * Math.sin(a * RAD), cy - r * Math.cos(a * RAD)];
     const A = { 1: t.focus };
-    for (let k = 1; k < 2 ** GENS; k++) { if (!A[k]) continue; const [fa, mo] = parentPair(A[k]); if (fa) A[2 * k] = fa; if (mo) A[2 * k + 1] = mo; }
+    for (let k = 1; k < 2 ** 6; k++) { if (!A[k]) continue; const [fa, mo] = parentPairX(A[k]); if (fa) A[2 * k] = fa; if (mo) A[2 * k + 1] = mo; }
+    const deepest = Math.max(...Object.keys(A).map(k => Math.floor(Math.log2(k))));
+    if (!deepest) { renderRoots(); return; }
+    // Only as many rings as there are ancestors (plus one to grow into), widened to fill the fan.
+    const GENS = Math.min(6, deepest + 1), W = [62, 54, 50, 44, 38, 32].slice(0, GENS), k0 = 280 / W.reduce((a, b) => a + b, 0);
+    const R = W.reduce((r, w) => (r.push(r[r.length - 1] + w * k0), r), [72]).map(Math.round);
+    const ghosts = Object.values(A).filter(id => !ix.get(id)).length;
     const HUES = { 4: 18, 5: 38, 6: 168, 7: 210 }, G1 = { 2: 22, 3: 180 };
     let segs = '', defs = '', labels = '';
     for (let g = 1; g <= GENS; g++) {
@@ -3692,10 +3933,11 @@
         const [x1, y1] = at(r2, a1), [x2, y2] = at(r2, a2), [x3, y3] = at(r1, a2), [x4, y4] = at(r1, a1);
         const d = `M${F(x1)} ${F(y1)}A${r2} ${r2} 0 0 1 ${F(x2)} ${F(y2)}L${F(x3)} ${F(y3)}A${r1} ${r1} 0 0 0 ${F(x4)} ${F(y4)}Z`;
         if (!pid) { segs += `<path class="fan-seg vacant fan-g${g}" d="${d}"/>`; continue; }
-        const p = ix.get(pid);
+        const ghost = !ix.get(pid), p = personOf(pid);
         const hue = g === 1 ? G1[k] : HUES[k >> (g - 2)];
-        const tip = `${p.n}${T().lifespan(p) ? ` (${T().lifespan(p)})` : ''}`;
-        segs += `<path class="fan-seg fan-g${g} hue-${hue}" data-action="tree-focus" data-pid="${esc(pid)}" d="${d}"><title>${esc(tip)}</title></path>`;
+        const tip = `${ghost ? 'Possible ancestor: ' : ''}${p.n}${lifeOf(p) ? ` (${lifeOf(p)})` : ''}`;
+        segs += ghost ? `<path class="fan-seg ghost fan-g${g}" data-action="tree-ghost" data-gid="${esc(pid)}" d="${d}"><title>${esc(tip)}</title></path>`
+          : `<path class="fan-seg fan-g${g} hue-${hue}" data-action="tree-focus" data-pid="${esc(pid)}" d="${d}"><title>${esc(tip)}</title></path>`;
         const mid = (a1 + a2) / 2, rm = (r1 + r2) / 2;
         if (g <= 4) {
           // names follow the arc; on the lower half the arc is drawn the other way so text stays upright
@@ -3706,24 +3948,24 @@
           const arcLen = (span * RAD) * rr, fs = g === 1 ? 15 : g === 2 ? 13 : g === 3 ? 11.5 : 10;
           const max = Math.max(3, Math.floor(arcLen / (fs * 0.56)) - 1);
           const name = g >= 3 ? (g === 4 ? firstName(p.n) : `${firstName(p.n)} ${p.s || ''}`.trim()) : p.n;
-          labels += `<text class="fan-name g${g}"><textPath href="#${id}" startOffset="50%">${esc(name.length > max ? name.slice(0, max - 1) + '…' : name)}</textPath></text>`;
+          labels += `<text class="fan-name g${g}${ghost ? ' ghost' : ''}"><textPath href="#${id}" startOffset="50%">${esc(name.length > max ? name.slice(0, max - 1) + '…' : name)}</textPath></text>`;
           if (g <= 3) {
             const id2 = `fy${k}`, ry = rm - (g <= 2 ? 12 : 10);
             const [sx2, sy2] = at(ry, flip ? a2 : a1), [ex2, ey2] = at(ry, flip ? a1 : a2);
             defs += `<path id="${id2}" d="M${F(sx2)} ${F(sy2)}A${F(ry)} ${F(ry)} 0 0 ${flip ? 0 : 1} ${F(ex2)} ${F(ey2)}"/>`;
-            labels += `<text class="fan-years g${g}"><textPath href="#${id2}" startOffset="50%">${esc(T().lifespan(p))}</textPath></text>`;
+            labels += `<text class="fan-years g${g}"><textPath href="#${id2}" startOffset="50%">${esc(ghost ? 'possible' + (lifeOf(p) ? ' · ' + lifeOf(p) : '') : lifeOf(p))}</textPath></text>`;
           }
         } else if (g === 5) {
           const [tx, ty] = at(rm, mid), rot = mid > 0 ? mid - 90 : mid + 90;
           const nm = firstName(p.n);
-          labels += `<text class="fan-name g5" transform="translate(${F(tx)} ${F(ty)}) rotate(${F(rot)})">${esc(nm.length > 8 ? nm.slice(0, 7) + '…' : nm)}</text>`;
+          labels += `<text class="fan-name g5${ghost ? ' ghost' : ''}" transform="translate(${F(tx)} ${F(ty)}) rotate(${F(rot)})">${esc(nm.length > 8 ? nm.slice(0, 7) + '…' : nm)}</text>`;
         }
       }
     }
     const fp = ix.get(t.focus), photo = photoFor(t.focus);
-    const count = Object.keys(A).length - 1;
+    const count = Object.keys(A).length - 1 - ghosts;
     $('#tree-canvas').innerHTML = `<div class="fan-wrap">
-      <svg class="fan" viewBox="0 0 760 572" role="img" aria-label="Ancestors of ${esc(fp.n)}: ${count} found in six generations">
+      <svg class="fan" viewBox="0 0 760 572" role="img" aria-label="Ancestors of ${esc(fp.n)}: ${count} in the tree${ghosts ? ` and ${ghosts} possible from research` : ''}">
         <defs>${defs}<clipPath id="fanClip"><circle cx="${cx}" cy="${cy}" r="${R[0] - 6}"/></clipPath>
           <radialGradient id="fanGlow"><stop offset="0" stop-color="#f2c478" stop-opacity=".35"/><stop offset="1" stop-color="#f2c478" stop-opacity="0"/></radialGradient></defs>
         <circle cx="${cx}" cy="${cy}" r="${R[0] + 30}" fill="url(#fanGlow)"/>
@@ -3734,21 +3976,19 @@
         <text class="fan-focus" x="${cx}" y="${cy + R[0] + 34}">${esc(fp.n)}</text>
         <text class="fan-focus-years" x="${cx}" y="${cy + R[0] + 56}">${esc(T().lifespan(fp))}</text>
       </svg>
-      <p class="fan-legend"><span class="lg p"></span>Father’s side <span class="lg m"></span>Mother’s side · tap anyone to step back in time</p>
+      <p class="fan-legend"><span class="lgi"><span class="lg p"></span>Father’s side</span><span class="lgi"><span class="lg m"></span>Mother’s side</span>${ghosts ? '<span class="lgi"><span class="lg g"></span>Possible, from research</span>' : ''}<span class="lgi">Tap anyone to step back in time</span></p>
     </div>`;
   }
 
   // ---- the profile ----
   function renderPanel() {
     const t = S.tree, ix = t.ix, pid = t.focus, p = ix.get(pid);
+    if (t.ghost && t.ghosts.get(t.ghost)) { renderGhostPanel(t.ghosts.get(t.ghost)); return; }
     if (!p) { $('#tree-panel').innerHTML = ''; return; }
     const photo = photoFor(pid), rel = relLong(relOf(pid)), me = treeMe();
     const ev = e => (e ? [e.d, e.p].filter(Boolean).join(' · ') : '');
     const fact = (ico, label, value) => (value ? `<div class="tp-fact">${icon(ico)}<div><dt>${label}</dt><dd>${esc(value)}</dd></div></div>` : '');
-    const chip = id => {
-      const q = ix.get(id), ph = photoFor(id), r = relShort(relOf(id));
-      return `<button class="tchip" type="button" data-action="tree-focus" data-pid="${esc(id)}">${ph ? `<img src="${ph}" alt="">` : `<span class="tc-mono">${esc(initials(q.n))}</span>`}<span><b>${esc(q.n)}</b><small>${esc([T().lifespan(q), r].filter(Boolean).join(' · '))}</small></span></button>`;
-    };
+    const chip = id => treeChip(id);
     const group = (title, ids, extra) => (ids.length ? `<section class="tp-group"><h3>${title}<span>${ids.length}</span></h3><div class="tp-chips">${ids.map((id, i) => chip(id) + (extra ? extra(id, i) : '')).join('')}</div></section>` : '');
     const unions = ix.unions(pid).filter(u => u.spouse && ix.get(u.spouse));
     const marriage = (id, i) => { const u = unions[i], m = u && u.fam.m; return m || (u && u.fam.dv) ? `<p class="tp-marr">${m ? `Married ${esc(ev(m))}` : ''}${u.fam.dv ? `${m ? ' · ' : ''}Divorced` : ''}</p>` : ''; };
@@ -3764,13 +4004,17 @@
       </div>
       <div class="tp-body">
         <h2 class="tp-name">${esc(p.n)}</h2>
+        ${p.aka ? `<p class="tp-aka">Also recorded as ${esc(p.aka.join(' · '))}</p>` : ''}
         <p class="tp-years">${esc(T().lifespan(p) || (p.L ? 'Living' : ''))}${age != null ? ` · ${age} years` : ''}</p>
         ${rel ? `<p class="tp-rel">${icon(rel === 'This is you' ? 'user' : 'heart')}${esc(rel)}</p>` : ''}
-        <dl class="tp-facts">${fact('cake', p.L ? 'Born' : 'Born', p.L ? (p.b ? p.b.d : '') : ev(p.b))}${fact('candle', 'Died', ev(p.d))}${fact('pin', 'Resting place', p.bu)}${p.r ? fact('home', 'Lived in', p.r.map(r => r.p + (r.y ? ` (${r.y})` : '')).join(' · ')) : ''}</dl>
+        <dl class="tp-facts">${fact('cake', p.L ? 'Born' : 'Born', p.L ? (p.b ? p.b.d : '') : ev(p.b))}${fact('candle', 'Died', ev(p.d) + (p.d && p.d.c ? ` — ${p.d.c}` : ''))}${fact('pin', 'Resting place', p.bu)}${p.r ? fact('home', 'Lived in', p.r.map(r => r.p + (r.y ? ` (${r.y})` : '')).join(' · ')) : ''}</dl>
         ${group('Parents', ix.parents(pid))}
         ${group(unions.length > 1 ? 'Partners' : 'Partner', unions.map(u => u.spouse), marriage)}
         ${group('Children', ix.children(pid))}
         ${group('Brothers &amp; sisters', ix.siblings(pid))}
+        ${p.nt ? `<section class="tp-group tp-notes"><h3>${icon('note')}Notes</h3><p class="tp-nt">${esc(p.nt)}</p></section>` : ''}
+        ${mediaHTML(p, treeNo, num)}
+        ${recordsHTML(p)}
         ${researchHTML(pid)}
         <div class="tp-actions">
           ${!me ? `<button class="btn btn-sm btn-ghost" type="button" data-action="tree-me" data-pid="${esc(pid)}">${icon('user')}This is me</button>`
@@ -3779,6 +4023,53 @@
           ${own && (own.uid === S.user.uid || isAdmin()) ? `<button class="link-btn danger-link" type="button" data-action="tree-photo-remove" data-pid="${esc(pid)}">Remove photo</button>` : ''}
         </div>
         ${p.L ? `<p class="tp-note">${icon('shield')}Living relative — only the birth year is kept here.</p>` : ''}
+      </div>`;
+  }
+
+  // ---- everything else from the Ancestry export: photos & documents, and records ----
+  const MEDIA_KIND = { portrait: ['image', 'Photo'], photo: ['image', 'Photo'], document: ['note', 'Document'], headstone: ['candle', 'Headstone'],
+    story: ['book', 'Story'], immigration: ['globe', 'Immigration'], place: ['pin', 'Place'], other: ['image', 'Item'], file: ['note', 'File'] };
+  const more = (items, n, label) => (items.length > n ? `<button class="link-btn tp-more" type="button" data-action="tp-more">${icon('chev-d')}Show all ${items.length} ${label}</button>` : '');
+  function mediaHTML(p, treeNo, num) {
+    if (!p.md) return '';
+    const gallery = num && treeNo ? `https://www.ancestry.com/family-tree/person/tree/${encodeURIComponent(treeNo)}/person/${num}/gallery` : '';
+    const rows = p.md.map((m, i) => {
+      const k = MEDIA_KIND[m.k] || MEDIA_KIND.other, link = safeUrl(m.u) || gallery;
+      return `<li class="tmedia${i >= 4 ? ' tp-extra' : ''}"><span class="tm-ico">${icon(k[0])}</span><div><p>${link ? extLink(link, m.t) : esc(m.t)}${m.m ? ' <span class="conf h">Main photo</span>' : ''}</p><small>${esc(k[1])}${safeUrl(m.u) ? ' · saved from the web' : gallery ? ' · on Ancestry' : ''}</small>${m.d ? `<p class="tm-about">${esc(m.d)}</p>` : ''}</div></li>`;
+    }).join('');
+    const pics = p.md.filter(m => /portrait|photo|headstone|place|other/.test(m.k)).length;
+    return `<section class="tp-group tp-docs"><h3>${icon('image')}Photos &amp; documents<span>${p.md.length}</span></h3>
+      <ul class="rlist">${rows}</ul>${more(p.md, 4, 'photos & documents')}
+      ${pics && !S.tree.photos[p.id] ? `<p class="tp-note">${icon('sparkle')}<span>The pictures themselves live on Ancestry. Open one, download it, then tap <b>Add a photo</b> above — or drop a whole folder into <b>Add photos</b> and each is matched to the right person.</span></p>` : ''}
+    </section>`;
+  }
+  const RECORD_ICON = [[/census/i, 'users'], [/death|burial|grave|cemetery|funeral/i, 'candle'], [/birth|baptism|christening/i, 'cake'], [/marriage/i, 'heart'],
+    [/border|passenger|immigra|naturali|arrival|crossing|passport/i, 'globe'], [/military|draft|army|navy|veteran|war/i, 'shield'],
+    [/newspaper|obituar/i, 'note'], [/directory|address|phone/i, 'book']];
+  function recordsHTML(p) {
+    if (!p.src) return '';
+    const rows = p.src.map((r, i) => {
+      const ico = (RECORD_ICON.find(([re]) => re.test(r.t)) || [0, 'book'])[1];
+      const links = [r.a ? `<a href="https://www.ancestry.com/discoveryui-content/view/${esc(r.a)}" target="_blank" rel="noopener noreferrer">View the record</a>` : '', safeUrl(r.u) ? extLink(r.u, /newspapers\.com/.test(r.u) ? 'See the newspaper' : 'Open the page') : ''].filter(Boolean).join(' · ');
+      return `<li class="trec${i >= 5 ? ' tp-extra' : ''}"><span class="tm-ico">${icon(ico)}</span><div><p>${esc(r.t)}</p>${r.p ? `<small>${esc(r.p)}</small>` : ''}${r.e || links ? `<small>${r.e ? `Shows: ${esc(r.e)}` : ''}${r.e && links ? ' · ' : ''}${links}</small>` : ''}</div></li>`;
+    }).join('');
+    return `<section class="tp-group tp-records"><h3>${icon('book')}Records<span>${p.src.length}</span></h3><ul class="rlist">${rows}</ul>${more(p.src, 5, 'records')}</section>`;
+  }
+  function renderGhostPanel(g) {
+    const t = S.tree, child = personOf(g.child), conf = { h: 'Confirmed', m: 'Likely', l: 'Possible' }[g.c] || 'Possible';
+    $('#tree-panel').innerHTML = `
+      <div class="tp-hero tp-ghost"><span class="tp-mono">${esc(initials(g.n))}</span></div>
+      <div class="tp-body">
+        <h2 class="tp-name">${esc(g.n)}</h2>
+        <p class="tp-years">${esc(lifeOf(g) || 'Dates unknown')}</p>
+        <p class="tp-rel">${icon('sparkle')}Possible ${esc(g.r)} of ${esc(child ? child.n : g.of || '')}</p>
+        <dl class="tp-facts">
+          <div class="tp-fact">${icon('check')}<div><dt>How sure</dt><dd><span class="conf ${esc(g.c || 'l')}">${conf}</span></dd></div></div>
+          ${g.w ? `<div class="tp-fact">${icon('note')}<div><dt>Why we think so</dt><dd>${esc(g.w)}</dd></div></div>` : ''}
+          ${g.s || g.u ? `<div class="tp-fact">${icon('book')}<div><dt>Source</dt><dd>${extLink(g.u, g.s || 'Source')}</dd></div></div>` : ''}
+        </dl>
+        <p class="tp-note">${icon('sparkle')}Found by research in public records — not in the family’s Ancestry tree yet. If it checks out, add them on Ancestry and update the tree here.</p>
+        <div class="tp-actions"><button class="btn btn-sm btn-ghost" type="button" data-action="tree-focus" data-pid="${esc(t.focus)}">${icon('arrow-l')}Back to ${esc(firstName(t.ix.get(t.focus).n))}</button></div>
       </div>`;
   }
 
@@ -3916,7 +4207,7 @@
   async function saveTree(model) {
     const parts = T().chunk(model);
     const before = S.tree && S.tree.meta ? S.tree.meta.parts || 0 : 0;
-    const meta = { v: 1, name: (model.name || 'Family tree').slice(0, 80), treeId: model.treeId || '', source: (model.source || 'GEDCOM').slice(0, 40),
+    const meta = { v: model.v || 1, name: (model.name || 'Family tree').slice(0, 80), treeId: model.treeId || '', source: (model.source || 'GEDCOM').slice(0, 40),
       people: model.people.length, families: model.families.length, portraits: model.portraits || 0, earliest: model.earliest || null,
       generations: model.generations || 0, parts: parts.length, importedAt: nowIso(), importedBy: myName().slice(0, 80) };
     const b = db.batch();
@@ -3935,6 +4226,7 @@
       S.treeDraft = null;
       renderTree();
       toast(`The family tree is in — ${model.people.length.toLocaleString()} relatives`);
+      celebrate($('.tree-stats'));
     } catch (e) {
       busy(btn, false);
       toast(denied(e) ? NEED_RULES : 'Couldn’t save the tree. Please try again.', true);
@@ -3966,8 +4258,6 @@
     const t = S.tree || {};
     if (t.status === 'denied' || t.status === 'error') return; // the page already says what's wrong
     if (!isAdmin()) { toast('Only a family admin can add the family tree.', true); return; }
-    const hasResearch = t.research && Object.keys(t.research).length;
-    if (t.status === 'ready' && hasResearch) { toast('The family tree is already here'); return; }
     if (S.view === 'tree') {
       $('#tree-head').hidden = true;
       $('#tree-body').innerHTML = `<div class="tree-import card tree-unlock" aria-live="polite">
@@ -3979,12 +4269,16 @@
     try {
       await loadTreeLib();
       const data = await openLocked(key);
-      const added = t.status !== 'ready';
-      if (added) { say(`Saving ${data.tree.people.length.toLocaleString()} relatives privately for the family…`); await saveTree(data.tree); }
+      // A newer reading of the export (more of it harvested) replaces the saved tree; photos,
+      // research and everyone's “This is me” stay as they are.
+      const newer = t.status !== 'ready' || (t.meta.v || 1) < (data.tree.v || 1);
+      const hadResearch = t.research && Object.keys(t.research).length;
+      if (!newer && (hadResearch || !data.research)) { toast('The family tree is already up to date'); return; }
+      if (newer) { say(`Saving ${data.tree.people.length.toLocaleString()} relatives privately for the family…`); await saveTree(data.tree); }
       let found = 0;
       if (data.research) { say('Adding what was found in the archives…'); found = await saveResearch(data.research); }
       const n = S.tree.model.people.length.toLocaleString();
-      toast(added ? `The family tree is in — ${n} relatives${found ? `, with research for ${found}` : ''}` : `Research added for ${found} ${found === 1 ? 'person' : 'people'} — look for “From the archives”`);
+      toast(newer ? `The family tree is in — ${n} relatives${found ? `, with research for ${found}` : ''}` : `Research added for ${found} ${found === 1 ? 'person' : 'people'} — look for “From the archives”`);
     } catch (e) {
       const why = denied(e) ? NEED_RULES
         : e.message === 'key' ? 'That link didn’t unlock the tree — check you opened the whole link.'
@@ -4269,6 +4563,8 @@
       case 'tree-update': S.tree.updating = true; renderTree(); window.scrollTo({ top: 0, behavior: REDUCED ? 'auto' : 'smooth' }); break;
       case 'tree-update-cancel': S.tree.updating = false; S.treeDraft = null; renderTree(); break;
       case 'tree-import-go': importTree(t); break;
+      case 'tree-ghost': if (S.tree && S.tree.ghosts.get(t.dataset.gid)) { S.tree.ghost = t.dataset.gid; renderPanel(); } break;
+      case 'tp-more': { const sec = t.closest('.tp-group'); if (sec) sec.classList.add('show-all'); t.remove(); break; }
       case 'tree-photo': S.tree.photoTarget = t.dataset.pid; $('#tree-photo-input').click(); break;
       case 'tree-photo-remove': removeTreePhoto(t.dataset.pid); break;
       case 'tree-photos': openMatcher(); break;

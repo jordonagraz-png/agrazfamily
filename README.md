@@ -177,9 +177,25 @@ in the link: the part of an address after `#` is never sent to a server, and the
 hub clears it from the address bar. The service worker never caches the file.
 Delete the `.bin` once the tree is in.
 
+**Everything in the export:** besides names, dates and places, each profile
+lists the person's **records** (every source citation in the export, such as
+census, birth, marriage, death, border crossings and newspapers, each linked to
+the record on Ancestry), their **photos & documents** (titles, kinds and
+descriptions, with links to the person's Ancestry gallery or the saved web
+clipping), notes, cause of death and other recorded names. Under the chart,
+**Life & times** weaves their life events (arrivals, military service, moves,
+marriages, children) together with the history around them, chosen by where
+they lived (Mexico, the U.S., Germany, Britain, Spain…). **The line down to you**
+shows every generation between them and you. If nobody has found their
+parents yet, there are links to search FamilySearch, Ancestry and Find a Grave.
+Possible ancestors from the research show as dashed cards in the chart and
+fan. Opening a newer one-tap link upgrades a tree saved by an older version
+and keeps photos, research and "This is me".
+
 **Privacy:** relatives who are probably living (no death record and born in
 the last 100 years) are saved with their **birth year only** — no birthdays,
-birthplaces or addresses. Only signed-in family members can see the tree.
+birthplaces, addresses, records, notes or document titles. Only signed-in
+family members can see the tree.
 
 **Photos:** Ancestry's export lists every photo (title, exact size,
 dimensions) but doesn't include the pictures. So:
@@ -254,9 +270,10 @@ npm run serve        # http://127.0.0.1:8080/
 
 Every push runs two test suites on GitHub (see *Actions → Tests*):
 
-- **Family tree engine** (`tests/tree.test.mjs`) — ~50 checks with a small
+- **Family tree engine** (`tests/tree.test.mjs`) — ~60 checks with a small
   fictional family: reading the .zip, dates and places, living relatives
-  trimmed, relationship names, search, and matching photos to people.
+  trimmed, records, documents, life events and notes, the history around a
+  life, relationship names, search, and matching photos to people.
 - **Security rules** (`tests/rules.test.mjs`) — ~185 checks against the
   Firestore emulator: outsiders and wrong invite codes are locked out, the code
   can't be read, pending members see nothing, nobody can heart/RSVP/comment as

@@ -15,22 +15,43 @@
 1 BIRT
 2 DATE 3 Mar 1890
 2 PLAC Havana, Cuba
+2 SOUR @S2@
+3 PAGE Book 3; Page 41; URL: https://www.newspapers.com/clip/1/mateo-agraz-born/
+3 _APID 1,7000::555
 1 DEAT
 2 DATE abt 1960
 2 PLAC Miami, Florida, USA
 1 RESI
 2 DATE 1930
 2 PLAC Tampa, Florida, USA
+2 SOUR @S1@
+3 PAGE Tampa, Hillsborough, Florida; Roll: 321
+3 _APID 1,6224::12345
+1 EVEN
+2 TYPE Arrival
+2 DATE 14 May 1912
+2 PLAC Key West, Florida, USA
+1 _MILT
+2 DATE 1917
+2 PLAC Tampa, Florida, USA
+2 NOTE Registered for the draft
+1 SOUR @S1@
+2 _APID 1,6224::12345
 1 FAMS @F1@
 1 OBJE @O1@
 2 _PRIM Y
+1 OBJE @O4@
+1 OBJE @O5@
 0 @I2@ INDI
 1 NAME Lucia /Ferrer/
+1 NAME Lucía /Ferrer Díaz/
 1 SEX F
 1 BIRT
 2 DATE 1895
 1 DEAT
 2 DATE 12 December 1970
+2 CAUS Pneumonia
+1 NOTE Lucia ran the family bakery on 7th Avenue.
 1 BURI
 2 PLAC Woodlawn Cemetery, Miami, Florida, USA
 1 FAMS @F1@
@@ -112,6 +133,9 @@
 2 PLAC Miami, Florida, USA
 1 RESI
 2 PLAC Miami, Florida, USA
+2 SOUR @S1@
+3 _APID 1,6224::99999
+1 NOTE A note about a living relative — never kept.
 1 FAMC @F4@
 0 @I12@ INDI
 1 NAME Daniel /Agraz/
@@ -145,6 +169,8 @@
 2 DATE 25 Oct 2012
 1 FAMC @F6@
 0 @F1@ FAM
+1 SOUR @S3@
+2 _APID 1,8000::777
 1 HUSB @I1@
 1 WIFE @I2@
 1 CHIL @I3@
@@ -204,4 +230,30 @@
 3 _WDTH 1200
 3 _HGHT 900
 2 TITL 1940 census page
+0 @O4@ OBJE
+1 FILE
+2 FORM jpg
+3 TYPE image
+3 _MTYPE document
+3 _SIZE 9000
+3 _WDTH 800
+3 _HGHT 1100
+2 TITL Mateo naturalization papers
+1 _DSCR Certificate of naturalization, Tampa, 1921
+0 @O5@ OBJE
+1 FILE
+2 FORM jpg
+3 TYPE image
+3 _MTYPE document
+2 TITL Mateo &#34;Matty&#34; Agraz obituary &amp; &lt;i&gt;notice&lt;/i&gt;
+1 _ORIG newspapers
+2 _URL https://www.newspapers.com/clip/2/mateo-agraz-obituary/
+0 @S1@ SOUR
+1 TITL 1930 United States Federal Census
+1 AUTH Ancestry.com
+1 NOTE This note describes the collection, not a person.
+0 @S2@ SOUR
+1 TITL Cuba, Births, 1880-1920
+0 @S3@ SOUR
+1 TITL Florida, U.S., Marriages, 1830-1993
 0 TRLR

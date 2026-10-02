@@ -52,6 +52,29 @@ const walk = (v, path, inArr) => {
 walk(m, 'model', false);
 ok(!bad.length, 'the model can be stored in Firestore (no lists inside lists, nothing undefined)', bad.slice(0, 3));
 
+console.log('— everything else in the export');
+{
+  const mateo = P('I1'), lucia = P('I2');
+  const census = (mateo.src || []).find(r => r.a === '12345:6224');
+  ok(census && census.t === '1930 United States Federal Census' && census.p === 'Tampa, Hillsborough, Florida; Roll: 321' && census.e === 'Residence', 'records: the collection, the details and the event it backs up', mateo.src);
+  ok((mateo.src || []).filter(r => r.a === '12345:6224').length === 1, 'the same record cited twice is listed once');
+  const born = (mateo.src || []).find(r => r.a === '555:7000');
+  ok(born && born.u === 'https://www.newspapers.com/clip/1/mateo-agraz-born/' && born.p === 'Book 3; Page 41' && born.e === 'Birth', 'web addresses in the details become links (and leave the text)', born);
+  ok([mateo, lucia].every(p => (p.src || []).some(r => r.a === '777:8000' && r.e === undefined)), 'a marriage record counts for both partners');
+  ok(!P('I11').src && !P('I11').nt && !P('I11').md && !P('I11').ev, 'living relatives get no records, notes, documents or life events');
+  const arrival = (mateo.ev || []).find(e => e.k === 'Arrival'), draft = (mateo.ev || []).find(e => e.k === 'Military service');
+  ok(arrival && arrival.d === '14 May 1912' && arrival.p === 'Key West, Florida, USA' && draft && draft.n === 'Registered for the draft', 'life events: arrivals, military service with notes', mateo.ev);
+  ok(mateo.ev.map(e => e.y).join() === '1912,1917,1930', 'life events in order, with residences', mateo.ev);
+  ok(lucia.nt === 'Lucia ran the family bakery on 7th Avenue.' && lucia.d.c === 'Pneumonia' && lucia.aka.join() === 'Lucía Ferrer Díaz', 'notes, cause of death and other recorded names');
+  const docs = mateo.md || [];
+  ok(docs.length === 3 && docs[0].m === 1 && docs.some(d => d.t === 'Mateo naturalization papers' && d.k === 'document' && d.d === 'Certificate of naturalization, Tampa, 1921'), 'photos and documents with their descriptions, main photo first', docs);
+  ok(docs.some(d => d.u === 'https://www.newspapers.com/clip/2/mateo-agraz-obituary/' && d.t === 'Mateo "Matty" Agraz obituary & notice'), 'clippings saved from the web keep their link; Ancestry’s HTML codes become plain text', docs.map(d => d.t));
+  ok(m.v === 2, 'the model says which reading of the export it is');
+  const W = T.world(T.regionsOf({ b: { p: 'Valle de Allende, Chihuahua, Mexico' } }), 1800, 1830);
+  ok(W.some(w => w.y === 1810) && W.every(w => w.y >= 1800 && w.y <= 1830), 'history around a life: Mexico’s independence for someone in Chihuahua', W);
+  ok(T.regionsOf({ b: { p: 'Franklin, Johnson, Indiana, USA' } }).has('us') && !T.regionsOf({ b: { p: 'Franklin, Indiana, USA' } }).has('mx'), 'places say which history applies');
+}
+
 console.log('— relationships');
 const ix = T.index(m), cache = new Map();
 const rel = (a, b) => T.relationship(ix, a, b, cache);
