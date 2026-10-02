@@ -2666,6 +2666,18 @@
     $('#globe-place-btn span').textContent = on ? 'Move my pin' : 'Put me on the globe';
   }
 
+  // The family clocks keep time while you watch them.
+  let clockMinute = -1;
+  setInterval(() => {
+    if (S.view !== 'globe' || !S.globe.api || document.hidden) return;
+    const d = globeTime();
+    if (d.getMinutes() === clockMinute) return;
+    clockMinute = d.getMinutes();
+    $$('#globe-clocks .clock[data-uid]').forEach(el => {
+      const m = S.byUid[el.dataset.uid], b = el.querySelector('.clock-time b');
+      if (m && b) b.textContent = clockAt(m, d);
+    });
+  }, 5000);
   function renderGlobeSide() {
     if (!window.AgrazGlobe || !S.user) return;
     const date = globeTime();

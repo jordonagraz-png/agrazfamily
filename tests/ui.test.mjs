@@ -513,8 +513,9 @@ try {
     ok((await p.textContent('#globe-missing')).includes('Sofia'), 'lists who isn’t on the globe yet');
     ok((await p.textContent('#globe-best')).includes('Best time for a family call'), 'finds the best time for a family call');
     ok(await p.$$eval('#globe-strip .gt-cell', e => e.length) === 24, 'shows who’s awake hour by hour');
-    const madridNow = () => p.evaluate(() => new Date().toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZone: 'Europe/Madrid' }));
-    const before = await madridNow(), shown = await p.textContent('.clock[data-uid=u3] .clock-time b'), after = await madridNow();
+    // the clocks tick every few seconds, so allow for a minute that has only just turned
+    const madridAt = ago => p.evaluate(ms => new Date(Date.now() - ms).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZone: 'Europe/Madrid' }), ago);
+    const before = await madridAt(8000), shown = await p.textContent('.clock[data-uid=u3] .clock-time b'), after = await madridAt(0);
     ok(shown === before || shown === after, 'Daniel’s clock shows the time in Madrid');
     await p.evaluate(() => { const r = document.getElementById('globe-time'); r.value = '48'; r.dispatchEvent(new Event('input', { bubbles: true })); });
     await p.waitForTimeout(SLOW * 200);
