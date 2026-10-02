@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "serve": "node tests/serve.mjs",
+    "stamp": "node tools/stamp.mjs",
     "test": "npm run test:tree && npm run test:rules && npm run test:ui",
     "test:tree": "node tests/tree.test.mjs",
     "test:rules": "firebase emulators:exec --only firestore --project demo-agraz \"node tests/rules.test.mjs\"",

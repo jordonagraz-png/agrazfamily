@@ -52,7 +52,7 @@
     document.body.classList.toggle('menu-open', open);
     menuBtn.setAttribute('aria-expanded', String(open));
     menuBtn.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
-    menuIcon.setAttribute('href', '/assets/icons.svg#' + (open ? 'x' : 'menu'));
+    menuIcon.setAttribute('href', menuIcon.getAttribute('href').replace(/#.*$/, '#') + (open ? 'x' : 'menu'));
   }
   menuBtn.addEventListener('click', function () { setMenu(menu.hidden); });
   menu.addEventListener('click', function (e) { if (e.target.closest('a')) setMenu(false); });

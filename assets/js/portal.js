@@ -51,11 +51,13 @@
   const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
   /* ===================== Helpers ===================== */
+  // The ?v= stamp this script was loaded with — reused for everything it loads later.
+  const ASSET_V = (() => { try { return new URL(document.currentScript.src).search; } catch (e) { return ''; } })();
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
   const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
   const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ESC[c]);
-  const icon = (n, cls = '') => `<svg class="i ${cls}" aria-hidden="true"><use href="/assets/icons.svg#${n}"/></svg>`;
+  const icon = (n, cls = '') => `<svg class="i ${cls}" aria-hidden="true"><use href="/assets/icons.svg${ASSET_V}#${n}"/></svg>`;
   const okImg = s => typeof s === 'string' && IMG_RE.test(s);
   const pad = n => String(n).padStart(2, '0');
   const isoDay = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -2284,7 +2286,7 @@
     if (!qrLib) {
       qrLib = new Promise((resolve, reject) => {
         const sc = document.createElement('script');
-        sc.src = '/assets/js/vendor/qrcode.js';
+        sc.src = '/assets/js/vendor/qrcode.js' + ASSET_V;
         sc.onload = resolve;
         sc.onerror = () => { qrLib = null; reject(new Error('qr')); };
         document.head.appendChild(sc);
@@ -2473,7 +2475,7 @@
     if (!globeLib) {
       globeLib = new Promise((resolve, reject) => {
         const sc = document.createElement('script');
-        sc.src = '/assets/js/globe.js';
+        sc.src = '/assets/js/globe.js' + ASSET_V;
         sc.onload = resolve;
         sc.onerror = () => { globeLib = null; reject(new Error('globe')); };
         document.head.appendChild(sc);
@@ -3400,7 +3402,7 @@
     if (!treeLib) {
       treeLib = new Promise((resolve, reject) => {
         const sc = document.createElement('script');
-        sc.src = '/assets/js/tree.js';
+        sc.src = '/assets/js/tree.js' + ASSET_V;
         sc.onload = resolve;
         sc.onerror = () => { treeLib = null; reject(new Error('tree')); };
         document.head.appendChild(sc);
@@ -4096,7 +4098,7 @@
         const show = input.type === 'password';
         input.type = show ? 'text' : 'password';
         t.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
-        t.querySelector('use').setAttribute('href', `/assets/icons.svg#${show ? 'eye-off' : 'eye'}`);
+        t.querySelector('use').setAttribute('href', `/assets/icons.svg${ASSET_V}#${show ? 'eye-off' : 'eye'}`);
         break;
       }
       case 'signout': await signOut(); break;

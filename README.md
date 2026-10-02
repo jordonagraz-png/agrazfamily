@@ -224,10 +224,13 @@ assets/icons.svg      Icon set + logo mark
 firestore.rules       Server-side security rules (publish in Firebase)
 sw.js                 Service worker (offline shell; never caches private data)
 tests/                Security-rule + UI tests (run on every push)
-tools/                make-land-mask.mjs rebuilds assets/data/land.bin
+tools/                stamp.mjs versions asset links; make-land-mask.mjs rebuilds land.bin
 ```
 
-No build step — it's static HTML/CSS/JS served by GitHub Pages. Both pages ship
+No build step — it's static HTML/CSS/JS served by GitHub Pages. Before
+publishing a change, run `npm run stamp`: it puts a fresh version on every
+script, stylesheet and icon the pages load, so browsers never mix a new page
+with old cached files. Both pages ship
 a strict Content-Security-Policy, and the hub clears private content from the
 page on sign-out.
 

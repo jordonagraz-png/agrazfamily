@@ -700,6 +700,7 @@ try {
     const a = await open('/family/#tree', { signedIn: true, role: 'owner' });
     await a.waitForTimeout(SLOW * 1000);
     ok(!!(await a.$('#tree-file')), 'admins are offered the Ancestry import');
+    ok(await a.evaluate(() => [...document.querySelectorAll('a')].filter(x => /family tree/i.test(x.textContent)).every(x => x.getAttribute('href') === '#tree' && !x.target)), 'every “Family Tree” link opens the tree in the hub, not another site');
     await a.setInputFiles('#tree-file', zipPath);
     await a.waitForTimeout(SLOW * 700);
     ok((await a.textContent('#tree-preview')).includes('16 people'), 'the .zip is read right in the browser: 16 people');
