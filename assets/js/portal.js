@@ -3873,10 +3873,12 @@
     if (!p) return `<div class="tcard ${size} unknown" data-slot="${slot}" aria-hidden="true"><span class="tc-photo">${icon('user')}</span><span class="tc-name">Not in the tree</span></div>`;
     const photo = photoFor(pid), rel = relShort(relOf(pid));
     const vt = used && !used.has(pid) ? (used.add(pid), vtName(pid)) : '';
-    return `<button type="button" class="tcard ${size}${pid === t.focus ? ' is-focus' : ''} sx-${(p.x || 'u').toLowerCase()}${p.L ? ' is-living' : ''}" data-action="tree-focus" data-pid="${esc(pid)}" data-slot="${slot}"${vt ? ` data-vt="${vt}"` : ''} aria-label="${esc(p.n)}${T().lifespan(p) ? `, ${esc(T().lifespan(p))}` : ''}${rel ? `, ${esc(rel)}` : ''}">
+    // A long name keeps its family name in sight: given names first, then the surname on its own line.
+    const given = p.n.length > 24 && p.g && p.n.indexOf(p.g + ' ') === 0 ? p.g : '';
+    return `<button type="button" class="tcard ${size}${pid === t.focus ? ' is-focus' : ''} sx-${(p.x || 'u').toLowerCase()}${p.L ? ' is-living' : ''}" data-action="tree-focus" data-pid="${esc(pid)}" data-slot="${slot}"${vt ? ` data-vt="${vt}"` : ''}${given ? ` title="${esc(p.n)}"` : ''} aria-label="${esc(p.n)}${T().lifespan(p) ? `, ${esc(T().lifespan(p))}` : ''}${rel ? `, ${esc(rel)}` : ''}">
       <span class="tc-photo">${photo ? `<img src="${photo}" alt="">` : `<span class="tc-mono">${esc(initials(p.n))}</span>`}</span>
       ${hasArchive(pid) ? `<span class="tc-badge" title="Records found">${icon('book')}</span>` : ''}
-      <span class="tc-name">${esc(p.n)}</span>
+      ${given ? `<span class="tc-name tc-split"><span class="tc-given">${esc(given)}</span> <span class="tc-sur">${esc(p.n.slice(given.length + 1))}</span></span>` : `<span class="tc-name">${esc(p.n)}</span>`}
       <span class="tc-years">${esc(T().lifespan(p)) || '&nbsp;'}</span>
       ${rel ? `<span class="tc-rel">${esc(rel)}</span>` : ''}
     </button>`;
@@ -4038,6 +4040,15 @@
     if (treeRO) { treeRO.disconnect(); treeRO.observe($('#fam-chart')); }
   }
   let treeRO = null;
+  // The fan's lettering is sized for the width it was drawn at; redraw it when that changes a lot (a phone turned sideways).
+  let fanDrawnAt = 0, fanTimer = 0;
+  window.addEventListener('resize', () => {
+    clearTimeout(fanTimer);
+    fanTimer = setTimeout(() => {
+      const c = $('#tree-canvas');
+      if (S.view === 'tree' && S.tree && S.tree.status === 'ready' && S.tree.view === 'fan' && c && $('.fan', c) && Math.abs(c.clientWidth - fanDrawnAt) > 60) renderFan();
+    }, 250);
+  });
   // Flowing connectors: each pair of parents meets at a point, which branches to their children.
   function drawFamilyLines() {
     const chart = $('#fam-chart'), svg = $('#fam-lines');
@@ -4087,6 +4098,13 @@
     const GENS = Math.min(6, deepest + 1), W = [62, 54, 50, 44, 38, 32].slice(0, GENS), k0 = 280 / W.reduce((a, b) => a + b, 0);
     const R = W.reduce((r, w) => (r.push(r[r.length - 1] + w * k0), r), [72]).map(Math.round);
     const ghosts = Object.values(A).filter(id => !ix.get(id)).length;
+    // Labels stay readable when the fan is drawn small (a phone): each ring's lettering grows by up to
+    // the room it has, and the names are shortened to fit at that size.
+    const cv = $('#tree-canvas'), ccs = getComputedStyle(cv);
+    fanDrawnAt = cv.clientWidth;
+    const sc = Math.max(0.3, Math.min(880, cv.clientWidth - parseFloat(ccs.paddingLeft) - parseFloat(ccs.paddingRight) - 12) / 760);
+    const FS = [0, 15, 13, 11.5, 10], MINPX = [0, 12, 11, 10, 9.5], KMAX = [0, 1.75, 1.7, 1.9, 2.2];
+    const boost = g => Math.min(KMAX[g], Math.max(1, MINPX[g] / (FS[g] * sc)));
     const HUES = { 4: 18, 5: 38, 6: 168, 7: 210 }, G1 = { 2: 22, 3: 180 };
     let segs = '', defs = '', labels = '';
     for (let g = 1; g <= GENS; g++) {
@@ -4104,21 +4122,24 @@
         const mid = (a1 + a2) / 2, rm = (r1 + r2) / 2;
         if (g <= 4) {
           // names follow the arc; on the lower half the arc is drawn the other way so text stays upright
-          const flip = Math.abs(mid) > 90;
-          const id = `fa${k}`, rr = rm + (g <= 2 ? 6 : 3);
+          // On a flipped arc the letters hang toward the centre, so larger lettering moves out by its extra
+          // height; a name with no years under it (the outer rings, or a small fan) sits centred in its band.
+          const flip = Math.abs(mid) > 90, kb = boost(g), fs = FS[g] * kb, lift = flip ? 0.72 * FS[g] * (kb - 1) : 0;
+          const years = g <= 2 || (g === 3 && sc >= 0.6);
+          const id = `fa${k}`, rr = years ? rm + (g <= 2 ? 6 : 3) * kb + lift : rm + (flip ? 0.36 : -0.36) * fs;
           const [sx, sy] = at(rr, flip ? a2 : a1), [ex, ey] = at(rr, flip ? a1 : a2);
           defs += `<path id="${id}" d="M${F(sx)} ${F(sy)}A${F(rr)} ${F(rr)} 0 0 ${flip ? 0 : 1} ${F(ex)} ${F(ey)}"/>`;
-          const arcLen = (span * RAD) * rr, fs = g === 1 ? 15 : g === 2 ? 13 : g === 3 ? 11.5 : 10;
+          const arcLen = (span * RAD) * rr;
           const max = Math.max(3, Math.floor(arcLen / (fs * 0.56)) - 1);
           const name = g >= 3 ? (g === 4 ? firstName(p.n) : `${firstName(p.n)} ${p.s || ''}`.trim()) : p.n;
-          labels += `<text class="fan-name g${g}${ghost ? ' ghost' : ''}"><textPath href="#${id}" startOffset="50%">${esc(name.length > max ? name.slice(0, max - 1) + '…' : name)}</textPath></text>`;
-          if (g <= 3) {
-            const id2 = `fy${k}`, ry = rm - (g <= 2 ? 12 : 10);
+          labels += `<text class="fan-name g${g}${ghost ? ' ghost' : ''}" font-size="${F(fs)}"><textPath href="#${id}" startOffset="50%">${esc(name.length > max ? name.slice(0, max - 1) + '…' : name)}</textPath></text>`;
+          if (years) {
+            const id2 = `fy${k}`, ry = rm - (g <= 2 ? 12 : 10) * kb + lift;
             const [sx2, sy2] = at(ry, flip ? a2 : a1), [ex2, ey2] = at(ry, flip ? a1 : a2);
             defs += `<path id="${id2}" d="M${F(sx2)} ${F(sy2)}A${F(ry)} ${F(ry)} 0 0 ${flip ? 0 : 1} ${F(ex2)} ${F(ey2)}"/>`;
-            labels += `<text class="fan-years g${g}"><textPath href="#${id2}" startOffset="50%">${esc(ghost ? 'possible' + (lifeOf(p) ? ' · ' + lifeOf(p) : '') : lifeOf(p))}</textPath></text>`;
+            labels += `<text class="fan-years g${g}" font-size="${F((g === 3 ? 9 : 10.5) * kb)}"><textPath href="#${id2}" startOffset="50%">${esc(ghost ? 'possible' + (lifeOf(p) ? ' · ' + lifeOf(p) : '') : lifeOf(p))}</textPath></text>`;
           }
-        } else if (g === 5) {
+        } else if (g === 5 && sc >= 0.6) {
           const [tx, ty] = at(rm, mid), rot = mid > 0 ? mid - 90 : mid + 90;
           const nm = firstName(p.n);
           labels += `<text class="fan-name g5${ghost ? ' ghost' : ''}" transform="translate(${F(tx)} ${F(ty)}) rotate(${F(rot)})">${esc(nm.length > 8 ? nm.slice(0, 7) + '…' : nm)}</text>`;
@@ -4127,6 +4148,7 @@
     }
     const fp = ix.get(t.focus), photo = photoFor(t.focus);
     const count = Object.keys(A).length - 1 - ghosts;
+    const kn = Math.min(2, Math.max(1, 14 / (23 * sc))), ky = Math.min(2, Math.max(1, 9 / (13 * sc))), ny = cy + R[0] + 12 + 22 * kn;
     $('#tree-canvas').innerHTML = `<div class="fan-wrap">
       <svg class="fan" viewBox="0 0 760 572" role="img" aria-label="Ancestors of ${esc(fp.n)}: ${count} in the tree${ghosts ? ` and ${ghosts} possible from research` : ''}">
         <defs>${defs}<clipPath id="fanClip"><circle cx="${cx}" cy="${cy}" r="${R[0] - 6}"/></clipPath>
@@ -4136,8 +4158,8 @@
         <circle class="fan-core" cx="${cx}" cy="${cy}" r="${R[0] - 2}"/>
         ${photo ? `<image href="${photo}" x="${cx - R[0] + 6}" y="${cy - R[0] + 6}" width="${(R[0] - 6) * 2}" height="${(R[0] - 6) * 2}" clip-path="url(#fanClip)" preserveAspectRatio="xMidYMid slice"/>`
         : `<text class="fan-mono" x="${cx}" y="${cy + 12}">${esc(initials(fp.n))}</text>`}
-        <text class="fan-focus" x="${cx}" y="${cy + R[0] + 34}">${esc(fp.n)}</text>
-        <text class="fan-focus-years" x="${cx}" y="${cy + R[0] + 56}">${esc(T().lifespan(fp))}</text>
+        <text class="fan-focus" x="${cx}" y="${F(ny)}" font-size="${F(23 * kn)}">${esc(fp.n)}</text>
+        <text class="fan-focus-years" x="${cx}" y="${F(ny + 22 * ky)}" font-size="${F(13 * ky)}">${esc(T().lifespan(fp))}</text>
       </svg>
       <p class="fan-legend"><span class="lgi"><span class="lg p"></span>Father’s side</span><span class="lgi"><span class="lg m"></span>Mother’s side</span>${ghosts ? '<span class="lgi"><span class="lg g"></span>Possible, from research</span>' : ''}<span class="lgi">Tap anyone to step back in time</span></p>
     </div>`;
