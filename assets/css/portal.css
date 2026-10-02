@@ -454,6 +454,9 @@ dialog::backdrop { background: rgba(7, 17, 20, .55); backdrop-filter: blur(4px);
 .toast-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: var(--r-pill); background: rgba(255, 255, 255, .18); color: inherit; font-weight: 600; font-size: .82rem; text-decoration: none; }
 .toast-btn:hover { background: rgba(255, 255, 255, .3); }
 .toast-btn .i { width: 14px; height: 14px; }
+.rules-card { grid-column: 1 / -1; }
+.rules-card > p { font-size: var(--fs-sm); max-width: 78ch; }
+#rules-card-status { font-size: var(--fs-sm); white-space: nowrap; }
 .rules-card .card-title { display: inline-flex; align-items: center; gap: 8px; }
 .rules-card .card-title .i { width: 18px; height: 18px; color: var(--sea); }
 .rules-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-top: 14px; }
@@ -677,7 +680,7 @@ dialog::backdrop { background: rgba(7, 17, 20, .55); backdrop-filter: blur(4px);
 .copy-field { display: flex; gap: 8px; }
 .copy-field .input { flex: 1; min-width: 0; font-size: var(--fs-sm); background: var(--surface-2); color: var(--ink-2); text-overflow: ellipsis; }
 .share-row { display: flex; flex-wrap: wrap; gap: 8px; }
-.share-btn { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 16px; border-radius: var(--r-pill); border: 1px solid var(--line-2); background: var(--surface); font-size: var(--fs-sm); font-weight: 600; color: var(--ink); transition: background-color .2s, border-color .2s, transform .2s var(--ease); }
+.share-btn { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 16px; border-radius: var(--r-pill); border: 1px solid var(--line-2); background: var(--surface); font-size: var(--fs-sm); font-weight: 600; color: var(--ink); white-space: nowrap; transition: background-color .2s, border-color .2s, transform .2s var(--ease); }
 .share-btn:hover { border-color: var(--ink-3); transform: translateY(-1px); }
 .share-btn .i { width: 17px; height: 17px; color: var(--sea); }
 .share-btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
@@ -685,7 +688,7 @@ dialog::backdrop { background: rgba(7, 17, 20, .55); backdrop-filter: blur(4px);
 .invite-qr { display: grid; justify-items: center; align-content: center; gap: 14px; text-align: center; }
 .qr-box { width: min(210px, 100%); aspect-ratio: 1; border-radius: 18px; overflow: hidden; background: #fff; box-shadow: var(--shadow-md); border: 1px solid var(--line); }
 .qr-box svg { width: 100%; height: 100%; }
-.invite-qr p { display: grid; gap: 2px; font-size: var(--fs-sm); }
+.invite-qr p { display: grid; gap: 2px; font-size: var(--fs-sm); text-wrap: balance; }
 .code-row { display: flex; align-items: center; gap: 8px; padding: 12px 12px 12px 18px; border-radius: var(--r-md); background: var(--surface-2); border: 1px dashed var(--line-2); margin-bottom: 12px; }
 .invite-code { flex: 1; min-width: 0; font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: clamp(1.05rem, .95rem + .5vw, 1.3rem); font-weight: 600; letter-spacing: .04em; overflow-wrap: anywhere; color: var(--ink); }
 .code-row .icon-btn { color: var(--sea); }
@@ -708,7 +711,7 @@ dialog::backdrop { background: rgba(7, 17, 20, .55); backdrop-filter: blur(4px);
 .invite-none { margin-top: 14px; font-size: var(--fs-sm); }
 .invite-how { grid-column: 1 / -1; }
 .steps { list-style: none; counter-reset: s; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 16px; }
-.steps li { counter-increment: s; display: grid; gap: 4px; padding-top: 50px; position: relative; }
+.steps li { counter-increment: s; display: grid; align-content: start; gap: 4px; padding-top: 50px; position: relative; }
 .steps li::before { content: counter(s); position: absolute; top: 0; left: 0; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); font-family: var(--font-display); font-size: 1.15rem; font-weight: 500; }
 .steps li span { font-size: var(--fs-sm); color: var(--ink-3); }
 .invite-setup, .invite-member { max-width: 620px; display: grid; gap: 14px; justify-items: start; }
@@ -1579,7 +1582,7 @@ button.tcard:hover, button.tcard:focus-visible { transform: translateY(-3px); bo
   .steps { grid-template-columns: 1fr; gap: 14px; }
   .steps li { padding: 4px 0 0 52px; min-height: 38px; }
   .copy-field { flex-direction: column; }
-  .share-row .share-btn { flex: 1 1 calc(50% - 8px); justify-content: center; }
+  .share-row .share-btn { flex: 1 1 auto; justify-content: center; padding: 0 14px; }
   .view-head .head-actions .btn-ghost { display: none; }
 }
 
@@ -1666,7 +1669,7 @@ button.tcard:hover, button.tcard:focus-visible { transform: translateY(-3px); bo
 .gc-title { font-family: var(--font-display); font-weight: 400; font-size: clamp(1.7rem, 1.4rem + 1vw, 2.2rem); letter-spacing: -.02em; line-height: 1.05; }
 .gc-blurb { color: var(--ink-2); max-width: 52ch; }
 .gc-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-top: 4px; }
-.gc-best { font-size: var(--fs-sm); color: var(--ink-3); }
+.gc-best { flex: 1 1 180px; min-width: 0; font-size: var(--fs-sm); color: var(--ink-3); text-wrap: pretty; }
 .gc-best b { color: var(--ink); font-variant-numeric: tabular-nums; }
 .gc-board { margin-top: 8px; padding-top: 14px; border-top: 1px solid var(--line); }
 .gc-board h3, .game-board h3 { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: .66rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); }
@@ -1694,7 +1697,7 @@ button.tcard:hover, button.tcard:focus-visible { transform: translateY(-3px); bo
 .game-board { grid-area: board; display: grid; gap: 12px; }
 .gb-you { font-size: var(--fs-sm); color: var(--ink-2); }
 .gb-you b { color: var(--ink); font-variant-numeric: tabular-nums; }
-.gb-help { display: flex; align-items: flex-start; gap: 8px; font-size: .8rem; line-height: 1.45; color: var(--ink-3); }
+.gb-help { display: flex; align-items: flex-start; gap: 8px; font-size: .8rem; line-height: 1.45; color: var(--ink-3); text-wrap: pretty; }
 .gb-help .i { width: 14px; height: 14px; flex: none; margin-top: 2px; color: var(--sea); }
 @media (max-width: 1000px) {
   .game-play { grid-template-columns: 1fr; grid-template-areas: "bar" "host" "board"; }

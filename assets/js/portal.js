@@ -735,6 +735,7 @@
     else if (S.view === 'invite') renderInvite();
     else if (S.view === 'tree' && S.tree && S.tree.status === 'ready') renderTree();
     else if (S.view === 'globe' && S.globe.api) { S.globe.api.setPeople(globePeople(), S.user.uid); paintPlaceBtn(); renderGlobeSide(); }
+    else if (S.view === 'games' && S.scores) { if (S.game) renderGameBoard(); else renderLobby(); } // leaderboards get everyone's photos
   }
   async function loadEvents(force) {
     if (S.events && !force) return S.events;
