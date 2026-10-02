@@ -1775,7 +1775,7 @@ button.tcard:hover, button.tcard:focus-visible { transform: translateY(-3px); bo
 .snap.s2 { transform: rotate(-1.5deg) translate(-9px, 9px); }
 .snap.s3 { transform: rotate(7deg) translate(11px, -5px); }
 .snap.fly { animation: snapFly .7s cubic-bezier(.5, 0, .75, 0) forwards; }
-@keyframes snapFly { to { transform: translate(-150%, -24px) rotate(-26deg); opacity: 0; } }
+@keyframes snapFly { to { transform: translate(-45%, -90%) rotate(-18deg); opacity: 0; } }
 
 /* buttons catch the light on hover */
 .welcome-actions .btn { position: relative; overflow: hidden; }
