@@ -1,4 +1,5 @@
 # GitHub Pages: publish the site files only (tests and tooling stay in the repo).
+# firestore.rules IS published, so the Invite page can copy it for the owner (it holds no secrets).
 exclude:
   - tests
   - tools
@@ -6,5 +7,4 @@ exclude:
   - package.json
   - package-lock.json
   - firebase.json
-  - firestore.rules
   - README.md

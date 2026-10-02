@@ -402,9 +402,14 @@ try {
     ok((await setup.textContent('#toast')).includes('invite code is ready'), '…and says so');
     await done(setup, 'invite (owner setup)');
 
-    const old = await open('/family/#invite', { signedIn: true, admin: false, oldRules: true });
+    const old = await open('/family/#invite', { signedIn: true, admin: false, oldRules: true }, { permissions: ['clipboard-read', 'clipboard-write'] });
     await old.waitForTimeout(SLOW * 1000);
     ok((await old.textContent('#rules-status')).includes('Not yet'), 'setup notices when the security rules aren’t published');
+    ok((await old.getAttribute('.mini-steps a', 'href')).includes('/project/agrazfamily/firestore/'), '…links straight to the rules editor');
+    await old.click('[data-action=copy-rules]');
+    await old.waitForTimeout(SLOW * 300);
+    const copied = await old.evaluate(() => navigator.clipboard.readText());
+    ok(copied.startsWith('rules_version') && copied.includes('match /capsuleLetters/{id}') && copied.includes('function ownerKeyHash()'), '…and copies the latest rules to paste in');
     await old.fill('#owner-key', 'test-owner-key');
     await old.click('#owner-go');
     await old.waitForTimeout(SLOW * 600);

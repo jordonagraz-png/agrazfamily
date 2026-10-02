@@ -2311,18 +2311,40 @@
     if (S.view === 'invite' && !isAdmin()) renderInvite();
     return S.rulesOk;
   }
+  // The rules file is published with the site, so the owner can copy it straight into the console.
+  let rulesText = '';
+  async function loadRulesText() {
+    if (rulesText) return rulesText;
+    try {
+      const r = await fetch('/firestore.rules', { cache: 'no-store' });
+      const t = r.ok ? await r.text() : '';
+      if (/^rules_version/m.test(t)) rulesText = t;
+    } catch (e) {}
+    return rulesText;
+  }
+  async function copyRules() {
+    if (!(await loadRulesText())) { toast('Couldn’t load the rules — copy them from firestore.rules on GitHub instead.', true); return; }
+    copyText(rulesText, 'Rules copied — now paste them in the Firebase console and click Publish');
+  }
   function ownerSetupHTML() {
     const r = S.rulesOk;
     const again = '<button class="link-btn" type="button" data-action="check-rules">Check again</button>';
-    const status = r === true ? `<span class="setup-ok">${icon('check')}Published</span>`
-      : r === false ? `<span class="setup-warn">Not yet.</span> In the <a href="https://console.firebase.google.com/project/agrazfamily/firestore/rules" target="_blank" rel="noopener noreferrer">Firebase console</a>: Firestore Database → Rules → paste in <b>firestore.rules</b> → Publish. ${again}`
-        : r === null ? `Couldn’t check just now. ${again}` : 'Checking…';
+    if (r === false) loadRulesText(); // ready before the tap, so copying works on iPhones too
+    const status = r === true ? `<p id="rules-status"><span class="setup-ok">${icon('check')}Published</span></p>`
+      : r === false ? `<p id="rules-status"><span class="setup-warn">Not yet</span> — your Firebase project still has the old rules.</p>
+        <ol class="mini-steps">
+          <li><button class="btn btn-sm" type="button" data-action="copy-rules">${icon('copy')}Copy the rules</button></li>
+          <li>Open the <a href="https://console.firebase.google.com/project/agrazfamily/firestore/databases/-default-/rules" target="_blank" rel="noopener noreferrer">rules editor</a> in the Firebase console (sign in with the Google account that owns the project).</li>
+          <li>Select everything in the editor (Ctrl+A, or ⌘A on a Mac), paste, and click <b>Publish</b>.</li>
+          <li>Wait a minute, then ${again}.</li>
+        </ol>`
+        : `<p id="rules-status">${r === null ? `Couldn’t check just now. ${again}` : 'Checking…'}</p>`;
     return `<article class="card owner-setup">
       <span class="sc-icon sc-accent">${icon('key')}</span>
       <h2>Make your family invite code</h2>
       <p class="muted">Invite codes are made by the family’s owner. If that’s you, it’s two quick steps — just this once.</p>
       <ol class="setup-steps">
-        <li class="${r === true ? 'done' : ''}"><strong>Publish the latest security rules</strong><p id="rules-status">${status}</p></li>
+        <li class="${r === true ? 'done' : ''}"><strong>Publish the latest security rules</strong>${status}</li>
         <li><strong>Become the owner</strong><p>Paste your owner key — or the whole owner link.</p>
           <form class="copy-field" id="owner-form" novalidate>
             <label class="sr-only" for="owner-key">Owner key or link</label>
@@ -2359,7 +2381,7 @@
       let why = 'Couldn’t finish. Check your connection and try again.';
       if (denied(e)) {
         why = (await checkRules()) === false
-          ? 'The latest security rules aren’t published yet. Publish them first (Firebase console → Firestore Database → Rules), then try again.'
+          ? 'The latest security rules aren’t published yet — do step 1 first, then try again.'
           : 'That owner key didn’t work. Check it — it only works once, so the family may already have an owner.';
       }
       if (fromPage && $('#owner-msg')) $('#owner-msg').textContent = why; else toast(why, true);
@@ -3484,6 +3506,7 @@
       case 'vault-bio-off': disableBio(); break;
       case 'manage-member': openMemberDialog(t.dataset.uid); break;
       case 'check-rules': S.rulesOk = undefined; renderInvite(); break;
+      case 'copy-rules': copyRules(); break;
       case 'new-story': openRecorder(); break;
       case 'rec-toggle': if (rec.state === 'recording') stopRecording(); else if (rec.state === 'idle') startRecording(); break;
       case 'rec-play': toggleListen(); break;
