@@ -4259,7 +4259,7 @@
     const docs = (r.doc || []).map(d => { const k = KIND[d.k] || KIND.other; return `<li class="rdoc">${icon(k[0])}<div>${extLink(d.u, d.t || k[1])}<small>${esc(k[1])}${d.l ? ` · ${esc(d.l)}` : ''}${d.n ? ` · ${esc(d.n)}` : ''}</small></div></li>`; }).join('');
     const facts = (r.f || []).map(f => `<li class="rfact"><span class="rlabel">${esc(FACT[f.t] || 'Note')}</span><div><p>${esc(f.v)} ${conf(f.c)}${f.d ? ' <span class="conf x">Differs from the tree</span>' : ''}</p><small>${extLink(f.u, f.s)}</small></div></li>`).join('');
     const rels = (r.rel || []).map(x => `<li class="rrel"><span class="rlabel">Possible ${esc(x.r)}</span><div><p><b>${esc(x.n)}</b>${x.b || x.d ? ` · ${esc([x.b, x.d].filter(Boolean).join('–'))}` : ''} ${conf(x.c)}</p>${x.of ? `<small class="rof">${esc(capFirst(x.r))} of ${esc(x.of)}</small>` : ''}<small>${x.w ? `${esc(x.w)} · ` : ''}${extLink(x.u, x.s)}</small></div></li>`).join('');
-    const count = (r.doc || []).length + (r.f || []).length + (r.rel || []).length;
+    const count = (r.doc || []).length + (r.f || []).length + (r.rel || []).length + (r.sv && r.sv.length ? 1 : 0) + (r.note ? 1 : 0);
     return `<section class="tp-group tp-research"><h3>${icon('book')}From the archives<span>${count}</span></h3>
       ${docs ? `<ul class="rlist">${docs}</ul>` : ''}
       ${facts ? `<ul class="rlist">${facts}</ul>` : ''}
@@ -4446,7 +4446,8 @@
       // A newer reading of the export (more of it harvested) replaces the saved tree; photos,
       // research and everyone's “This is me” stay as they are.
       const newer = t.status !== 'ready' || (t.meta.v || 1) < (data.tree.v || 1);
-      const places = data.places && typeof data.places === 'object' ? Object.entries(data.places).filter(([id, x]) => /^place-[a-z0-9-]{1,32}$/.test(id) && x && okImg(x.img) && x.img.length <= 90000) : [];
+      const placeSrc = data.places || (data.research && data.research.places);
+      const places = placeSrc && typeof placeSrc === 'object' ? Object.entries(placeSrc).filter(([id, x]) => /^place-[a-z0-9-]{1,32}$/.test(id) && x && okImg(x.img) && x.img.length <= 90000) : [];
       const missingPlaces = places.filter(([id]) => !(S.tree && S.tree.photos && S.tree.photos[id]));
       const hadResearch = t.research && Object.keys(t.research).length;
       if (!newer && (hadResearch || !data.research) && !missingPlaces.length) { toast('The family tree is already up to date'); return; }

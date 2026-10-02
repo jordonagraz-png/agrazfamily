@@ -68,7 +68,8 @@
       return i >= 0 ? MONTHS[i].slice(0, 3) : w;
     });
   }
-  const cleanPlace = s => String(s || '').split(',').map(t => t.trim()).filter(Boolean).join(', ');
+  // "parral, Chihuahua" → "Parral, Chihuahua": each part starts with a capital, the rest is left alone
+  const cleanPlace = s => String(s || '').split(',').map(t => t.trim()).filter(Boolean).map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(', ');
   const oneLine = s => String(s || '').replace(/\s+/g, ' ').trim();
   // Ancestry writes some text as HTML ("&#34;", "&lt;i&gt;Title&lt;/i&gt;"): back to plain text.
   const ENT = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
