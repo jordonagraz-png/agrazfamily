@@ -1,0 +1,100 @@
+/* ==========================================================================
+   Agraz Family — signature moments (both pages)
+   Decorations only: every element here is created by assets/js/signature.js,
+   is aria-hidden, never takes pointer events, and holds still (fully drawn)
+   for reduced motion.
+   ========================================================================== */
+
+/* ---------- light that knows the hour ---------- */
+.sg-light { position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; mix-blend-mode: screen; opacity: 0; transition: opacity 2.4s var(--ease); }
+.sg-light.on { opacity: 1; }
+.sg-light > i { position: absolute; display: block; pointer-events: none; }
+.sg-l-glow { inset: 0; animation: sg-breathe 11s ease-in-out infinite alternate; }
+.sg-l-ray { left: 0; top: 0; transform-origin: 0 50%; animation: sg-sway 17s ease-in-out infinite alternate; }
+.sg-l-ray + .sg-l-ray { animation-duration: 23s; animation-direction: alternate-reverse; }
+.sg-l-ghost { border-radius: 50%; animation: sg-breathe 13s ease-in-out infinite alternate-reverse; }
+@keyframes sg-breathe { from { opacity: .72; } to { opacity: 1; } }
+@keyframes sg-sway { from { transform: rotate(-1.4deg); } to { transform: rotate(1.4deg); } }
+.sg-paused, .sg-paused * { animation-play-state: paused !important; }
+
+/* the sign-in photo's living ocean sits over the still photo, under the shade */
+.auth-art > .welcome-canvas { z-index: -2; }
+
+/* ---------- the arrival: the A drawn in light becomes the horizon ---------- */
+.sg-arrive { position: absolute; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
+.sg-arrive svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 0 1.5px rgb(var(--sg-c) / 1)) drop-shadow(0 0 7px rgb(var(--sg-c) / .9)) drop-shadow(0 0 22px rgb(var(--sg-c) / .55)); }
+.sg-arrive path { fill: none; stroke: #fffcf5; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.sg-arrive circle { fill: #fffaf0; transform-box: fill-box; transform-origin: center; }
+
+/* ---------- en agraz: the vine across Our Name ---------- */
+/* clip (not hidden) so the section isn't a scroll container and the vine's view timeline follows the page */
+.sg .name { overflow: clip; }
+.sg-vine { position: absolute; left: 0; top: 0; width: 100%; pointer-events: none; overflow: visible; color: var(--sea); view-timeline: --sgv block; z-index: 0;
+  --g0: #a2bd62; --g1: #c9c06c; --g2: #b9706d; --g3: #7c3d63; --g4: #4a2550; --gs: rgba(16, 37, 43, .34); --gh: rgba(255, 255, 255, .6); --lf: rgba(43, 107, 102, .07); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .sg-vine { --g0: #a3c96f; --g1: #d2c473; --g2: #cf7d7d; --g3: #a15a8e; --g4: #7a4386; --gs: rgba(0, 0, 0, .45); --gh: rgba(255, 255, 255, .4); --lf: rgba(127, 198, 178, .07); } }
+:root[data-theme="dark"] .sg-vine { --g0: #a3c96f; --g1: #d2c473; --g2: #cf7d7d; --g3: #a15a8e; --g4: #7a4386; --gs: rgba(0, 0, 0, .45); --gh: rgba(255, 255, 255, .4); --lf: rgba(127, 198, 178, .07); }
+.sg-vine .sg-stem, .sg-vine .sg-tendril, .sg-vine .sg-ped { fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; }
+.sg-vine .sg-stem { stroke-width: 1.7; opacity: .85; }
+.sg-vine .sg-tendril { stroke-width: 1.1; opacity: .7; }
+.sg-vine .sg-ped { stroke-width: 1.3; opacity: .8; }
+.sg-vine .sg-leaf path:first-child { fill: var(--lf); stroke: currentColor; stroke-width: 1.15; stroke-linejoin: round; opacity: .85; }
+.sg-vine .sg-leaf path + path { fill: none; stroke: currentColor; stroke-width: .8; stroke-linecap: round; opacity: .5; }
+.sg-vine .sg-pop { transform-box: fill-box; transform-origin: 50% 0; }
+.sg-vine .sg-ripe { fill: var(--gf, var(--g0)); stroke: var(--gs); stroke-width: .9; }
+.sg-vine .sg-hl { fill: var(--gh); }
+/* scroll-driven where the browser can, scrubbed from script elsewhere; the base styles above are the finished picture */
+.sg-vine.sg-sda .sg-v { animation-duration: auto; animation-timing-function: linear; animation-fill-mode: both; animation-timeline: --sgv; animation-range: contain calc(var(--a) * 100%) contain calc(var(--b) * 100%); }
+.sg-vine.sg-scrub .sg-v { animation-duration: 1s; animation-timing-function: linear; animation-fill-mode: both; animation-play-state: paused; animation-delay: calc(-1s * clamp(0, (var(--sgp, 0) - var(--a)) * var(--d), 1)); }
+.sg-vine.sg-sda .sg-stem, .sg-vine.sg-sda .sg-tendril, .sg-vine.sg-sda .sg-ped,
+.sg-vine.sg-scrub .sg-stem, .sg-vine.sg-scrub .sg-tendril, .sg-vine.sg-scrub .sg-ped { animation-name: sg-draw; }
+.sg-vine.sg-sda .sg-leaf, .sg-vine.sg-scrub .sg-leaf { animation-name: sg-unfurl; }
+.sg-vine.sg-sda .sg-pop, .sg-vine.sg-scrub .sg-pop { animation-name: sg-pop; }
+.sg-vine.sg-sda .sg-ripe.sg-v, .sg-vine.sg-scrub .sg-ripe.sg-v { animation-name: sg-ripen; }
+@keyframes sg-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes sg-unfurl { from { transform: scale(0) rotate(-35deg); opacity: 0; } 30% { opacity: 1; } to { transform: none; opacity: 1; } }
+@keyframes sg-pop { from { transform: scale(0); } 70% { transform: scale(1.08); } to { transform: none; } }
+@keyframes sg-ripen { 0% { fill: var(--g0); } 35% { fill: var(--g1); } 60% { fill: var(--g2); } 80% { fill: var(--g3); } 100% { fill: var(--g4); } }
+
+/* ---------- the living shoreline under the hero ---------- */
+.sg-shore { position: absolute; left: 0; right: 0; bottom: -1px; height: clamp(28px, 4vw, 64px); z-index: 1; overflow: hidden; pointer-events: none; }
+.sg-shore i { position: absolute; left: 0; bottom: 0; width: 150%; height: 100%; display: block; background: var(--paper);
+  -webkit-mask: var(--sg-wave) 0 100% / calc(100% / 3) 100% repeat-x; mask: var(--sg-wave) 0 100% / calc(100% / 3) 100% repeat-x;
+  --sg-wave: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 720 80' preserveAspectRatio='none'%3E%3Cpath d='M0 48c120-26 240-26 360 0s240 26 360 0v32H0Z'/%3E%3C/svg%3E"); }
+/* a thin line of foam drifts just above the water's edge */
+.sg-shore i:first-child { bottom: 7px; background: #fff; opacity: .34; animation: sg-tide 19s linear infinite;
+  --sg-wave: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 720 80' preserveAspectRatio='none'%3E%3Cpath d='M0 48c120-26 240-26 360 0s240 26 360 0' fill='none' stroke='%23000' stroke-width='2.4'/%3E%3C/svg%3E"); }
+.sg-shore i + i { animation: sg-tide 31s linear infinite reverse; }
+@keyframes sg-tide { from { transform: translate3d(-33.3333%, 0, 0); } to { transform: translate3d(0, 0, 0); } }
+.sg-shore-on .hero-wave { visibility: hidden; }
+
+/* ---------- small graces ---------- */
+.sg-lantern { position: absolute; left: 0; top: 0; z-index: -1; width: 720px; height: 720px; margin: -360px 0 0 -360px; border-radius: 50%; pointer-events: none; opacity: 0; mix-blend-mode: screen; transition: opacity .8s var(--ease);
+  background: radial-gradient(circle, rgba(255, 216, 176, .2) 0%, rgba(255, 190, 140, .085) 32%, rgba(255, 180, 130, 0) 64%); }
+.sg-lantern.on { opacity: 1; }
+.sg-mag { transition: translate .5s var(--ease-out), transform .25s var(--ease), box-shadow .25s var(--ease), background-color .2s, color .2s, border-color .2s, opacity .2s; }
+.sg-mag.sg-near { transition: translate .14s linear, transform .25s var(--ease), box-shadow .25s var(--ease), background-color .2s, color .2s, border-color .2s, opacity .2s; }
+.sg-mag .i { transition: translate .5s var(--ease-out); }
+.sg-mag.sg-near .i { transition: translate .14s linear; }
+.sg-lean .mosaic { perspective: 1600px; }
+.sg-lean .m { transition: opacity .9s var(--ease-out) var(--d, 0ms), transform .9s var(--ease-out) var(--d, 0ms), rotate .7s var(--ease-out); }
+.sg-lean .m img { transition: transform 1.2s var(--ease-out), translate .7s var(--ease-out); }
+.sg-lean .m.sg-leaning { transition: opacity .9s var(--ease-out) var(--d, 0ms), transform .9s var(--ease-out) var(--d, 0ms), rotate .18s linear; }
+.sg-lean .m.sg-leaning img { transition: transform 1.2s var(--ease-out), translate .18s linear; }
+.sg .scroll-cue { animation: sg-breathe-cue 3.8s ease-in-out infinite; }
+@keyframes sg-breathe-cue { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+
+/* ---------- threads of light between the family (hub tree) ---------- */
+.sg-threads { position: absolute; left: 0; top: 0; z-index: 0; pointer-events: none; overflow: visible; }
+.sg-threads path { fill: none; stroke-linecap: round; stroke-dasharray: 0 1; }
+.sg-th-glow { stroke: #f2c478; stroke-width: 8; opacity: .5; filter: blur(3px); }
+.sg-th-core { stroke: #fff6e2; stroke-width: 2.2; }
+.tcard.sg-lit .tc-photo { animation: sg-lit 1.25s var(--ease-out); }
+@keyframes sg-lit {
+  0% { box-shadow: 0 0 0 2px rgba(255, 255, 255, .14), 0 0 0 0 rgba(242, 196, 120, 0); }
+  22% { box-shadow: 0 0 0 2.5px #f8d58e, 0 0 26px 5px rgba(242, 196, 120, .6); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sg-light > i, .sg .scroll-cue { animation: none !important; }
+  .sg-vine .sg-v { animation: none !important; }
+}
