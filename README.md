@@ -23,14 +23,16 @@ invite code check onto the server, so two quick steps are needed in the
 1. **Publish the rules.** Firestore Database → **Rules** → paste the contents
    of [`firestore.rules`](firestore.rules) → **Publish**.
    *(or `firebase deploy --only firestore:rules`)*
-2. **Make yourself the owner (once).** Sign in to the hub as yourself, then
-   open the one-time **owner link** you were given
-   (`agrazfamily.com/family/#claim?key=…`). It works exactly once — after
-   that the family has an owner and the link is useless. *(Lost it? In the
-   console, add the field `role` (string) = `owner` to your document in
-   `users`.)*
-3. **Open the hub → Invite family** and tap **Create invite code**. From then
-   on, invites, codes and approvals are all managed on that page.
+2. **Make yourself the owner (once).** Sign in to the hub as yourself and go to
+   **Invite family**. Until the family has an owner, that page shows a setup
+   card: it checks that step 1 is done, then you paste your one-time **owner
+   key** (or the whole owner link, `agrazfamily.com/family/#claim?key=…`) and
+   tap **Become the owner**. Your invite code is created on the spot. (Opening
+   the owner link while signed in does the same.) The key works exactly once.
+   *(Lost it? In the console, add the field `role` (string) = `owner` to your
+   document in `users`.)*
+3. From then on, invite links, the QR code, the code itself and approvals are
+   all managed on the **Invite family** page.
 
 The old code (`agraz2025`) was visible in the old site's source, so use the new
 one the Invite page creates.
@@ -221,7 +223,8 @@ for the emulator). To publish rules from the command line: `npm run deploy:rules
 | Everyone gets "That invite code isn't right" | Rules not published, or `config/invite` missing — see setup above |
 | "Needs the latest security rules" / "isn't set up yet" | Publish the latest `firestore.rules` |
 | A new member is stuck on "You're almost in" | Approve them on the **Invite family** page (or in the Directory) |
-| The Invite page says "ask a family admin" | Open your one-time owner link while signed in (or add `role: "owner"` to your `users` doc) |
+| The Invite page says "ask a family admin" | Use the setup card on that page: paste your owner key and tap **Become the owner** |
+| The setup card says the rules are "Not yet" published | Publish `firestore.rules` (Firebase console → Firestore Database → Rules), then tap **Check again** |
 | "That owner link didn't work" | Publish the latest rules, sign in first, and use the link only once — the family may already have an owner |
 | JARVIS opens the wrong address | My Profile → Preferences → JARVIS address (saved per device) |
 | "Record a story" can't use the microphone | Allow the microphone for agrazfamily.com in the browser's site settings |

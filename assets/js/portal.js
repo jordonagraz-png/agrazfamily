@@ -206,7 +206,7 @@
     tributes: null, candles: null, otd: null, addcal: null, prefillPost: '', installEvt: null,
     vaultOpen: false, lastActive: Date.now(), hiddenAt: 0, invite: undefined,
     globe: { api: null, offset: 0, draft: null, picking: false, active: new Set() },
-    capsules: null, capPhoto: '', justSealed: null, stories: null, storyUrls: {}
+    capsules: null, capPhoto: '', justSealed: null, stories: null, storyUrls: {}, rulesOk: undefined
   };
   const myName = () => (S.me && S.me.name) || (S.user && (S.user.displayName || S.user.email)) || 'Family member';
 
@@ -460,7 +460,7 @@
       me: null, members: [], byUid: {}, view: null, events: null, updates: null, vault: null, memorial: null, recent: null,
       vaultCat: 'all', avatarDraft: undefined, pending: [], comments: {}, lbThread: false, recipes: null, recipeCat: 'all',
       openRecipe: null, tributes: null, candles: null, otd: null, addcal: null, prefillPost: '', vaultOpen: false, invite: undefined,
-      capsules: null, capPhoto: '', justSealed: null, stories: null
+      capsules: null, capPhoto: '', justSealed: null, stories: null, rulesOk: undefined
     });
     stopPlayer();
     if ($('#story-dialog').open) $('#story-dialog').close();
@@ -1667,6 +1667,7 @@
   }
   document.addEventListener('submit', e => {
     if (e.target.id === 'custom-code-form') { e.preventDefault(); saveCustomCode(); return; }
+    if (e.target.id === 'owner-form') { e.preventDefault(); claimFromInvite(); return; }
     const f = e.target.closest && e.target.closest('.comment-form');
     if (!f) return;
     e.preventDefault();
@@ -2189,13 +2190,16 @@
     const el = $('#invite-body');
     if (!isAdmin()) {
       const admins = S.members.filter(m => m.role === 'admin' || m.role === 'owner');
-      el.innerHTML = `<article class="card invite-member">
+      const setup = !admins.length;
+      if (setup && S.rulesOk === undefined) { S.rulesOk = 'checking'; checkRules(); }
+      const typed = $('#owner-key') ? $('#owner-key').value : '';
+      el.innerHTML = (setup ? ownerSetupHTML() : '') + `<article class="card invite-member">
         <span class="sc-icon sc-accent">${icon('user-plus')}</span>
         <h2 class="card-title">Know someone who should be here?</h2>
         <p class="muted">Send them the sign-up page. They’ll also need the family invite code — ${admins.length ? `ask ${esc(joinNames(admins.map(m => firstName(m.name))))}` : 'ask a family admin'}, who can send them a link with the code built in.</p>
         <div class="copy-field"><input class="input" readonly value="${esc(`${location.origin}/family/#join`)}" aria-label="Sign-up page"><button class="btn" type="button" data-action="copy-join-link">${icon('copy')}Copy link</button></div>
-        ${admins.length ? '' : `<div class="notice">${icon('key')}<p><strong>Setting this up?</strong> The site owner becomes an admin once in the Firebase console: Firestore Database → <b>users</b> → your document → add a field <b>role</b> = <b>admin</b>. Then this page lets you create invite links, QR codes and approvals.</p></div>`}
       </article>`;
+      if (typed && $('#owner-key')) $('#owner-key').value = typed;
       return;
     }
     if (S.invite === 'denied' || S.invite === 'error') {
@@ -2298,23 +2302,84 @@
   }
 
   /* ===================== Owner + member management ===================== */
-  async function claimOwner(key) {
-    history.replaceState(null, '', '#home'); // never leave the key in the address bar
-    if (isOwner()) { toast('You’re already the owner'); return; }
+  // First-time setup on the Invite page: no admin yet, so whoever holds the owner key
+  // claims ownership right there — and gets the family's invite code straight away.
+  // capsules only exist in the latest rules, so reading them is a quick "are the rules published?" check.
+  async function checkRules() {
+    try { await col('capsules').limit(1).get(); S.rulesOk = true; }
+    catch (e) { S.rulesOk = denied(e) ? false : null; }
+    if (S.view === 'invite' && !isAdmin()) renderInvite();
+    return S.rulesOk;
+  }
+  function ownerSetupHTML() {
+    const r = S.rulesOk;
+    const again = '<button class="link-btn" type="button" data-action="check-rules">Check again</button>';
+    const status = r === true ? `<span class="setup-ok">${icon('check')}Published</span>`
+      : r === false ? `<span class="setup-warn">Not yet.</span> In the <a href="https://console.firebase.google.com/project/agrazfamily/firestore/rules" target="_blank" rel="noopener noreferrer">Firebase console</a>: Firestore Database → Rules → paste in <b>firestore.rules</b> → Publish. ${again}`
+        : r === null ? `Couldn’t check just now. ${again}` : 'Checking…';
+    return `<article class="card owner-setup">
+      <span class="sc-icon sc-accent">${icon('key')}</span>
+      <h2>Make your family invite code</h2>
+      <p class="muted">Invite codes are made by the family’s owner. If that’s you, it’s two quick steps — just this once.</p>
+      <ol class="setup-steps">
+        <li class="${r === true ? 'done' : ''}"><strong>Publish the latest security rules</strong><p id="rules-status">${status}</p></li>
+        <li><strong>Become the owner</strong><p>Paste your owner key — or the whole owner link.</p>
+          <form class="copy-field" id="owner-form" novalidate>
+            <label class="sr-only" for="owner-key">Owner key or link</label>
+            <input class="input" id="owner-key" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Owner key or link">
+            <button class="btn btn-accent" type="submit" id="owner-go">${icon('sparkle')}Become the owner</button>
+          </form>
+          <p class="form-msg" id="owner-msg" role="alert"></p>
+        </li>
+      </ol>
+      <p class="setup-then">${icon('user-plus')}Then your invite code appears right here, ready to share by text, email or QR code.</p>
+    </article>`;
+  }
+  async function claimFromInvite() {
+    const raw = $('#owner-key').value.trim();
+    let key = (raw.match(/key=([^&\s]+)/) || [])[1] || raw;
+    try { key = decodeURIComponent(key); } catch (e) {}
+    if (!key) { $('#owner-msg').textContent = 'Paste your owner key or link first.'; $('#owner-key').focus(); return; }
+    $('#owner-msg').textContent = '';
+    const btn = $('#owner-go');
+    busy(btn, true, 'One moment…');
+    const ok = await claimOwner(key, true);
+    if (!ok && $('#owner-go')) busy($('#owner-go'), false);
+  }
+
+  async function claimOwner(key, fromPage) {
+    if (/^#claim/.test(location.hash)) history.replaceState(null, '', '#home'); // never leave the key in the address bar
+    if (isOwner()) { toast('You’re already the owner'); return true; }
     try {
       const batch = db.batch();
       batch.set(col('config').doc('owner'), { uid: S.user.uid, key, claimedAt: nowIso() });
       batch.update(col('users').doc(S.user.uid), { role: 'owner' });
       await batch.commit();
-      S.me.role = 'owner';
-      S.invite = undefined;
-      paintMe();
-      await loadMembers().catch(() => {});
-      if (S.view && RENDER[S.view]) RENDER[S.view]();
-      toast('You’re now the owner — full admin access to everything');
     } catch (e) {
-      toast(denied(e) ? 'That owner link didn’t work. It may already have been used, or the latest security rules aren’t published yet.' : 'Couldn’t finish. Please try again.', true);
+      let why = 'Couldn’t finish. Check your connection and try again.';
+      if (denied(e)) {
+        why = (await checkRules()) === false
+          ? 'The latest security rules aren’t published yet. Publish them first (Firebase console → Firestore Database → Rules), then try again.'
+          : 'That owner key didn’t work. Check it — it only works once, so the family may already have an owner.';
+      }
+      if (fromPage && $('#owner-msg')) $('#owner-msg').textContent = why; else toast(why, true);
+      return false;
     }
+    S.me.role = 'owner';
+    S.invite = undefined;
+    paintMe();
+    await loadMembers().catch(() => {});
+    let made = false;
+    if (fromPage) {
+      await loadInvite(true);
+      if (S.invite === null || (S.invite && typeof S.invite === 'object' && !S.invite.code)) {
+        await saveInvite({ code: newInviteCode(), requireApproval: true });
+        made = !!(S.invite && S.invite.code);
+      }
+    }
+    if (S.view && RENDER[S.view]) RENDER[S.view]();
+    toast(made ? 'You’re the owner — and your invite code is ready to share' : 'You’re now the owner — full admin access to everything');
+    return true;
   }
   function openMemberDialog(uid) {
     const m = S.byUid[uid];
@@ -3418,6 +3483,7 @@
       case 'vault-bio-on': enableBio(t); break;
       case 'vault-bio-off': disableBio(); break;
       case 'manage-member': openMemberDialog(t.dataset.uid); break;
+      case 'check-rules': S.rulesOk = undefined; renderInvite(); break;
       case 'new-story': openRecorder(); break;
       case 'rec-toggle': if (rec.state === 'recording') stopRecording(); else if (rec.state === 'idle') startRecording(); break;
       case 'rec-play': toggleListen(); break;

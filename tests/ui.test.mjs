@@ -381,8 +381,35 @@ try {
     await member.waitForTimeout(SLOW * 900);
     const body = await member.textContent('#invite-body');
     ok(!body.includes('seashell'), 'non-admins never see the invite code');
-    ok(body.includes('role') && body.includes('admin'), 'without any admin, the page explains how to become one');
+    ok(body.includes('Become the owner'), 'without any admin, the page offers first-time setup');
     await done(member, 'invite (member)');
+
+    const setup = await open('/family/#invite', { signedIn: true, admin: false, noInvite: true });
+    await setup.waitForTimeout(SLOW * 1000);
+    ok((await setup.textContent('#rules-status')).includes('Published'), 'setup checks that the latest security rules are published');
+    await setup.fill('#owner-key', 'not-the-key');
+    await setup.click('#owner-go');
+    await setup.waitForTimeout(SLOW * 600);
+    ok((await setup.textContent('#owner-msg')).includes('didn’t work'), 'a wrong owner key is refused');
+    ok(await store(setup, () => !window.__store.users.u1.role && !window.__store.config.owner), '…and changes nothing');
+    ok(await setup.inputValue('#owner-key') === 'not-the-key', '…without wiping what you typed');
+    await setup.fill('#owner-key', 'https://www.agrazfamily.com/family/#claim?key=test-owner-key');
+    await setup.click('#owner-go');
+    await setup.waitForTimeout(SLOW * 1200);
+    ok(await store(setup, () => window.__store.users.u1.role === 'owner' && window.__store.config.owner.uid === 'u1'), 'pasting the owner link on the Invite page makes you the owner');
+    ok(await store(setup, () => /^[a-z]+-[a-z]+-\d{4}$/.test((window.__store.config.invite || {}).code || '')), '…and creates the family invite code right away');
+    ok((await setup.inputValue('#invite-link')).includes('#join?code='), '…with the invite link ready to share');
+    ok((await setup.textContent('#toast')).includes('invite code is ready'), '…and says so');
+    await done(setup, 'invite (owner setup)');
+
+    const old = await open('/family/#invite', { signedIn: true, admin: false, oldRules: true });
+    await old.waitForTimeout(SLOW * 1000);
+    ok((await old.textContent('#rules-status')).includes('Not yet'), 'setup notices when the security rules aren’t published');
+    await old.fill('#owner-key', 'test-owner-key');
+    await old.click('#owner-go');
+    await old.waitForTimeout(SLOW * 600);
+    ok((await old.textContent('#owner-msg')).includes('aren’t published'), '…and says to publish them before claiming');
+    await done(old, 'invite (rules not published)');
 
     const guest = await open('/family/#join?code=seashell', { signedIn: false, newUser: true });
     ok(await guest.inputValue('#join-code') === 'seashell', 'invite link fills in the code for the new person');

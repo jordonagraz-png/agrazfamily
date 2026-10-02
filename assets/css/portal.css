@@ -702,6 +702,22 @@ dialog::backdrop { background: rgba(7, 17, 20, .55); backdrop-filter: blur(4px);
 .invite-setup h2 { font-family: var(--font-display); font-weight: 400; font-size: 1.8rem; letter-spacing: -.02em; }
 .invite-member .copy-field { width: 100%; }
 .invite-member .notice { margin: 4px 0 0; }
+.owner-setup { max-width: 620px; display: grid; gap: 14px; justify-items: start; margin-bottom: 18px; border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); }
+.owner-setup h2 { font-family: var(--font-display); font-weight: 400; font-size: 1.8rem; letter-spacing: -.02em; }
+.setup-steps { list-style: none; counter-reset: s; display: grid; gap: 20px; width: 100%; margin-top: 4px; }
+.setup-steps li { counter-increment: s; position: relative; display: grid; gap: 6px; min-height: 38px; padding-left: 52px; }
+.setup-steps li::before { content: counter(s); position: absolute; top: -6px; left: 0; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); font-family: var(--font-display); font-size: 1.15rem; font-weight: 500; }
+.setup-steps li.done::before { content: "✓"; background: var(--sea-soft); color: var(--sea); font-family: var(--font-sans); font-weight: 700; }
+.setup-steps strong { font-weight: 600; }
+.setup-steps p { font-size: var(--fs-sm); color: var(--ink-2); line-height: 1.55; }
+.setup-steps a { color: var(--sea); text-decoration: underline; text-underline-offset: 3px; }
+.setup-steps .copy-field { width: 100%; margin-top: 4px; }
+.setup-steps .form-msg { margin-top: 0; min-height: 0; text-align: left; }
+.setup-ok { display: inline-flex; align-items: center; gap: 6px; color: var(--sea); font-weight: 600; }
+.setup-ok .i { width: 16px; height: 16px; }
+.setup-warn { color: var(--accent); font-weight: 600; }
+.setup-then { display: flex; align-items: center; gap: 10px; font-size: var(--fs-sm); color: var(--ink-3); }
+.setup-then .i { width: 18px; height: 18px; color: var(--accent); }
 .fam-invite { display: inline-flex; align-items: center; gap: 8px; margin-top: 16px; font-size: var(--fs-sm); font-weight: 600; color: var(--sea); }
 .fam-invite .i { width: 17px; height: 17px; }
 

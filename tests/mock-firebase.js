@@ -1,7 +1,8 @@
 /* Test double for the Firebase compat SDK subset used by assets/js/portal.js.
    Loaded by tests/ui.test.mjs in place of https://www.gstatic.com/firebasejs/…/firebase-app-compat.js.
    Options (set window.__MOCK before load): signedIn, newUser, empty, bdayToday, admin (false = plain member),
-   role ('admin' | 'owner'), requireApproval, noInvite, placed (you're on the Family Globe).
+   role ('admin' | 'owner'), requireApproval, noInvite, placed (you're on the Family Globe),
+   oldRules (the latest firestore.rules aren't published: new collections and the owner claim are refused).
    The test owner key is 'test-owner-key'.
    Optional window.__IMG = { photos: [...dataUrls], memorial: [...], av1 } to use real photos. */
 (function () {
@@ -196,6 +197,7 @@
       startAfter: s => next({ after: s.id }),
       get() {
         if (!member() || c === 'capsuleLetters') return fail('permission-denied');
+        if (M.oldRules && ['capsules', 'stories', 'storyAudio'].includes(c)) return fail('permission-denied');
         let ids = Object.keys(store[c]).filter(id => o.wheres.every(w => matches(store[c][id], w)));
         if (o.f) ids.sort((a, b) => { const x = store[c][a][o.f], y = store[c][b][o.f]; return (x > y ? 1 : x < y ? -1 : 0) * (o.dir === 'desc' ? -1 : 1); });
         if (o.after) ids = ids.slice(ids.indexOf(o.after) + 1);
@@ -225,7 +227,7 @@
               if (data.approved !== false && invite().requireApproval) return fail('permission-denied');
             }
             if (c === 'config' && id === 'owner') {
-              if (store.config.owner || !member() || data.uid !== current.uid || data.key !== 'test-owner-key') return fail('permission-denied');
+              if (M.oldRules || store.config.owner || !member() || data.uid !== current.uid || data.key !== 'test-owner-key') return fail('permission-denied');
             } else if (c === 'config' && !(admin() && id === 'invite' && /^[A-Za-z0-9-]{6,64}$/.test(data.code || ''))) return fail('permission-denied');
             if (c === 'capsules' && !(member() && typeof data.openAt === 'number' && data.openAt > Date.now() + 3600e3 && data.uid === current.uid)) return fail('permission-denied');
             store[c][id] = clone(data);
