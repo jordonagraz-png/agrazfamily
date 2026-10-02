@@ -212,7 +212,8 @@ birthplaces, addresses, records, notes or document titles. Only signed-in
 family members can see the tree.
 
 **Photos:** Ancestry's export lists every photo (title, exact size,
-dimensions) but doesn't include the pictures. So:
+dimensions) but doesn't include the pictures. **Add photos** shows a checklist
+of which Ancestry portraits are still to bring in, person by person. So:
 
 - Anyone can tap **Add a photo** on a person's profile.
 - Admins can tap **Add photos** and drop in a whole folder — for example
@@ -222,6 +223,13 @@ dimensions) but doesn't include the pictures. So:
   person's full name in the file name. You can fix any match before saving.
 - Members who tap **This is me** bring their profile photo, and the home
   person (Hector) uses the first In Memory photo, until someone adds one.
+
+**Places in their life:** a research bundle can also carry openly licensed
+photos (public domain / Creative Commons, from Wikimedia Commons, credited)
+of the towns in the family's story — Indianapolis, El Paso, Valle de Allende,
+Mountain Lake, Almondbury… They're saved as tree photos (`treePhotos/place-…`)
+and shown on each relative's profile and at the head of their Life & times,
+for everyone whose records place them there.
 
 **From the archives:** research gathered from public records (graves,
 obituaries, newspapers, census and church indexes, published genealogies) can
