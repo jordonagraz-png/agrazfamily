@@ -20,13 +20,14 @@ let pass = 0, fail = 0;
 const ok = (cond, name) => { if (cond) { pass++; console.log('  ok  ', name); } else { fail++; console.log('  FAIL', name); } };
 
 async function open(path, mock = {}, opts = {}) {
-  const { localhost, webauthn, lockedTree, ...ctxOpts } = opts;
+  const { localhost, webauthn, lockedTree, gate, ...ctxOpts } = opts;
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 860 }, serviceWorkers: 'block', acceptDownloads: true, ...ctxOpts });
-  await ctx.addInitScript(m => {
+  await ctx.addInitScript(([m, gate]) => {
     window.__MOCK = m;
+    if (!gate) { try { sessionStorage.setItem('agraz-seen-public', '1'); } catch (e) {} } // most tests have "been to the public site"
     window.__csp = [];
     document.addEventListener('securitypolicyviolation', e => window.__csp.push(`${e.violatedDirective} ${e.blockedURI}`));
-  }, mock);
+  }, [mock, !!gate]);
   await ctx.route('**/*', route => {
     const url = route.request().url();
     if (lockedTree && /\/assets\/data\/tree-import\.bin(\?|$)/.test(url)) return route.fulfill({ contentType: 'application/octet-stream', body: lockedTree });
@@ -69,7 +70,21 @@ try {
     await done(night, 'homepage');
     const dawn = await open('/', {}, { clockTime: new Date(2026, 9, 2, 7, 30) });
     ok((await dawn.getAttribute('#hero-img', 'src') || '').includes('1473116763249'), 'dawn hero photo chosen at 7:30am');
-    await dawn.context().close();
+    await done(dawn, 'homepage (dawn)');
+
+    // Every way into the hub passes through the public site first, once per visit.
+    const gated = await open('/family/#tree?key=abc-123', { signedIn: true }, { gate: true });
+    await gated.waitForTimeout(SLOW * 600);
+    ok(new URL(gated.url()).pathname === '/' && !gated.url().includes('abc-123'), 'a direct hub link lands on the public site first — and the key never shows in the address bar');
+    ok(await gated.evaluate(() => [...document.querySelectorAll('a[href^="/family/"]')].every(a => a.getAttribute('href') === '/family/#tree?key=abc-123')), 'every Family Login button carries you on to where you were going');
+    ok(await gated.isVisible('.hub-continue'), 'and a quiet “Continue to the Family Hub” waits at the foot of the page');
+    await gated.click('.hub-continue');
+    await gated.waitForTimeout(SLOW * 900);
+    ok(new URL(gated.url()).pathname === '/family/' && await gated.evaluate(() => document.body.dataset.state) === 'app', 'then the hub opens as usual');
+    await done(gated, 'front porch first');
+    const seen = await open('/family/#home', { signedIn: true });
+    ok(new URL(seen.url()).pathname === '/family/', 'having seen the public site this visit, the hub opens straight away');
+    await seen.context().close();
     const legacy = await open('/#memories');
     await legacy.waitForTimeout(SLOW * 300);
     ok(legacy.url().endsWith('/family/#photos'), 'old /#memories links forward to the hub');

@@ -14,6 +14,33 @@
 
   var REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+  /* ---------- the front porch comes first ----------
+     Every way into the Family Hub passes through this page once per visit. The hub sends people
+     here with its intended page in the hash (#enter=<hash>), which never reaches any server; we
+     remember the visit, clear it from the address bar and carry it on the Family Login buttons. */
+  try { sessionStorage.setItem('agraz-seen-public', '1'); } catch (e) {}
+  (function () {
+    var m = /^#enter=(.*)$/.exec(location.hash);
+    if (!m) return;
+    var dest = '';
+    try { dest = decodeURIComponent(m[1]); } catch (e) {}
+    if (!/^#[\w?=&%.:+-]*$/.test(dest)) dest = '';
+    history.replaceState(null, '', location.pathname + location.search);
+    if (!dest || dest === '#' || dest === '#home') return;
+    document.querySelectorAll('a[href^="/family/"]').forEach(function (a) { a.setAttribute('href', '/family/' + dest); });
+    // a quiet way on, once they've had a look around
+    var bar = document.createElement('a');
+    bar.className = 'btn btn-light hub-continue';
+    bar.href = '/family/' + dest;
+    bar.textContent = 'Continue to the Family Hub →';
+    try {
+      var css = new CSSStyleSheet();
+      css.replaceSync('.hub-continue{position:fixed;left:50%;bottom:22px;z-index:60;transform:translate(-50%,0);box-shadow:0 18px 40px -16px rgba(0,0,0,.55);animation:hubContinueIn .9s cubic-bezier(.16,1,.3,1) 1.6s both}@keyframes hubContinueIn{from{opacity:0;transform:translate(-50%,16px)}}@media(prefers-reduced-motion:reduce){.hub-continue{animation:none}}');
+      document.adoptedStyleSheets = document.adoptedStyleSheets.concat(css);
+    } catch (e) {}
+    document.body.appendChild(bar);
+  })();
+
   /* ---------- the hero follows the sun (photo chosen + preloaded in <head>) ---------- */
   var hero = document.getElementById('hero-img');
   if (hero && window.__heroUrl) {
