@@ -506,6 +506,8 @@
     if (!S.me) return;
     const ownerKey = (location.hash.match(/^#claim\?(?:.*&)?key=([^&]+)/) || [])[1];
     if (ownerKey) claimOwner(decodeURIComponent(ownerKey)); // swaps the hash for #home right away
+    const treeKey = (location.hash.match(/^#tree\?(?:.*&)?key=([^&]+)/) || [])[1];
+    if (treeKey) { S.treeKey = decodeURIComponent(treeKey); history.replaceState(null, '', '#tree'); } // the key never stays in the address bar
     let v = location.hash.slice(1);
     v = ALIASES[v] || v;
     if (!VIEWS.includes(v)) v = 'home';
@@ -3498,6 +3500,7 @@
       try { await loadTree(); }
       catch (e) { S.tree = { status: denied(e) ? 'denied' : 'error', photos: {} }; }
     }
+    if (S.treeKey) { const key = S.treeKey; S.treeKey = null; await unlockTree(key); }
     if (S.view === 'tree') renderTree();
   }
   function renderTree() {
@@ -3793,7 +3796,7 @@
     const conf = c => { const k = CONF[c] || CONF.l; return `<span class="conf ${k[0]}">${k[1]}</span>`; };
     const docs = (r.doc || []).map(d => { const k = KIND[d.k] || KIND.other; return `<li class="rdoc">${icon(k[0])}<div>${extLink(d.u, d.t || k[1])}<small>${esc(k[1])}${d.l ? ` · ${esc(d.l)}` : ''}${d.n ? ` · ${esc(d.n)}` : ''}</small></div></li>`; }).join('');
     const facts = (r.f || []).map(f => `<li class="rfact"><span class="rlabel">${esc(FACT[f.t] || 'Note')}</span><div><p>${esc(f.v)} ${conf(f.c)}${f.d ? ' <span class="conf x">Differs from the tree</span>' : ''}</p><small>${extLink(f.u, f.s)}</small></div></li>`).join('');
-    const rels = (r.rel || []).map(x => `<li class="rrel"><span class="rlabel">Possible ${esc(x.r)}</span><div><p><b>${esc(x.n)}</b>${x.b || x.d ? ` · ${esc([x.b, x.d].filter(Boolean).join('–'))}` : ''} ${conf(x.c)}</p><small>${x.w ? `${esc(x.w)} · ` : ''}${extLink(x.u, x.s)}</small></div></li>`).join('');
+    const rels = (r.rel || []).map(x => `<li class="rrel"><span class="rlabel">Possible ${esc(x.r)}</span><div><p><b>${esc(x.n)}</b>${x.b || x.d ? ` · ${esc([x.b, x.d].filter(Boolean).join('–'))}` : ''} ${conf(x.c)}</p>${x.of ? `<small class="rof">${esc(capFirst(x.r))} of ${esc(x.of)}</small>` : ''}<small>${x.w ? `${esc(x.w)} · ` : ''}${extLink(x.u, x.s)}</small></div></li>`).join('');
     const count = (r.doc || []).length + (r.f || []).length + (r.rel || []).length;
     return `<section class="tp-group tp-research"><h3>${icon('book')}From the archives<span>${count}</span></h3>
       ${docs ? `<ul class="rlist">${docs}</ul>` : ''}
@@ -3804,27 +3807,32 @@
     </section>`;
   }
   // A research file (from a research pass over public records): { kind: 'agraz-research', people: { id: { f, doc, rel, sv, note } } }
-  async function importResearch(file) {
-    try {
-      const data = JSON.parse(await file.text());
-      if (!data || data.kind !== 'agraz-research' || typeof data.people !== 'object') throw new Error('shape');
-      const cut = (v, n) => String(v == null ? '' : v).slice(0, n);
-      const people = {};
-      Object.entries(data.people).forEach(([pid, r]) => {
-        if (!S.tree.ix.get(pid) || S.tree.ix.get(pid).L || !r) return; // only people in the tree who have passed
-        const out = {};
-        const f = (r.f || []).filter(x => x && x.v).slice(0, 30).map(x => ({ t: cut(x.t, 20), v: cut(x.v, 400), s: cut(x.s, 160), u: safeUrl(x.u), c: ['h', 'm', 'l'].includes(x.c) ? x.c : 'l', d: x.d ? 1 : 0 }));
-        const doc = (r.doc || []).filter(x => x && safeUrl(x.u)).slice(0, 30).map(x => ({ k: cut(x.k, 20), t: cut(x.t, 200), u: safeUrl(x.u), l: cut(x.l, 80), n: cut(x.n, 200) }));
-        const rel = (r.rel || []).filter(x => x && x.n).slice(0, 12).map(x => ({ r: cut(x.r, 20), n: cut(x.n, 120), b: cut(x.b, 40), d: cut(x.d, 40), s: cut(x.s, 160), u: safeUrl(x.u), c: ['h', 'm', 'l'].includes(x.c) ? x.c : 'l', w: cut(x.w, 300) }));
-        const sv = (r.sv || []).slice(0, 30).map(x => cut(x, 120)).filter(Boolean);
-        if (f.length) out.f = f; if (doc.length) out.doc = doc; if (rel.length) out.rel = rel; if (sv.length) out.sv = sv;
-        if (r.note) out.note = cut(r.note, 600);
-        if (Object.keys(out).length) people[pid] = out;
-      });
-      const count = Object.keys(people).length;
-      if (!count) { toast('Nothing in that file matches people in this tree.', true); return; }
+  async function saveResearch(data) {
+    if (!data || data.kind !== 'agraz-research' || typeof data.people !== 'object') throw new Error('shape');
+    const cut = (v, n) => String(v == null ? '' : v).slice(0, n);
+    const people = {};
+    Object.entries(data.people).forEach(([pid, r]) => {
+      if (!S.tree.ix.get(pid) || S.tree.ix.get(pid).L || !r) return; // only people in the tree who have passed
+      const out = {};
+      const f = (r.f || []).filter(x => x && x.v).slice(0, 30).map(x => ({ t: cut(x.t, 20), v: cut(x.v, 400), s: cut(x.s, 160), u: safeUrl(x.u), c: ['h', 'm', 'l'].includes(x.c) ? x.c : 'l', d: x.d ? 1 : 0 }));
+      const doc = (r.doc || []).filter(x => x && safeUrl(x.u)).slice(0, 30).map(x => ({ k: cut(x.k, 20), t: cut(x.t, 200), u: safeUrl(x.u), l: cut(x.l, 80), n: cut(x.n, 200) }));
+      const rel = (r.rel || []).filter(x => x && x.n).slice(0, 12).map(x => Object.assign({ r: cut(x.r, 20), n: cut(x.n, 120), b: cut(x.b, 40), d: cut(x.d, 40), s: cut(x.s, 160), u: safeUrl(x.u), c: ['h', 'm', 'l'].includes(x.c) ? x.c : 'l', w: cut(x.w, 300) }, x.of ? { of: cut(x.of, 120) } : {}));
+      const sv = (r.sv || []).slice(0, 30).map(x => cut(x, 120)).filter(Boolean);
+      if (f.length) out.f = f; if (doc.length) out.doc = doc; if (rel.length) out.rel = rel; if (sv.length) out.sv = sv;
+      if (r.note) out.note = cut(r.note, 600);
+      if (Object.keys(out).length) people[pid] = out;
+    });
+    const count = Object.keys(people).length;
+    if (count) {
       await col('tree').doc('research').set({ people, count, createdAt: nowIso(), by: myName().slice(0, 80) });
       S.tree.research = people;
+    }
+    return count;
+  }
+  async function importResearch(file) {
+    try {
+      const count = await saveResearch(JSON.parse(await file.text()));
+      if (!count) { toast('Nothing in that file matches people in this tree.', true); return; }
       renderTree();
       toast(`Research added for ${count} ${count === 1 ? 'person' : 'people'} — look for “From the archives”`);
     } catch (e) {
@@ -3905,28 +3913,84 @@
       box.innerHTML = `<p class="form-msg">That doesn’t look like a family tree export. Choose the .zip or .ged file from Ancestry.</p>`;
     }
   }
+  async function saveTree(model) {
+    const parts = T().chunk(model);
+    const before = S.tree && S.tree.meta ? S.tree.meta.parts || 0 : 0;
+    const meta = { v: 1, name: (model.name || 'Family tree').slice(0, 80), treeId: model.treeId || '', source: (model.source || 'GEDCOM').slice(0, 40),
+      people: model.people.length, families: model.families.length, portraits: model.portraits || 0, earliest: model.earliest || null,
+      generations: model.generations || 0, parts: parts.length, importedAt: nowIso(), importedBy: myName().slice(0, 80) };
+    const b = db.batch();
+    b.set(col('tree').doc('meta'), meta);
+    parts.forEach((p, i) => b.set(col('tree').doc('part' + i), p));
+    for (let i = parts.length; i < before; i++) b.delete(col('tree').doc('part' + i));
+    await b.commit();
+    setTreeModel(meta, Object.assign({}, meta, { people: model.people, families: model.families }));
+  }
   async function importTree(btn) {
     const model = S.treeDraft;
     if (!model) return;
     busy(btn, true, 'Saving the tree…');
     try {
-      const parts = T().chunk(model);
-      const before = S.tree && S.tree.meta ? S.tree.meta.parts || 0 : 0;
-      const meta = { v: 1, name: (model.name || 'Family tree').slice(0, 80), treeId: model.treeId || '', source: (model.source || 'GEDCOM').slice(0, 40),
-        people: model.people.length, families: model.families.length, portraits: model.portraits || 0, earliest: model.earliest || null,
-        generations: model.generations || 0, parts: parts.length, importedAt: nowIso(), importedBy: myName().slice(0, 80) };
-      const b = db.batch();
-      b.set(col('tree').doc('meta'), meta);
-      parts.forEach((p, i) => b.set(col('tree').doc('part' + i), p));
-      for (let i = parts.length; i < before; i++) b.delete(col('tree').doc('part' + i));
-      await b.commit();
+      await saveTree(model);
       S.treeDraft = null;
-      setTreeModel(meta, Object.assign({}, meta, { people: model.people, families: model.families }));
       renderTree();
       toast(`The family tree is in — ${model.people.length.toLocaleString()} relatives`);
     } catch (e) {
       busy(btn, false);
       toast(denied(e) ? NEED_RULES : 'Couldn’t save the tree. Please try again.', true);
+    }
+  }
+
+  // ---- one-tap import from a private link (admins) ----
+  // The tree (and its research) can ship on the site as /assets/data/tree-import.bin, locked with
+  // AES-256-GCM. The key only travels in a private link, /family/#tree?key=… — the part of an
+  // address after # is never sent to any server, and it's wiped from the address bar on arrival.
+  const LOCKED_TREE = '/assets/data/tree-import.bin';
+  async function openLocked(key) {
+    let raw;
+    try { raw = Uint8Array.from(atob(key.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)); } catch (e) { raw = []; }
+    if (raw.length !== 32) throw new Error('key');
+    const res = await fetch(LOCKED_TREE + ASSET_V, { cache: 'no-store' });
+    if (!res.ok) throw new Error('gone');
+    const buf = new Uint8Array(await res.arrayBuffer());
+    let plain;
+    try {
+      const k = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['decrypt']);
+      plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: buf.slice(0, 12) }, k, buf.slice(12));
+    } catch (e) { throw new Error('key'); }
+    const data = JSON.parse(await new Response(new Blob([plain]).stream().pipeThrough(new DecompressionStream('gzip'))).text());
+    if (!data || data.kind !== 'agraz-tree' || !data.tree || !Array.isArray(data.tree.people) || !data.tree.people.length) throw new Error('shape');
+    return data;
+  }
+  async function unlockTree(key) {
+    const t = S.tree || {};
+    if (t.status === 'denied' || t.status === 'error') return; // the page already says what's wrong
+    if (!isAdmin()) { toast('Only a family admin can add the family tree.', true); return; }
+    const hasResearch = t.research && Object.keys(t.research).length;
+    if (t.status === 'ready' && hasResearch) { toast('The family tree is already here'); return; }
+    if (S.view === 'tree') {
+      $('#tree-head').hidden = true;
+      $('#tree-body').innerHTML = `<div class="tree-import card tree-unlock" aria-live="polite">
+        <div class="ti-art" aria-hidden="true">${icon('pedigree')}</div>
+        <div class="ti-text"><h2>Bringing in the family tree…</h2><p class="muted" id="unlock-msg">Unlocking it right here in your browser.</p></div>
+      </div>`;
+    }
+    const say = m => { const el = $('#unlock-msg'); if (el) el.textContent = m; };
+    try {
+      await loadTreeLib();
+      const data = await openLocked(key);
+      const added = t.status !== 'ready';
+      if (added) { say(`Saving ${data.tree.people.length.toLocaleString()} relatives privately for the family…`); await saveTree(data.tree); }
+      let found = 0;
+      if (data.research) { say('Adding what was found in the archives…'); found = await saveResearch(data.research); }
+      const n = S.tree.model.people.length.toLocaleString();
+      toast(added ? `The family tree is in — ${n} relatives${found ? `, with research for ${found}` : ''}` : `Research added for ${found} ${found === 1 ? 'person' : 'people'} — look for “From the archives”`);
+    } catch (e) {
+      const why = denied(e) ? NEED_RULES
+        : e.message === 'key' ? 'That link didn’t unlock the tree — check you opened the whole link.'
+        : e.message === 'gone' ? 'That link has expired. The tree can still be added from the Ancestry file below.'
+        : 'Couldn’t bring in the tree. Check your connection and open the link again.';
+      toast(why, true);
     }
   }
 

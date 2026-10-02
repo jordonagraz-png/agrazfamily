@@ -1269,6 +1269,7 @@ button.tcard:hover, button.tcard:focus-visible { transform: translateY(-3px); bo
 .rdoc > .i { width: 17px; height: 17px; flex: none; margin-top: 2px; color: var(--sea); }
 .rdoc a, .rlist small a { color: var(--sea); text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
 .rlist small { display: block; font-size: .74rem; color: var(--ink-3); margin-top: 2px; }
+.rlist .rof { font-style: italic; }
 .rlabel { flex: none; min-width: 64px; font-size: .64rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); padding-top: 2px; }
 .rfact p, .rrel p { color: var(--ink); }
 .conf { display: inline-block; padding: 1px 7px; margin-left: 2px; border-radius: var(--r-pill); font-size: .64rem; font-weight: 700; letter-spacing: .02em; vertical-align: 1px; }
@@ -1472,3 +1473,8 @@ button.tcard:hover, button.tcard:focus-visible { transform: translateY(-3px); bo
 @media (prefers-reduced-motion: reduce) {
   .auth-art::before, .flame { animation: none; }
 }
+
+/* One-tap import: the tree unlocking in the browser */
+.tree-unlock .ti-art { animation: unlock-pulse 1.6s ease-in-out infinite; }
+@keyframes unlock-pulse { 50% { transform: scale(.94); opacity: .75; } }
+@media (prefers-reduced-motion: reduce) { .tree-unlock .ti-art { animation: none; } }

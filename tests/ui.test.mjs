@@ -20,7 +20,7 @@ let pass = 0, fail = 0;
 const ok = (cond, name) => { if (cond) { pass++; console.log('  ok  ', name); } else { fail++; console.log('  FAIL', name); } };
 
 async function open(path, mock = {}, opts = {}) {
-  const { localhost, webauthn, ...ctxOpts } = opts;
+  const { localhost, webauthn, lockedTree, ...ctxOpts } = opts;
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 860 }, serviceWorkers: 'block', acceptDownloads: true, ...ctxOpts });
   await ctx.addInitScript(m => {
     window.__MOCK = m;
@@ -29,6 +29,7 @@ async function open(path, mock = {}, opts = {}) {
   }, mock);
   await ctx.route('**/*', route => {
     const url = route.request().url();
+    if (lockedTree && /\/assets\/data\/tree-import\.bin(\?|$)/.test(url)) return route.fulfill({ contentType: 'application/octet-stream', body: lockedTree });
     if (url.startsWith(BASE) || url.startsWith(LOCAL)) return route.continue();
     if (url.startsWith('https://www.gstatic.com/firebasejs/')) {
       return route.fulfill({ contentType: 'text/javascript', body: url.includes('firebase-app-compat') ? MOCK : '/* stub */' });
@@ -809,6 +810,29 @@ try {
     await old.waitForTimeout(SLOW * 1000);
     ok(!!(await old.$('.rules-needed [data-action=copy-rules]')), 'without the latest rules, admins are shown how to publish them');
     await done(old, 'family tree (rules not published)');
+
+    // One-tap import: the tree and its research ship locked, and a private link holds the key.
+    const { lockTree } = await import('../tools/lock-tree.mjs');
+    const locked = lockTree({ kind: 'agraz-tree', v: 1, tree: model, research: { kind: 'agraz-research', v: 1, people: {
+      I1: { rel: [{ r: 'father', n: 'Tomas Agraz', of: 'Mateo Agraz', c: 'l' }] }, I11: { note: 'living — must be dropped' } } } });
+    const tap = await open(`/family/#tree?key=${locked.key}`, { signedIn: true, role: 'owner' }, { lockedTree: locked.bin });
+    await tap.waitForTimeout(SLOW * 1500);
+    ok(await tap.evaluate(() => location.hash) === '#tree', 'the key is wiped from the address bar on arrival');
+    const got = await store(tap, () => ({ meta: window.__store.tree.meta, research: window.__store.tree.research }));
+    ok(got.meta && got.meta.people === 16 && got.research && got.research.count === 1 && !got.research.people.I11, 'one tap brings in the whole tree and its research — never research on living relatives');
+    ok(got.research && got.research.people.I1.rel[0].of === 'Mateo Agraz', 'possible ancestors remember whose parent they’d be');
+    ok((await tap.textContent('.tcard.is-focus')).includes('Hector Agraz') && !(await tap.$('#tree-file')), 'the tree opens straight away — no file to choose');
+    await done(tap, 'family tree (one-tap link)');
+
+    const wrong = await open(`/family/#tree?key=${'A'.repeat(43)}`, { signedIn: true, role: 'owner' }, { lockedTree: locked.bin });
+    await wrong.waitForTimeout(SLOW * 1200);
+    ok((await wrong.textContent('#toast')).includes('didn’t unlock') && !!(await wrong.$('#tree-file')) && await store(wrong, () => !window.__store.tree.meta), 'a wrong key unlocks nothing — the usual import is still there');
+    await done(wrong, 'family tree (wrong key)');
+
+    const notAdmin = await open(`/family/#tree?key=${locked.key}`, { signedIn: true, admin: false }, { lockedTree: locked.bin });
+    await notAdmin.waitForTimeout(SLOW * 1200);
+    ok(await store(notAdmin, () => !window.__store.tree.meta) && (await notAdmin.textContent('#tree-body')).includes('on its way'), 'only a family admin can use the link');
+    await done(notAdmin, 'family tree (link, not an admin)');
   }
 
   console.log('— install prompt + sign out');

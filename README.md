@@ -168,6 +168,15 @@ settings** → **Export tree**, download the file, then in the hub go to
 and saved to the private database — never to this repository. To refresh it
 later, export again and tap **Update** on the Family Tree page.
 
+**One-tap link (optional):** `node tools/lock-tree.mjs "Family Tree.zip"
+[research.json]` locks the tree, and its research if you give it, into
+`assets/data/tree-import.bin` (gzip + AES-256-GCM). It then prints a private link,
+`/family/#tree?key=…`. When a signed-in admin opens the link, the hub unlocks the
+file in the browser and saves it, so there's no file to choose. The key is only
+in the link: the part of an address after `#` is never sent to a server, and the
+hub clears it from the address bar. The service worker never caches the file.
+Delete the `.bin` once the tree is in.
+
 **Privacy:** relatives who are probably living (no death record and born in
 the last 100 years) are saved with their **birth year only** — no birthdays,
 birthplaces or addresses. Only signed-in family members can see the tree.
@@ -224,7 +233,8 @@ assets/icons.svg      Icon set + logo mark
 firestore.rules       Server-side security rules (publish in Firebase)
 sw.js                 Service worker (offline shell; never caches private data)
 tests/                Security-rule + UI tests (run on every push)
-tools/                stamp.mjs versions asset links; make-land-mask.mjs rebuilds land.bin
+tools/                stamp.mjs versions asset links; lock-tree.mjs makes the one-tap tree link;
+                      make-land-mask.mjs rebuilds land.bin
 ```
 
 No build step — it's static HTML/CSS/JS served by GitHub Pages. Before
