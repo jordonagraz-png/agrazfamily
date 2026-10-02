@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /family/
+
+Sitemap: https://www.agrazfamily.com/sitemap.xml

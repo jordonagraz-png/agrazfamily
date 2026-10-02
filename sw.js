@@ -1,12 +1,18 @@
 /* Agraz Family — service worker
-   Network-first for the HTML shell (so updates always show), cache-first for
-   fonts/icons, and Firebase/Firestore traffic is never cached (always live). */
-const CACHE = 'agraz-v1';
-const SHELL = ['/', '/index.html', '/favicon.svg', '/manifest.webmanifest'];
+   Same-origin files: network-first (updates always show), cached copy when offline.
+   Google Fonts: cache-first. Everything else (Firebase, Firestore, photos) goes
+   straight to the network untouched — private data is never cached here. */
+const CACHE = 'agraz-v2';
+const SHELL = [
+  '/', '/family/', '/404.html',
+  '/assets/css/base.css', '/assets/css/public.css', '/assets/css/portal.css',
+  '/assets/js/public.js', '/assets/js/portal.js', '/assets/icons.svg',
+  '/favicon.svg', '/manifest.webmanifest'
+];
 
 self.addEventListener('install', (e) => {
   self.skipWaiting();
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL).catch(() => {})));
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).catch(() => {}));
 });
 
 self.addEventListener('activate', (e) => {
@@ -22,25 +28,26 @@ self.addEventListener('fetch', (e) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
 
-  // Never intercept live Firebase/Firestore/Auth traffic.
-  if (/firestore|firebaseio|identitytoolkit|googleapis|gstatic\.com\/firebasejs/.test(url.href)) return;
-
-  // HTML navigations: network-first, fall back to cached shell when offline.
-  if (req.mode === 'navigate') {
+  if (url.origin === self.location.origin) {
     e.respondWith(
       fetch(req)
-        .then((r) => { const cp = r.clone(); caches.open(CACHE).then((c) => c.put('/index.html', cp)); return r; })
-        .catch(() => caches.match('/index.html'))
+        .then((res) => {
+          if (res.ok && res.type === 'basic') { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
+          return res;
+        })
+        .catch(() => caches.match(req, { ignoreSearch: true })
+          .then((hit) => hit || (req.mode === 'navigate' ? caches.match(url.pathname.startsWith('/family') ? '/family/' : '/') : undefined))
+          .then((hit) => hit || Response.error()))
     );
     return;
   }
 
-  // Fonts, icons, images: cache-first.
-  if (/fonts\.gstatic\.com|fonts\.googleapis\.com|\.svg(\?|$)|\.png(\?|$)|\.webmanifest$/.test(url.href)) {
+  if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
     e.respondWith(
-      caches.match(req).then((c) => c || fetch(req).then((r) => {
-        const cp = r.clone(); caches.open(CACHE).then((ch) => ch.put(req, cp)); return r;
-      }).catch(() => c))
+      caches.match(req).then((hit) => hit || fetch(req).then((res) => {
+        if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
+        return res;
+      }))
     );
   }
 });
