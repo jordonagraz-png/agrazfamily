@@ -116,7 +116,7 @@ service cloud.firestore {
           && str(p.label, 1, 60) && optStr(p, 'tz', 64);
       }
       function validProfile(d) {
-        return d.keys().hasOnly(['name', 'email', 'uid', 'joinedDate', 'phone', 'birthday', 'address', 'bio', 'avatar', 'approved', 'role', 'place'])
+        return d.keys().hasOnly(['name', 'email', 'uid', 'joinedDate', 'phone', 'birthday', 'address', 'bio', 'avatar', 'approved', 'role', 'place', 'treeId'])
           && d.uid == uid
           && str(d.name, 1, 80)
           && optStr(d, 'email', 254) && optStr(d, 'joinedDate', 40)
@@ -125,7 +125,8 @@ service cloud.firestore {
           && (!('avatar' in d) || d.avatar == '' || isImage(d.avatar, 150000))
           && (!('approved' in d) || d.approved is bool)
           && (!('role' in d) || d.role in ['', 'admin', 'owner'])
-          && (!('place' in d) || d.place == null || validPlace(d.place));
+          && (!('place' in d) || d.place == null || validPlace(d.place))
+          && (!('treeId' in d) || d.treeId == null || (d.treeId is string && d.treeId.matches('[A-Za-z0-9_-]{1,40}')));
       }
       // Members see the whole family; anyone signed in may read their own doc
       // (that's how the site knows to ask for the code or show "waiting").
@@ -358,6 +359,44 @@ service cloud.firestore {
                     && request.resource.data.data.size() <= 900000
                     && !exists(/databases/$(database)/documents/stories/$(request.resource.data.story))
                     && getAfter(/databases/$(database)/documents/stories/$(request.resource.data.story)).data.uid == request.auth.uid;
+      allow delete: if isMember() && (resource.data.uid == request.auth.uid || isAdmin());
+    }
+
+    // ---- Family tree: imported from an Ancestry export by an admin (Family Tree page) ----
+    // tree/meta describes it; tree/part0… hold the people and families. Living relatives
+    // are stored with their birth year only (the hub trims them before saving).
+    match /tree/{doc} {
+      allow read: if isMember();
+      allow create, update: if isAdmin() && (
+        (doc == 'meta'
+          && request.resource.data.keys().hasOnly(['v', 'name', 'treeId', 'source', 'people', 'families', 'portraits', 'earliest', 'generations', 'parts', 'importedAt', 'importedBy'])
+          && request.resource.data.parts is int && request.resource.data.parts >= 1 && request.resource.data.parts <= 20
+          && request.resource.data.people is int && request.resource.data.families is int
+          && optStr(request.resource.data, 'name', 80) && optStr(request.resource.data, 'importedBy', 80))
+        || (doc.matches('part([0-9]|1[0-9])')
+          && request.resource.data.keys().hasOnly(['people', 'families'])
+          && request.resource.data.people is list && request.resource.data.families is list)
+        // research notes gathered from public records (sources, documents, leads), kept apart
+        // from the Ancestry data so updating the tree never wipes them
+        || (doc == 'research'
+          && request.resource.data.keys().hasOnly(['people', 'count', 'createdAt', 'by'])
+          && request.resource.data.people is map && request.resource.data.count is int
+          && optStr(request.resource.data, 'by', 80)));
+      allow delete: if isAdmin();
+    }
+
+    // ---- Family tree photos: one small portrait per person ----
+    match /treePhotos/{pid} {
+      function validTreePhoto() {
+        return pid.matches('[A-Za-z0-9_-]{1,40}')
+          && request.resource.data.keys().hasOnly(['img', 'uid', 'by', 'createdAt'])
+          && request.resource.data.uid == request.auth.uid
+          && str(request.resource.data.by, 1, 80)
+          && isImage(request.resource.data.img, 90000);
+      }
+      allow read:   if isMember();
+      allow create: if isMember() && validTreePhoto();
+      allow update: if isMember() && validTreePhoto() && (resource.data.uid == request.auth.uid || isAdmin());
       allow delete: if isMember() && (resource.data.uid == request.auth.uid || isAdmin());
     }
 

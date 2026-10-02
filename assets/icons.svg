@@ -72,5 +72,6 @@
 <symbol id="fingerprint" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.2 5.4A8.5 8.5 0 0 1 20.5 11.5v1.2M3.6 9.3a8.6 8.6 0 0 1 1.1-2.4M3.5 15.5V12"/><path d="M6.5 18.5c.6-1.3 1-2.9 1-4.6V12a4.5 4.5 0 0 1 9 0v1.6c0 1.8-.2 3.6-.7 5.2"/><path d="M12 11.5v2.4c0 2.8-.7 5.3-2.1 7.4M14.6 21c.9-2 1.3-4.3 1.3-6.6M19.8 16.4c.4-1.2.7-2.5.7-3.8"/></symbol>
 <symbol id="wave" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h1.4M6.6 8.5v7M10.2 5v14M13.8 8v8M17.4 6.5v11M21 10.5v3"/></symbol>
 <symbol id="refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.4-5.7M20 4v4.6h-4.6"/></symbol>
+<symbol id="pedigree" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="8.5" y="3" width="7" height="5.5" rx="1.6"/><rect x="2.5" y="15.5" width="7" height="5.5" rx="1.6"/><rect x="14.5" y="15.5" width="7" height="5.5" rx="1.6"/><path d="M12 8.5V12M6 15.5V14a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1.5"/></symbol>
 </defs>
 </svg>

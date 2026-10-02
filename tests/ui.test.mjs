@@ -2,8 +2,12 @@
 // fake Firebase (tests/mock-firebase.js). Hermetic: all external requests are blocked.
 //   npm run test:ui
 import { chromium } from 'playwright';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import vm from 'node:vm';
 import { start } from './serve.mjs';
+import { zipOf } from './zip.mjs';
 
 const SLOW = Number(process.env.SLOW) || 1; // CI runners can be slower: SLOW=2 doubles every wait
 const MOCK = readFileSync(new URL('./mock-firebase.js', import.meta.url), 'utf8');
@@ -678,6 +682,132 @@ try {
     await p.waitForTimeout(SLOW * 300);
     ok(await p.isHidden('#vault-bio'), 'quick unlock can be turned off again');
     await done(p, 'quick unlock');
+  }
+
+  console.log('— family tree');
+  {
+    // A small fictional family (tests/fixtures/sample-tree.ged), read by the same engine the hub uses.
+    vm.runInThisContext(readFileSync(new URL('../assets/js/tree.js', import.meta.url), 'utf8'));
+    const TR = globalThis.AgrazTree;
+    const GED = readFileSync(new URL('./fixtures/sample-tree.ged', import.meta.url), 'utf8');
+    const model = TR.parse(GED);
+    const treeDocs = { meta: { v: 1, name: model.name, treeId: model.treeId, source: model.source, people: model.people.length, families: model.families.length, portraits: model.portraits, earliest: model.earliest, generations: model.generations, parts: 1, importedAt: new Date().toISOString(), importedBy: 'Jordon Agraz' }, part0: TR.chunk(model)[0] };
+    const dir = join(tmpdir(), 'agraz-tree-test');
+    mkdirSync(dir, { recursive: true });
+    const zipPath = join(dir, 'Sample Family Tree.zip');
+    writeFileSync(zipPath, zipOf('Sample Family Tree.ged', GED));
+
+    const a = await open('/family/#tree', { signedIn: true, role: 'owner' });
+    await a.waitForTimeout(SLOW * 1000);
+    ok(!!(await a.$('#tree-file')), 'admins are offered the Ancestry import');
+    await a.setInputFiles('#tree-file', zipPath);
+    await a.waitForTimeout(SLOW * 700);
+    ok((await a.textContent('#tree-preview')).includes('16 people'), 'the .zip is read right in the browser: 16 people');
+    await a.click('#tree-import-go');
+    await a.waitForTimeout(SLOW * 1200);
+    const saved = await store(a, () => ({ meta: window.__store.tree.meta, jordon: window.__store.tree.part0.people.find(p => p.id === 'I11') }));
+    ok(saved.meta.people === 16 && saved.meta.parts === 1 && saved.meta.importedBy === 'Jordon Agraz', 'the tree is saved privately for the family');
+    ok(saved.jordon.b.d === '1990' && !saved.jordon.b.p, 'living relatives are saved with their birth year only');
+    ok((await a.textContent('.tcard.is-focus')).includes('Hector Agraz'), 'the tree opens on the home person, Hector');
+    ok(await a.$eval('.tcard.is-focus img', i => i.src.startsWith('data:image/jpeg')), 'Hector’s card uses his memorial photo');
+    ok((await a.textContent('.fam-g1')).includes('Rafael Agraz') && (await a.textContent('.fam-g2')).includes('Mateo Agraz'), 'parents and grandparents');
+    ok((await a.textContent('.fam-kids')).includes('with Ana') && (await a.textContent('.fam-kids')).includes('with Patricia'), 'children grouped by partner');
+    ok(await a.$$eval('#fam-lines path', e => e.length) >= 8, 'connector lines join the family');
+    ok((await a.textContent('#ts-photos')) === '1', 'counts who has a photo');
+    ok((await a.textContent('.tree-me')).includes('Jordon Agraz'), 'suggests which person is you');
+    await a.click('.tree-me [data-action=tree-me]');
+    await a.waitForTimeout(SLOW * 600);
+    ok(await store(a, () => window.__store.users.u1.treeId === 'I11'), 'links you to your place in the tree');
+    ok((await a.textContent('#tree-panel .tp-rel')).includes('This is you'), 'the tree centers on you');
+    ok((await a.textContent('.fam-g1')).includes('Father') && (await a.textContent('.fam-g2')).includes('Grandfather'), 'every card says how you’re related');
+    await a.click('.fam-g1 [data-pid="I182483266401"]');
+    await a.waitForTimeout(SLOW * 400);
+    const panel = await a.textContent('#tree-panel');
+    ok(panel.includes('Your father') && panel.includes('3 Apr 1950 · Chicago, Illinois, USA') && panel.includes('Married 1986') && panel.includes('Divorced'), 'profile: relationship, birth, marriages');
+    ok((await a.getAttribute('#tree-panel a[href*="ancestry.com"]', 'href')).endsWith('/tree/191301314/person/182483266401/facts'), 'opens the same person on Ancestry');
+    await a.fill('#tree-search', 'carm');
+    await a.waitForTimeout(SLOW * 200);
+    await a.click('#tree-results [data-pid="I4"]');
+    await a.waitForTimeout(SLOW * 400);
+    ok((await a.textContent('#tree-panel .tp-rel')).includes('Your great-aunt'), 'search finds Carmen — your great-aunt');
+    await a.click('#tree-back');
+    await a.waitForTimeout(SLOW * 300);
+    ok((await a.textContent('#tree-panel .tp-name')) === 'Hector Agraz', 'back returns to the previous person');
+    await a.click('[data-action=tree-view][data-v=fan]');
+    await a.waitForTimeout(SLOW * 400);
+    ok(await a.$$eval('.fan-seg[data-pid]', e => e.length) === 4, 'the ancestor fan shows Hector’s parents and grandparents');
+    await a.click('.fan-seg[data-pid="I1"]');
+    await a.waitForTimeout(SLOW * 400);
+    ok((await a.textContent('#tree-panel')).includes('Your great-grandfather'), 'tap the fan to step back in time — Mateo, your great-grandfather');
+    await a.click('[data-action=tree-view][data-v=family]');
+    await a.fill('#tree-search', 'carmen');
+    await a.waitForTimeout(SLOW * 200);
+    await a.click('#tree-results [data-pid="I4"]');
+    await a.waitForTimeout(SLOW * 300);
+    // test photos, drawn in the browser
+    const png = async (w, h, color) => Buffer.from(await a.evaluate(([w, h, color]) => { const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'); x.fillStyle = color; x.fillRect(0, 0, w, h); return c.toDataURL('image/png').split(',')[1]; }, [w, h, color]), 'base64');
+    const pic = (name, buf) => { const f = join(dir, name); writeFileSync(f, buf); return f; };
+    const carmenPng = pic('Carmen Agraz.png', await png(90, 120, '#a65'));
+    const [chooser] = await Promise.all([a.waitForEvent('filechooser'), a.click('#tree-panel [data-action=tree-photo]')]);
+    await chooser.setFiles(carmenPng);
+    await a.waitForTimeout(SLOW * 800);
+    ok(await store(a, () => /^data:image\/jpeg/.test((window.__store.treePhotos.I4 || {}).img || '')), 'add a photo to anyone in the tree');
+    ok(await a.$eval('.tcard.is-focus img', i => !!i.src), '…and it shows on their card');
+    const mateo = await png(400, 500, '#68a');
+    const files = [pic('download.png', Buffer.concat([mateo, Buffer.alloc(12345 - mateo.length)])), pic('IMG_3047.png', await png(60, 80, '#a86')), carmenPng, pic('beach.png', await png(30, 30, '#6a8'))];
+    await a.click('#tree-photos-btn');
+    await a.setInputFiles('#match-input', files);
+    await a.waitForTimeout(SLOW * 1000);
+    const how = await a.$$eval('#match-list .minfo small', e => e.map(x => x.textContent));
+    ok(how[0].includes('Exact match') && how[1].includes('Ancestry title') && how[2].includes('name in the file name'), 'photos are matched to people by exact size, Ancestry title, or name', how);
+    ok(how[3].includes('who is this'), 'a photo nobody can be matched to waits for you to choose');
+    await a.fill('#match-list .match-q', 'luis');
+    await a.waitForTimeout(SLOW * 150);
+    await a.click('.match-res [data-pid="I9"]');
+    ok((await a.textContent('#match-save')).includes('Save 4 photos'), 'choose who it is, then save them all');
+    await a.click('#match-save');
+    await a.waitForTimeout(SLOW * 1500);
+    ok(await store(a, () => ['I1', 'I182483266401', 'I4', 'I9'].every(id => /^data:image\/jpeg/.test((window.__store.treePhotos[id] || {}).img || ''))), 'every photo lands on the right person');
+    ok((await a.textContent('#toast')).includes('4 photos added'), '…and says so');
+    // research from public records
+    const researchPath = join(dir, 'research.json');
+    writeFileSync(researchPath, JSON.stringify({ kind: 'agraz-research', v: 1, people: {
+      I1: { doc: [{ k: 'grave', t: 'Mateo Agraz — memorial', u: 'https://www.findagrave.com/memorial/123' }, { k: 'photo', t: 'bad link', u: 'javascript:alert(1)' }],
+        f: [{ t: 'death', v: '4 Feb 1961, Miami, Florida', s: 'Florida Death Index', u: 'https://example.org/fdi', c: 'm', d: 1 }],
+        rel: [{ r: 'father', n: 'Tomas Agraz', b: '1860', d: '1931', s: 'Baptism index', u: 'https://example.org/bap', c: 'l', w: 'Same parish and godparents' }] },
+      I11: { note: 'living — must be dropped' },
+      I999: { note: 'not in the tree — dropped' } } }));
+    await a.setInputFiles('#research-file', researchPath);
+    await a.waitForTimeout(SLOW * 800);
+    const stored = await store(a, () => window.__store.tree.research);
+    ok(stored && stored.count === 1 && stored.people.I1 && !stored.people.I11 && !stored.people.I999, 'research is added for people who have passed — never for living relatives');
+    ok(stored && stored.people.I1.doc.length === 1, 'unsafe links are dropped');
+    await a.fill('#tree-search', 'mateo');
+    await a.waitForTimeout(SLOW * 200);
+    await a.click('#tree-results [data-pid="I1"]');
+    await a.waitForTimeout(SLOW * 400);
+    const arch = await a.textContent('#tree-panel .tp-research');
+    ok(arch.includes('From the archives') && arch.includes('Likely') && arch.includes('Differs from the tree') && arch.includes('Possible father') && arch.includes('Tomas Agraz'), 'profiles show records, facts with confidence, and possible new ancestors');
+    ok((await a.getAttribute('#tree-panel .rdoc a', 'href')) === 'https://www.findagrave.com/memorial/123', 'documents link to their source');
+    ok(!!(await a.$('.tcard.is-focus .tc-badge')), 'cards with records found get a badge');
+    await done(a, 'family tree (owner)');
+
+    const mbr = await open('/family/#tree', { signedIn: true, admin: false, treeDocs, memberTreeIds: { u2: 'I10' } });
+    await mbr.waitForTimeout(SLOW * 1200);
+    ok(await mbr.isHidden('#tree-photos-btn') && !(await mbr.$('[data-action=tree-update]')), 'only admins add photos in bulk or update the tree');
+    ok(await mbr.$eval('.tcard[data-pid="I10"] img', i => i.src.startsWith('data:image/')), 'a member’s profile photo appears on their card in the tree');
+    ok((await mbr.textContent('.tree-me')).includes('Jordon Agraz'), 'members can find themselves too');
+    await done(mbr, 'family tree (member)');
+
+    const none = await open('/family/#tree', { signedIn: true, admin: false });
+    await none.waitForTimeout(SLOW * 1000);
+    ok((await none.textContent('#tree-body')).includes('on its way') && !(await none.$('#tree-file')), 'before it’s added, members see that it’s on its way');
+    await done(none, 'family tree (not added yet)');
+
+    const old = await open('/family/#tree', { signedIn: true, role: 'owner', oldRules: true });
+    await old.waitForTimeout(SLOW * 1000);
+    ok(!!(await old.$('.rules-needed [data-action=copy-rules]')), 'without the latest rules, admins are shown how to publish them');
+    await done(old, 'family tree (rules not published)');
   }
 
   console.log('— install prompt + sign out');

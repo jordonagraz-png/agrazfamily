@@ -40,8 +40,8 @@ one the Invite page creates.
 Until steps 1–3 are done, existing members can still sign in, but **new people
 can't join** (they'll see "That invite code isn't right") and the newer
 features (Vault, profiles, recipes, RSVPs, hearts, comments, guestbook,
-candles, Family Globe, Voice Stories, Time Capsules) show "needs the latest
-security rules".
+candles, Family Globe, Voice Stories, Time Capsules, Family Tree) show "needs
+the latest security rules" — with a **Copy the rules** button and the steps.
 
 **Publishing the rules is what actually protects the family's data.** The
 site itself won't let anyone join without a server-checked code, but until the
@@ -102,6 +102,15 @@ Everything lives in the hub under **Invite family** (sidebar, the phone's
   automatically. Everyone can **RSVP** (Going / Maybe / Can't go) and **add
   any event to their own calendar** (Apple, Outlook or Google)
 - **Updates** — a family feed with hearts and comments
+- **Family Tree** — the whole Ancestry tree, inside the hub: a family chart
+  (grandparents → parents → you and your partner → children, joined by
+  flowing lines; tap anyone to glide the tree around them), an **ancestor
+  fan** six generations deep, a profile for everyone (dates, places, where
+  they lived, parents, partners, children, siblings, a link to the same
+  person on Ancestry), and search. Tap **This is me** and every card says how
+  you're related — "your 2nd great-grandmother", "your first cousin once
+  removed", "husband of your aunt". Photos come from the tree itself, from
+  members' profile photos, and Hector's from the In Memory page
 - **Family Globe** — a live, spinning Earth showing where everyone lives,
   with the real day/night line (computed from the sun's position), everyone's
   local time, distances, and **Family clocks**: slide through the next 24
@@ -151,6 +160,38 @@ so treat the console like the family safe. Quick unlock protects the vault on a
 phone or computer that's already signed in; the vault's notes are still
 protected by the rules either way.
 
+## The Family Tree
+
+**Adding or updating it (admins):** on Ancestry open the tree → **Tree
+settings** → **Export tree**, download the file, then in the hub go to
+**Family Tree** and choose it (the `.zip` is fine). It's read in your browser
+and saved to the private database — never to this repository. To refresh it
+later, export again and tap **Update** on the Family Tree page.
+
+**Privacy:** relatives who are probably living (no death record and born in
+the last 100 years) are saved with their **birth year only** — no birthdays,
+birthplaces or addresses. Only signed-in family members can see the tree.
+
+**Photos:** Ancestry's export lists every photo (title, exact size,
+dimensions) but doesn't include the pictures. So:
+
+- Anyone can tap **Add a photo** on a person's profile.
+- Admins can tap **Add photos** and drop in a whole folder — for example
+  photos downloaded from Ancestry, or the originals on your computer. Each
+  one is matched to the right person automatically: by its exact file size
+  and dimensions (the same photo as on Ancestry), its Ancestry title, or a
+  person's full name in the file name. You can fix any match before saving.
+- Members who tap **This is me** bring their profile photo, and the home
+  person (Hector) uses the first In Memory photo, until someone adds one.
+
+**From the archives:** research gathered from public records (graves,
+obituaries, newspapers, census and church indexes, published genealogies) can
+be added with **Add research** on the Family Tree page. Each person's profile
+then lists the records with links, facts marked *Confirmed / Likely /
+Possible* (and flagged when they differ from the tree), and possible new
+ancestors to check on Ancestry. It's stored separately, so updating the tree
+keeps it. Research files only ever cover relatives who have passed away.
+
 ## Editing the public site
 
 Everything public is in [`index.html`](index.html) — plain HTML, edit the text
@@ -177,6 +218,7 @@ assets/css/portal.css Family Hub styles
 assets/js/public.js   Public site interactions
 assets/js/portal.js   Family Hub app (Firebase Auth + Firestore)
 assets/js/globe.js    Family Globe renderer (canvas, no libraries; loaded on demand)
+assets/js/tree.js     Family tree engine: reads Ancestry exports, works out relationships
 assets/data/land.bin  Land mask for the globe (5 KB, from Natural Earth — public domain)
 assets/icons.svg      Icon set + logo mark
 firestore.rules       Server-side security rules (publish in Firebase)
@@ -199,17 +241,22 @@ npm run serve        # http://127.0.0.1:8080/
 
 Every push runs two test suites on GitHub (see *Actions → Tests*):
 
-- **Security rules** (`tests/rules.test.mjs`) — ~170 checks against the
+- **Family tree engine** (`tests/tree.test.mjs`) — ~50 checks with a small
+  fictional family: reading the .zip, dates and places, living relatives
+  trimmed, relationship names, search, and matching photos to people.
+- **Security rules** (`tests/rules.test.mjs`) — ~185 checks against the
   Firestore emulator: outsiders and wrong invite codes are locked out, the code
   can't be read, pending members see nothing, nobody can heart/RSVP/comment as
   someone else, removed members lose access, only the owner can make admins
   and nobody can demote the owner, a sealed time capsule can't be read (or
-  swapped) before its day, and voice recordings can't be faked or replaced.
-- **UI** (`tests/ui.test.mjs`) — ~240 end-to-end checks in a real browser with
+  swapped) before its day, voice recordings can't be faked or replaced, and
+  only admins can import or change the family tree.
+- **UI** (`tests/ui.test.mjs`) — ~295 end-to-end checks in a real browser with
   a fake Firebase, a fake microphone and a virtual fingerprint sensor: sign-in,
   joining and approval, RSVPs and calendar invites, hearts and comments,
   recipes and printing, candles and guestbook, vault locking and quick unlock,
-  the globe and family clocks, recording and playing voice stories, sealing and
+  the globe and family clocks, importing and exploring the family tree and
+  matching photos to people, recording and playing voice stories, sealing and
   opening time capsules, birthday banner, follows-the-sun, and that private
   content is cleared on sign-out.
 
@@ -228,6 +275,8 @@ for the emulator). To publish rules from the command line: `npm run deploy:rules
 | "That owner link didn't work" | Publish the latest rules, sign in first, and use the link only once — the family may already have an owner |
 | JARVIS opens the wrong address | My Profile → Preferences → JARVIS address (saved per device) |
 | "Record a story" can't use the microphone | Allow the microphone for agrazfamily.com in the browser's site settings |
+| The Family Tree says "on its way" | An admin needs to add it: Family Tree → choose the Ancestry export |
+| A tree photo matched the wrong person | In **Add photos**, tap **Change** on that photo before saving (or change it later from the person's profile) |
 | "Use my location" doesn't work | Allow location for the site — or just tap the globe where you live |
 | A capsule says "Almost — it opens any moment now" | The phone's clock is a little ahead of Google's; try again in a minute |
 | Forgot password | "Forgot password?" on the sign-in screen emails a reset link |

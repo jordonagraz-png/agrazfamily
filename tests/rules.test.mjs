@@ -264,6 +264,34 @@ await t('other members cannot delete a story', deleteDoc(doc(dan, 'stories/s1'))
 await t('the storyteller can delete it', deleteDoc(doc(bob, 'stories/s2')), true);
 await t('admins can remove any story', deleteDoc(doc(alice, 'stories/s1')), true);
 
+console.log('— family tree');
+await seed();
+await env.withSecurityRulesDisabled(c => setDoc(doc(c.firestore(), 'users/dan'), { name: 'Dan', email: 'dan@x.com', uid: 'dan', joinedDate: 'x' }));
+const meta = { v: 1, name: 'Agraz Family Tree', treeId: '191301314', source: 'Ancestry', people: 2, families: 1, portraits: 0, earliest: 1900, generations: 2, parts: 1, importedAt: 'x', importedBy: 'Alice Agraz' };
+const part = { people: [{ id: 'I1', n: 'Ana Agraz', fc: [], fs: ['F1'] }, { id: 'I2', n: 'Leo Agraz', L: 1, fc: ['F1'], fs: [] }], families: [{ id: 'F1', w: 'I1', c: ['I2'] }] };
+await t('members can’t import the tree', setDoc(doc(bob, 'tree/meta'), meta), false);
+await t('admins import the tree', (() => { const b = writeBatch(alice); b.set(doc(alice, 'tree/meta'), meta); b.set(doc(alice, 'tree/part0'), part); return b.commit(); })(), true);
+await t('members read the tree', getDoc(doc(bob, 'tree/part0')), true);
+await t('outsiders can’t read the tree', getDoc(doc(eve, 'tree/part0')), false);
+await t('tree pieces are named part0…part19', setDoc(doc(alice, 'tree/secret'), part), false);
+await t('tree pieces hold only people and families', setDoc(doc(alice, 'tree/part1'), { ...part, notes: 'x' }), false);
+await t('members can’t change the tree', setDoc(doc(bob, 'tree/part0'), part), false);
+await t('link yourself to your place in the tree', updateDoc(doc(bob, 'users/bob'), { treeId: 'I182483266401' }), true);
+await t('tree link must be a tree id', updateDoc(doc(bob, 'users/bob'), { treeId: 'not a/valid id' }), false);
+await t('members add a photo to someone in the tree', setDoc(doc(bob, 'treePhotos/I1'), { img: IMG, uid: 'bob', by: 'Bob Agraz', createdAt: 'x' }), true);
+await t('tree photos must be images', setDoc(doc(bob, 'treePhotos/I2'), { img: 'javascript:alert(1)', uid: 'bob', by: 'Bob Agraz', createdAt: 'x' }), false);
+await t('tree photos stay small', setDoc(doc(bob, 'treePhotos/I2'), { img: 'data:image/jpeg;base64,' + 'A'.repeat(90000), uid: 'bob', by: 'Bob Agraz', createdAt: 'x' }), false);
+await t('other members can’t replace your photo', setDoc(doc(dan, 'treePhotos/I1'), { img: IMG, uid: 'dan', by: 'Dan', createdAt: 'y' }), false);
+await t('admins can replace any tree photo', setDoc(doc(alice, 'treePhotos/I1'), { img: IMG, uid: 'alice', by: 'Alice Agraz', createdAt: 'y' }), true);
+await t('other members can’t delete a tree photo', deleteDoc(doc(dan, 'treePhotos/I1')), false);
+await t('outsiders can’t see tree photos', getDoc(doc(eve, 'treePhotos/I1')), false);
+const research = { people: { I1: { doc: [{ k: 'grave', t: 'Find a Grave memorial', u: 'https://www.findagrave.com/memorial/1' }] } }, count: 1, createdAt: 'x', by: 'Alice Agraz' };
+await t('admins add research notes', setDoc(doc(alice, 'tree/research'), research), true);
+await t('members read research notes', getDoc(doc(bob, 'tree/research')), true);
+await t('members can’t change research notes', setDoc(doc(bob, 'tree/research'), research), false);
+await t('research notes hold only what’s expected', setDoc(doc(alice, 'tree/research'), { ...research, secret: 'x' }), false);
+await t('admins can remove the tree', deleteDoc(doc(alice, 'tree/part0')), true);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 await env.cleanup();
 process.exit(fail ? 1 : 0);

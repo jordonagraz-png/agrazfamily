@@ -146,6 +146,7 @@
       <a href="#updates" data-nav="updates"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#chat"/></svg>Updates</a>
       <a href="#globe" data-nav="globe"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#earth"/></svg>Family Globe</a>
       <p class="side-label">Keepsakes</p>
+      <a href="#tree" data-nav="tree"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#pedigree"/></svg>Family Tree</a>
       <a href="#stories" data-nav="stories"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#mic"/></svg>Voice Stories</a>
       <a href="#capsules" data-nav="capsules"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#letter"/></svg>Time Capsules<span class="badge" data-capsule-badge hidden></span></a>
       <a href="#recipes" data-nav="recipes"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#book"/></svg>Recipes</a>
@@ -155,7 +156,7 @@
       <a href="#invite" data-nav="invite"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#user-plus"/></svg>Invite family<span class="badge" data-pending-badge hidden></span></a>
       <a href="#vault" data-nav="vault"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#key"/></svg>Family Vault</a>
       <p class="side-label">Links</p>
-      <a href="#" data-link="tree" target="_blank" rel="noopener noreferrer"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#tree"/></svg>Family Tree<svg class="i ext" aria-hidden="true"><use href="/assets/icons.svg#external"/></svg></a>
+      <a href="#" data-link="tree" target="_blank" rel="noopener noreferrer"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#tree"/></svg>Ancestry<svg class="i ext" aria-hidden="true"><use href="/assets/icons.svg#external"/></svg></a>
       <button type="button" data-action="jarvis"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#cpu"/></svg>JARVIS<span class="pill">AI</span><svg class="i ext" aria-hidden="true"><use href="/assets/icons.svg#external"/></svg></button>
       <a href="/"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#globe"/></svg>Public site</a>
     </nav>
@@ -313,6 +314,26 @@
           </div>
         </form>
         <div class="feed" id="feed"></div>
+      </section>
+
+      <!-- ============ Family Tree ============ -->
+      <section class="view view-wide" id="view-tree" data-view="tree" aria-labelledby="tree-title" hidden>
+        <header class="view-head">
+          <div><p class="eyebrow plain">Where we come from</p><h1 class="view-title" id="tree-title">Family Tree</h1></div>
+          <div class="head-actions tree-head" id="tree-head" hidden>
+            <div class="tree-find">
+              <label class="search">
+                <svg class="i" aria-hidden="true"><use href="/assets/icons.svg#search"/></svg>
+                <span class="sr-only">Find someone in the tree</span>
+                <input type="search" id="tree-search" placeholder="Find anyone in the tree…" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="tree-results">
+              </label>
+              <ul class="tree-results" id="tree-results" role="listbox" aria-label="People found" hidden></ul>
+            </div>
+            <button class="btn btn-ghost" type="button" data-action="tree-photos" id="tree-photos-btn" hidden><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#image"/></svg>Add photos</button>
+          </div>
+        </header>
+        <div id="tree-body"></div>
+        <input type="file" id="tree-photo-input" accept="image/*" class="sr-only" tabindex="-1" aria-hidden="true">
       </section>
 
       <!-- ============ Family Globe ============ -->
@@ -602,6 +623,7 @@
 <dialog class="sheet" id="more-sheet" aria-label="More">
   <div class="sheet-grip" aria-hidden="true"></div>
   <nav class="sheet-nav">
+    <a href="#tree"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#pedigree"/></svg>Family Tree</a>
     <a href="#globe"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#earth"/></svg>Family Globe</a>
     <a href="#stories"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#mic"/></svg>Voice Stories</a>
     <a href="#capsules"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#letter"/></svg>Time Capsules<span class="badge" data-capsule-badge hidden></span></a>
@@ -611,7 +633,7 @@
     <a href="#vault"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#key"/></svg>Family Vault</a>
     <a href="#memorial"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#candle"/></svg>In Memory</a>
     <a href="#profile"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#user"/></svg>My Profile</a>
-    <a href="#" data-link="tree" target="_blank" rel="noopener noreferrer"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#tree"/></svg>Family Tree<svg class="i ext" aria-hidden="true"><use href="/assets/icons.svg#external"/></svg></a>
+    <a href="#" data-link="tree" target="_blank" rel="noopener noreferrer"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#tree"/></svg>Ancestry<svg class="i ext" aria-hidden="true"><use href="/assets/icons.svg#external"/></svg></a>
     <button type="button" data-action="jarvis"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#cpu"/></svg>JARVIS<svg class="i ext" aria-hidden="true"><use href="/assets/icons.svg#external"/></svg></button>
     <a href="/"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#globe"/></svg>Public site</a>
     <button type="button" data-action="signout" class="danger"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#logout"/></svg>Sign out</button>
@@ -740,6 +762,19 @@
       <button class="btn btn-accent" type="submit" id="md-save">Save</button>
     </footer>
   </form>
+</dialog>
+
+<dialog class="modal modal-lg match-dialog" id="match-dialog" aria-labelledby="match-title">
+  <div class="match-wrap">
+    <header class="modal-head"><h2 id="match-title">Add photos to the tree</h2><button class="icon-btn" type="button" data-close aria-label="Close"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#x"/></svg></button></header>
+    <p class="muted">Drop in your family’s photos — the ones you downloaded from Ancestry, or the originals on your computer. Each one is matched to the right person automatically, using the exact file size, dimensions and title Ancestry keeps for every photo. You can fix any match before saving.</p>
+    <label class="match-drop" for="match-input" data-drop-match>
+      <svg class="i" aria-hidden="true"><use href="/assets/icons.svg#upload"/></svg><strong>Choose photos</strong><span>or drag them here — as many as you like</span>
+    </label>
+    <input type="file" id="match-input" accept="image/*" multiple class="sr-only">
+    <div class="match-list" id="match-list"></div>
+    <footer class="modal-foot match-foot"><p class="muted" id="match-summary"></p><button class="btn btn-ghost" type="button" data-close>Cancel</button><button class="btn btn-accent" type="button" data-action="match-save" id="match-save" disabled><svg class="i" aria-hidden="true"><use href="/assets/icons.svg#check"/></svg>Save photos</button></footer>
+  </div>
 </dialog>
 
 <dialog class="modal recorder" id="story-dialog" aria-labelledby="story-dialog-title">

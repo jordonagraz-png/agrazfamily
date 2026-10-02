@@ -33,10 +33,10 @@
   const VAULT_AWAY_MS = 60e3; // …or after the tab has been in the background this long
   const NEED_RULES = 'This needs the latest security rules — see README.';
 
-  const VIEWS = ['home', 'photos', 'calendar', 'updates', 'globe', 'stories', 'capsules', 'recipes', 'directory', 'invite', 'vault', 'memorial', 'profile'];
+  const VIEWS = ['home', 'photos', 'calendar', 'updates', 'tree', 'globe', 'stories', 'capsules', 'recipes', 'directory', 'invite', 'vault', 'memorial', 'profile'];
   const ALIASES = { memories: 'photos', events: 'calendar' };
-  const TITLES = { home: 'Home', photos: 'Photos', calendar: 'Calendar', updates: 'Updates', globe: 'Family Globe', stories: 'Voice Stories', capsules: 'Time Capsules', recipes: 'Recipes', directory: 'Directory', invite: 'Invite family', vault: 'Family Vault', memorial: 'In Memory', profile: 'My Profile' };
-  const SECONDARY = ['globe', 'stories', 'capsules', 'recipes', 'directory', 'invite', 'vault', 'memorial', 'profile'];
+  const TITLES = { home: 'Home', photos: 'Photos', calendar: 'Calendar', updates: 'Updates', tree: 'Family Tree', globe: 'Family Globe', stories: 'Voice Stories', capsules: 'Time Capsules', recipes: 'Recipes', directory: 'Directory', invite: 'Invite family', vault: 'Family Vault', memorial: 'In Memory', profile: 'My Profile' };
+  const SECONDARY = ['tree', 'globe', 'stories', 'capsules', 'recipes', 'directory', 'invite', 'vault', 'memorial', 'profile'];
   const RECIPE_CATS = { mains: 'Mains', sides: 'Sides', desserts: 'Desserts', breakfast: 'Breakfast', drinks: 'Drinks', other: 'Other' };
   const CATS = {
     emergency: { label: 'Emergency', icon: 'siren' },
@@ -206,7 +206,7 @@
     tributes: null, candles: null, otd: null, addcal: null, prefillPost: '', installEvt: null,
     vaultOpen: false, lastActive: Date.now(), hiddenAt: 0, invite: undefined,
     globe: { api: null, offset: 0, draft: null, picking: false, active: new Set() },
-    capsules: null, capPhoto: '', justSealed: null, stories: null, storyUrls: {}, rulesOk: undefined
+    capsules: null, capPhoto: '', justSealed: null, stories: null, storyUrls: {}, rulesOk: undefined, tree: null, treeDraft: null
   };
   const myName = () => (S.me && S.me.name) || (S.user && (S.user.displayName || S.user.email)) || 'Family member';
 
@@ -460,8 +460,9 @@
       me: null, members: [], byUid: {}, view: null, events: null, updates: null, vault: null, memorial: null, recent: null,
       vaultCat: 'all', avatarDraft: undefined, pending: [], comments: {}, lbThread: false, recipes: null, recipeCat: 'all',
       openRecipe: null, tributes: null, candles: null, otd: null, addcal: null, prefillPost: '', vaultOpen: false, invite: undefined,
-      capsules: null, capPhoto: '', justSealed: null, stories: null, rulesOk: undefined
+      capsules: null, capPhoto: '', justSealed: null, stories: null, rulesOk: undefined, tree: null, treeDraft: null
     });
+    matcher.rows = [];
     stopPlayer();
     if ($('#story-dialog').open) $('#story-dialog').close();
     resetRecorder();
@@ -489,7 +490,7 @@
     // Don't leave private content in the page after signing out.
     ['#home-upcoming', '#home-family', '#home-photos', '#home-updates', '#home-bday', '#home-otd-strip', '#photo-grid', '#cal-grid', '#cal-agenda', '#feed',
       '#people', '#pending-panel', '#notes', '#vault-filters', '#memorial-grid', '#tributes', '#candle-row', '#recipes', '#recipe-filters', '#lb-thread', '#invite-body',
-      '#globe-clocks', '#globe-strip', '#globe-best', '#globe-pins', '#capsules', '#home-capsule', '#co-text', '#stories'].forEach(s => { const el = $(s); if (el) el.innerHTML = ''; });
+      '#globe-clocks', '#globe-strip', '#globe-best', '#globe-pins', '#capsules', '#home-capsule', '#co-text', '#stories', '#tree-body', '#tree-results', '#match-list'].forEach(s => { const el = $(s); if (el) el.innerHTML = ''; });
     ['#home-bday', '#home-otd', '#pending-panel', '#home-capsule'].forEach(s => { $(s).hidden = true; });
     $('#co-photo').removeAttribute('src');
     paintPendingBadge();
@@ -555,6 +556,7 @@
     else if (S.view === 'updates' && S.updates) renderFeed();
     else if (S.view === 'memorial') { if (S.tributes) renderGuestbook(); if (S.candles) renderCandles(); }
     else if (S.view === 'invite') renderInvite();
+    else if (S.view === 'tree' && S.tree && S.tree.status === 'ready') renderTree();
     else if (S.view === 'globe' && S.globe.api) { S.globe.api.setPeople(globePeople(), S.user.uid); paintPlaceBtn(); renderGlobeSide(); }
   }
   async function loadEvents(force) {
@@ -1674,6 +1676,8 @@
     postComment(f);
   });
   document.addEventListener('change', e => {
+    if (e.target.id === 'tree-file') { previewImport(e.target.files && e.target.files[0]); e.target.value = ''; return; }
+    if (e.target.id === 'research-file') { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) importResearch(f); return; }
     if (e.target.id === 'invite-approval') {
       saveInvite({ requireApproval: e.target.checked }, e.target.checked ? 'New members will wait for your approval' : 'New members get in right away');
     }
@@ -2304,9 +2308,9 @@
   /* ===================== Owner + member management ===================== */
   // First-time setup on the Invite page: no admin yet, so whoever holds the owner key
   // claims ownership right there — and gets the family's invite code straight away.
-  // capsules only exist in the latest rules, so reading them is a quick "are the rules published?" check.
+  // The family tree is the newest part of the rules, so reading it is a quick "are the rules published?" check.
   async function checkRules() {
-    try { await col('capsules').limit(1).get(); S.rulesOk = true; }
+    try { await col('tree').doc('meta').get(); S.rulesOk = true; }
     catch (e) { S.rulesOk = denied(e) ? false : null; }
     if (S.view === 'invite' && !isAdmin()) renderInvite();
     return S.rulesOk;
@@ -3384,11 +3388,693 @@
     }
   }
 
+  /* ===================== Family Tree ===================== */
+  // The tree is imported once from an Ancestry export (by an admin) and lives in the private
+  // database: tree/meta + tree/part0…, read by /assets/js/tree.js (loaded on demand).
+  const ANCESTRY_TREE = (ANCESTRY_URL.match(/tree\/(\d+)/) || [])[1] || '';
+  // The tree's home person — Hector, whom the In Memory page honours — gets the memorial photo.
+  const HOME_PERSON = 'I' + ((ANCESTRY_URL.match(/cfpid=(\d+)/) || [])[1] || '');
+  let treeLib = null;
+  function loadTreeLib() {
+    if (window.AgrazTree) return Promise.resolve();
+    if (!treeLib) {
+      treeLib = new Promise((resolve, reject) => {
+        const sc = document.createElement('script');
+        sc.src = '/assets/js/tree.js';
+        sc.onload = resolve;
+        sc.onerror = () => { treeLib = null; reject(new Error('tree')); };
+        document.head.appendChild(sc);
+      });
+    }
+    return treeLib;
+  }
+  const T = () => window.AgrazTree;
+  const capFirst = x => x.charAt(0).toUpperCase() + x.slice(1);
+  const vtName = pid => 'tp-' + String(pid).replace(/[^A-Za-z0-9_-]/g, '');
+
+  async function loadTree() {
+    await loadTreeLib();
+    const metaSnap = await col('tree').doc('meta').get();
+    if (!metaSnap.exists) { S.tree = { status: 'empty', photos: {} }; return; }
+    const meta = metaSnap.data();
+    const snaps = await Promise.all(Array.from({ length: Math.max(1, Math.min(20, meta.parts || 1)) }, (_, i) => col('tree').doc('part' + i).get()));
+    const model = Object.assign({}, meta, { people: [], families: [] });
+    snaps.forEach(s => { if (s.exists) { const d = s.data(); model.people.push(...(d.people || [])); model.families.push(...(d.families || [])); } });
+    setTreeModel(meta, model);
+    try { const r = await col('tree').doc('research').get(); if (r.exists) S.tree.research = r.data().people || {}; } catch (e) {}
+  }
+  function setTreeModel(meta, model) {
+    const prev = S.tree || {};
+    S.tree = { status: 'ready', meta, model, ix: T().index(model), photos: prev.photos || {}, research: prev.research || {}, view: prev.view || 'family', history: [], relCache: new Map(), memorialThumb: prev.memorialThumb || '' };
+    S.tree.focus = treeStart();
+    loadTreePhotos();
+  }
+  const treeMe = () => (S.tree && S.tree.ix && S.me && S.me.treeId && S.tree.ix.get(S.me.treeId) ? S.me.treeId : null);
+  function treeStart() {
+    const ix = S.tree.ix;
+    if (treeMe()) return treeMe();
+    if (ix.get(HOME_PERSON)) return HOME_PERSON;
+    let best = null, n = -1;
+    S.tree.model.people.forEach(p => { const k = ix.parents(p.id).length + ix.children(p.id).length + ix.spouses(p.id).length; if (k > n) { n = k; best = p.id; } });
+    return best;
+  }
+  async function loadTreePhotos() {
+    try {
+      const snap = await col('treePhotos').get();
+      snap.docs.forEach(d => { const v = d.data(); if (okImg(v.img)) S.tree.photos[d.id] = { img: v.img, uid: v.uid }; });
+    } catch (e) { /* photos are a bonus */ }
+    // The memorial's first photo stands in for the home person, if they have no photo yet.
+    if (!S.tree.memorialThumb && S.tree.ix && S.tree.ix.get(HOME_PERSON)) {
+      try {
+        const snap = await col('memorial').orderBy('order').limit(1).get();
+        const src = snap.docs.length && snap.docs[0].data().imageData;
+        if (okImg(src)) S.tree.memorialThumb = await thumbOf(src, 320);
+      } catch (e) {}
+    }
+    if (S.view === 'tree' && S.tree.status === 'ready') {
+      paintTree(false);
+      const n = S.tree.model.people.reduce((k, p) => k + (photoFor(p.id) ? 1 : 0), 0), el = $('#ts-photos');
+      if (el) { el.dataset.count = n; el.textContent = n.toLocaleString(); }
+    }
+  }
+  function thumbOf(src, size) {
+    return new Promise(resolve => {
+      const img = new Image();
+      img.onload = () => {
+        const s = Math.min(img.naturalWidth, img.naturalHeight), c = document.createElement('canvas');
+        c.width = c.height = Math.min(size, s);
+        c.getContext('2d').drawImage(img, (img.naturalWidth - s) / 2, (img.naturalHeight - s) / 3, s, s, 0, 0, c.width, c.height);
+        resolve(c.toDataURL('image/jpeg', 0.82));
+      };
+      img.onerror = () => resolve('');
+      img.src = src;
+    });
+  }
+  // Photos, best first: one added to the tree → the member's own profile photo → the memorial.
+  function photoFor(pid) {
+    const t = S.tree;
+    if (t.photos[pid]) return t.photos[pid].img;
+    const m = S.members.find(x => x.treeId === pid && okImg(x.avatar));
+    if (m) return m.avatar;
+    if (pid === HOME_PERSON && t.memorialThumb) return t.memorialThumb;
+    return '';
+  }
+  function relOf(pid) {
+    const me = treeMe();
+    if (!me) return '';
+    if (pid === me) return 'you';
+    return T().relationship(S.tree.ix, me, pid, S.tree.relCache) || '';
+  }
+  const relLong = r => (!r ? '' : r === 'you' ? 'This is you' : /^your /.test(r) || / of your /.test(r) ? capFirst(r) : `Your ${r}`);
+  const relShort = r => (!r ? '' : r === 'you' ? 'You' : capFirst(r.replace(/^your /, '')));
+
+  async function openTree() {
+    const body = $('#tree-body');
+    if (!S.tree || !S.tree.status || S.tree.status === 'error' || S.tree.status === 'denied') {
+      body.innerHTML = '<div class="tree-skel"><div class="skel"></div><div class="skel"></div></div>';
+      $('#tree-head').hidden = true;
+      try { await loadTree(); }
+      catch (e) { S.tree = { status: denied(e) ? 'denied' : 'error', photos: {} }; }
+    }
+    if (S.view === 'tree') renderTree();
+  }
+  function renderTree() {
+    const t = S.tree || {}, body = $('#tree-body');
+    $('#tree-head').hidden = t.status !== 'ready';
+    $('#tree-photos-btn').hidden = !isAdmin();
+    if (t.status === 'denied') { body.innerHTML = rulesNeededHTML('The family tree'); return; }
+    if (t.status === 'error') { body.innerHTML = errorHTML('the family tree'); return; }
+    if (t.status === 'empty') { body.innerHTML = treeImportHTML(); return; }
+    body.innerHTML = `${t.updating ? treeImportHTML(true) : ''}${treeStatsHTML()}${treeMeBannerHTML()}
+      <div class="tree-layout">
+        <div class="tree-stage">
+          <div class="tree-toolbar">
+            <div class="seg seg-sm tree-seg" role="tablist" aria-label="Tree view">
+              <button type="button" role="tab" data-action="tree-view" data-v="family" aria-selected="${t.view === 'family'}">${icon('pedigree')}<span>Family</span></button>
+              <button type="button" role="tab" data-action="tree-view" data-v="fan" aria-selected="${t.view === 'fan'}">${icon('sunrise')}<span>Ancestors</span></button>
+            </div>
+            <span class="tree-tools">
+              <button class="icon-btn" type="button" data-action="tree-back" id="tree-back" aria-label="Back to the previous person" hidden>${icon('arrow-l')}</button>
+              <button class="btn btn-sm btn-ghost-light" type="button" data-action="tree-home" aria-label="${treeMe() ? 'Back to me' : 'Back to the start'}">${icon('home')}<span class="tt-label">${treeMe() ? 'Back to me' : 'Start'}</span></button>
+            </span>
+          </div>
+          <div class="tree-canvas" id="tree-canvas"></div>
+        </div>
+        <aside class="tree-panel card" id="tree-panel" aria-live="polite"></aside>
+      </div>`;
+    paintTree(false);
+    countUp();
+  }
+  // Redraw the chart and the profile (with a smooth glide between people where supported).
+  function paintTree(animate) {
+    const t = S.tree;
+    if (!t || t.status !== 'ready' || !$('#tree-canvas')) return;
+    const draw = () => {
+      if (t.view === 'fan') renderFan(); else renderFamily();
+      renderPanel();
+      const back = $('#tree-back');
+      if (back) back.hidden = !t.history.length;
+    };
+    if (animate && VT && !document.hidden) document.startViewTransition(draw); else draw();
+  }
+  function treeFocus(pid) {
+    const t = S.tree;
+    if (!t || !t.ix.get(pid)) return;
+    if (pid !== t.focus) { t.history.push(t.focus); if (t.history.length > 50) t.history.shift(); t.focus = pid; }
+    $('#tree-results').hidden = true;
+    $('#tree-search').setAttribute('aria-expanded', 'false');
+    paintTree(true);
+    if (window.matchMedia('(max-width: 1100px)').matches && t.view === 'family') {
+      const panel = $('#tree-panel');
+      if (panel && document.activeElement && document.activeElement.closest('.tree-panel')) panel.scrollIntoView({ block: 'start', behavior: REDUCED ? 'auto' : 'smooth' });
+    }
+  }
+
+  function treeStatsHTML() {
+    const t = S.tree, m = t.model;
+    const photos = m.people.reduce((n, p) => n + (photoFor(p.id) ? 1 : 0), 0);
+    const stat = (n, label, id) => `<div class="ts"><b data-count="${n}"${id ? ` id="${id}"` : ''}>${Number(n).toLocaleString()}</b><span>${label}</span></div>`;
+    return `<div class="tree-stats">
+      ${stat(m.people.length, 'relatives')}${stat(m.generations || 0, 'generations')}
+      ${m.earliest ? `<div class="ts"><b>${m.earliest}</b><span>earliest birth</span></div>` : ''}
+      ${stat(photos, 'with photos', 'ts-photos')}
+      <p class="ts-source">${icon('tree')}${esc(m.name || 'Family tree')} · from ${esc(t.meta.source || 'Ancestry')}${t.meta.importedAt ? ` · updated ${esc(fmtDate(t.meta.importedAt))}` : ''}${isAdmin() ? ' · <button class="link-btn" type="button" data-action="tree-update">Update</button> · <label class="link-btn" for="research-file">Add research</label><input type="file" id="research-file" accept=".json,application/json" class="sr-only">' : ''}</p>
+    </div>`;
+  }
+  function countUp() {
+    if (REDUCED) return;
+    $$('.tree-stats b[data-count]').forEach(el => {
+      const end = Number(el.dataset.count), t0 = performance.now();
+      if (!end) return;
+      (function step(now) {
+        const k = Math.min(1, (now - t0) / 1100), v = Math.round(end * (1 - Math.pow(1 - k, 3)));
+        el.textContent = v.toLocaleString();
+        if (k < 1 && el.isConnected) requestAnimationFrame(step);
+      })(t0);
+    });
+  }
+  function treeMeBannerHTML() {
+    if (treeMe()) return '';
+    let off = false;
+    try { off = localStorage.getItem('agraz-tree-me-off') === '1'; } catch (e) {}
+    if (off) return '';
+    const fullName = T().fold(myName()), first = fullName.split(' ')[0], last = fullName.split(' ').slice(-1)[0];
+    const cands = S.tree.model.people.filter(p => {
+      const n = T().fold(p.n);
+      return n === fullName || (n.split(' ')[0] === first && n.split(' ').slice(-1)[0] === last);
+    }).slice(0, 3);
+    if (!cands.length) {
+      return `<div class="tree-me">${icon('user')}<p><strong>Find yourself in the tree.</strong> Search your name, open your card and tap “This is me” — then the tree shows how everyone is related to you.</p><button class="link-btn" type="button" data-action="tree-me-off">Not now</button></div>`;
+    }
+    return `<div class="tree-me">${icon('sparkle')}<p><strong>Is this you?</strong> Link yourself and every card shows how you’re related — “your 2nd great-grandmother”, “your first cousin once removed”…</p>
+      <span class="tree-me-btns">${cands.map(p => `<button class="btn btn-sm btn-accent" type="button" data-action="tree-me" data-pid="${esc(p.id)}">${esc(p.n)}${T().lifespan(p) ? ` · ${esc(T().lifespan(p))}` : ''}</button>`).join('')}
+      <button class="link-btn" type="button" data-action="tree-me-off">Not me</button></span></div>`;
+  }
+
+  // ---- the family chart: grandparents, parents, the person and their partners, children ----
+  function personCard(pid, size, slot, used) {
+    const t = S.tree, p = pid && t.ix.get(pid);
+    if (!p) return `<div class="tcard ${size} unknown" data-slot="${slot}" aria-hidden="true"><span class="tc-photo">${icon('user')}</span><span class="tc-name">Not in the tree</span></div>`;
+    const photo = photoFor(pid), rel = relShort(relOf(pid));
+    const vt = used && !used.has(pid) ? (used.add(pid), vtName(pid)) : '';
+    return `<button type="button" class="tcard ${size}${pid === t.focus ? ' is-focus' : ''} sx-${(p.x || 'u').toLowerCase()}${p.L ? ' is-living' : ''}" data-action="tree-focus" data-pid="${esc(pid)}" data-slot="${slot}"${vt ? ` data-vt="${vt}"` : ''} aria-label="${esc(p.n)}${T().lifespan(p) ? `, ${esc(T().lifespan(p))}` : ''}${rel ? `, ${esc(rel)}` : ''}">
+      <span class="tc-photo">${photo ? `<img src="${photo}" alt="">` : `<span class="tc-mono">${esc(initials(p.n))}</span>`}</span>
+      ${t.research && t.research[pid] ? `<span class="tc-badge" title="Records found">${icon('book')}</span>` : ''}
+      <span class="tc-name">${esc(p.n)}</span>
+      <span class="tc-years">${esc(T().lifespan(p)) || '&nbsp;'}</span>
+      ${rel ? `<span class="tc-rel">${esc(rel)}</span>` : ''}
+    </button>`;
+  }
+  function parentPair(pid) {
+    if (!pid) return [null, null];
+    const ix = S.tree.ix, ps = ix.parents(pid);
+    let fa = ps.find(x => ix.get(x).x === 'M') || null, mo = ps.find(x => ix.get(x).x === 'F') || null;
+    ps.forEach(x => { if (x !== fa && x !== mo) { if (!fa) fa = x; else if (!mo) mo = x; } });
+    return [fa, mo];
+  }
+  function renderFamily() {
+    const t = S.tree, ix = t.ix, f = t.focus, used = new Set();
+    const P = parentPair(f), G = [...parentPair(P[0]), ...parentPair(P[1])];
+    const unions = ix.unions(f);
+    const groups = unions.map((u, k) => ({ k, spouse: u.spouse && ix.get(u.spouse) ? u.spouse : null, kids: u.fam.c.filter(c => ix.get(c)) })).filter(g => g.spouse || g.kids.length);
+    const gp = (id, i) => (P[i < 2 ? 0 : 1] ? personCard(id, 'sm', 'g' + i, used) : `<div class="tcard sm void" data-slot="g${i}"></div>`);
+    $('#tree-canvas').innerHTML = `<div class="fam-chart" id="fam-chart">
+      <svg class="fam-lines" id="fam-lines" aria-hidden="true"></svg>
+      <div class="fam-row fam-g2">${G.map(gp).join('')}</div>
+      <div class="fam-row fam-g1">${P.map((id, i) => personCard(id, 'md', 'p' + i, used)).join('')}</div>
+      <div class="fam-row fam-g0">${personCard(f, 'lg', 'focus', used)}${groups.filter(g => g.spouse).map(g => personCard(g.spouse, 'md', 's' + g.k, used)).join('')}</div>
+      ${groups.some(g => g.kids.length) ? `<div class="fam-row fam-kids">${groups.filter(g => g.kids.length).map(g => `
+        <div class="kid-group" data-union="${g.k}">${groups.filter(x => x.kids.length).length > 1 ? `<span class="kid-label">with ${g.spouse ? esc(firstName(ix.get(g.spouse).n)) : 'an unknown partner'}</span>` : ''}
+          <div class="kid-cards">${g.kids.map((c, j) => personCard(c, 'sm', `k${g.k}-${j}`, used)).join('')}</div>
+        </div>`).join('')}</div>` : `<p class="fam-none">No children recorded</p>`}
+    </div>`;
+    $$('#tree-canvas [data-vt]').forEach(el => { el.style.viewTransitionName = el.dataset.vt; });
+    drawFamilyLines();
+    if (!treeRO && window.ResizeObserver) { treeRO = new ResizeObserver(() => { if (S.view === 'tree' && S.tree && S.tree.view === 'family') drawFamilyLines(); }); }
+    if (treeRO) { treeRO.disconnect(); treeRO.observe($('#fam-chart')); }
+  }
+  let treeRO = null;
+  // Flowing connectors: each pair of parents meets at a point, which branches to their children.
+  function drawFamilyLines() {
+    const chart = $('#fam-chart'), svg = $('#fam-lines');
+    if (!chart || !svg) return;
+    const box = chart.getBoundingClientRect();
+    if (!box.width) return;
+    svg.setAttribute('viewBox', `0 0 ${box.width.toFixed(0)} ${box.height.toFixed(0)}`);
+    svg.setAttribute('width', box.width.toFixed(0));
+    svg.setAttribute('height', box.height.toFixed(0));
+    const el = slot => chart.querySelector(`[data-slot="${slot}"]:not(.void):not(.unknown)`);
+    const bottom = e => { const r = e.getBoundingClientRect(); return [r.left - box.left + r.width / 2, r.bottom - box.top + 2]; };
+    const top = e => { const r = e.getBoundingClientRect(); return [r.left - box.left + r.width / 2, r.top - box.top - 2]; };
+    const paths = [];
+    const link = (parents, kids, kind) => {
+      const ps = parents.map(el).filter(Boolean), ks = kids.map(el).filter(Boolean);
+      if (!ps.length || !ks.length) return;
+      const pb = ps.map(bottom), kt = ks.map(top);
+      const jx = pb.reduce((s, p) => s + p[0], 0) / pb.length;
+      const low = Math.max(...pb.map(p => p[1])), high = Math.min(...kt.map(k => k[1]));
+      const jy = low + Math.max(8, (high - low) * 0.42);
+      pb.forEach(p => { p[1] = low; });
+      pb.forEach(([x, y]) => paths.push([`M${x.toFixed(1)} ${y.toFixed(1)} C${x.toFixed(1)} ${jy.toFixed(1)} ${x.toFixed(1)} ${jy.toFixed(1)} ${jx.toFixed(1)} ${jy.toFixed(1)}`, kind]));
+      kt.forEach(([x, y]) => { const my = (jy + y) / 2; paths.push([`M${jx.toFixed(1)} ${jy.toFixed(1)} C${jx.toFixed(1)} ${my.toFixed(1)} ${x.toFixed(1)} ${my.toFixed(1)} ${x.toFixed(1)} ${y.toFixed(1)}`, kind]); });
+      paths.push([`M${jx.toFixed(1)} ${jy.toFixed(1)} m-3 0 a3 3 0 1 0 6 0 a3 3 0 1 0 -6 0`, kind + ' knot']);
+    };
+    link(['g0', 'g1'], ['p0'], 'up');
+    link(['g2', 'g3'], ['p1'], 'up');
+    link(['p0', 'p1'], ['focus'], 'up');
+    $$('.kid-group', chart).forEach(g => {
+      const k = g.dataset.union;
+      link(['focus', 's' + k], $$('[data-slot]', g).map(x => x.dataset.slot), 'down');
+    });
+    svg.innerHTML = `<defs><linearGradient id="famGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f2c478" stop-opacity=".85"/><stop offset="1" stop-color="#e58c63" stop-opacity=".55"/></linearGradient></defs>` +
+      paths.map(([d, kind], i) => `<path class="fl ${kind} d${Math.min(i, 9)}" d="${d}" pathLength="1"/>`).join('');
+  }
+
+  // ---- the ancestor fan: up to six generations around the chosen person ----
+  function renderFan() {
+    const t = S.tree, ix = t.ix, GENS = 6, cx = 380, cy = 380;
+    const R = [72, 134, 188, 238, 282, 320, 352];
+    const RAD = Math.PI / 180, F = n => n.toFixed(1);
+    const at = (r, a) => [cx + r * Math.sin(a * RAD), cy - r * Math.cos(a * RAD)];
+    const A = { 1: t.focus };
+    for (let k = 1; k < 2 ** GENS; k++) { if (!A[k]) continue; const [fa, mo] = parentPair(A[k]); if (fa) A[2 * k] = fa; if (mo) A[2 * k + 1] = mo; }
+    const HUES = { 4: 18, 5: 38, 6: 168, 7: 210 }, G1 = { 2: 22, 3: 180 };
+    let segs = '', defs = '', labels = '';
+    for (let g = 1; g <= GENS; g++) {
+      const n = 2 ** g, span = 240 / n, r1 = R[g - 1], r2 = R[g];
+      for (let j = 0; j < n; j++) {
+        const k = n + j, pid = A[k], a1 = -120 + j * span, a2 = a1 + span;
+        const [x1, y1] = at(r2, a1), [x2, y2] = at(r2, a2), [x3, y3] = at(r1, a2), [x4, y4] = at(r1, a1);
+        const d = `M${F(x1)} ${F(y1)}A${r2} ${r2} 0 0 1 ${F(x2)} ${F(y2)}L${F(x3)} ${F(y3)}A${r1} ${r1} 0 0 0 ${F(x4)} ${F(y4)}Z`;
+        if (!pid) { segs += `<path class="fan-seg vacant fan-g${g}" d="${d}"/>`; continue; }
+        const p = ix.get(pid);
+        const hue = g === 1 ? G1[k] : HUES[k >> (g - 2)];
+        const tip = `${p.n}${T().lifespan(p) ? ` (${T().lifespan(p)})` : ''}`;
+        segs += `<path class="fan-seg fan-g${g} hue-${hue}" data-action="tree-focus" data-pid="${esc(pid)}" d="${d}"><title>${esc(tip)}</title></path>`;
+        const mid = (a1 + a2) / 2, rm = (r1 + r2) / 2;
+        if (g <= 4) {
+          // names follow the arc; on the lower half the arc is drawn the other way so text stays upright
+          const flip = Math.abs(mid) > 90;
+          const id = `fa${k}`, rr = rm + (g <= 2 ? 6 : 3);
+          const [sx, sy] = at(rr, flip ? a2 : a1), [ex, ey] = at(rr, flip ? a1 : a2);
+          defs += `<path id="${id}" d="M${F(sx)} ${F(sy)}A${F(rr)} ${F(rr)} 0 0 ${flip ? 0 : 1} ${F(ex)} ${F(ey)}"/>`;
+          const arcLen = (span * RAD) * rr, fs = g === 1 ? 15 : g === 2 ? 13 : g === 3 ? 11.5 : 10;
+          const max = Math.max(3, Math.floor(arcLen / (fs * 0.56)) - 1);
+          const name = g >= 3 ? (g === 4 ? firstName(p.n) : `${firstName(p.n)} ${p.s || ''}`.trim()) : p.n;
+          labels += `<text class="fan-name g${g}"><textPath href="#${id}" startOffset="50%">${esc(name.length > max ? name.slice(0, max - 1) + '…' : name)}</textPath></text>`;
+          if (g <= 3) {
+            const id2 = `fy${k}`, ry = rm - (g <= 2 ? 12 : 10);
+            const [sx2, sy2] = at(ry, flip ? a2 : a1), [ex2, ey2] = at(ry, flip ? a1 : a2);
+            defs += `<path id="${id2}" d="M${F(sx2)} ${F(sy2)}A${F(ry)} ${F(ry)} 0 0 ${flip ? 0 : 1} ${F(ex2)} ${F(ey2)}"/>`;
+            labels += `<text class="fan-years g${g}"><textPath href="#${id2}" startOffset="50%">${esc(T().lifespan(p))}</textPath></text>`;
+          }
+        } else if (g === 5) {
+          const [tx, ty] = at(rm, mid), rot = mid > 0 ? mid - 90 : mid + 90;
+          const nm = firstName(p.n);
+          labels += `<text class="fan-name g5" transform="translate(${F(tx)} ${F(ty)}) rotate(${F(rot)})">${esc(nm.length > 8 ? nm.slice(0, 7) + '…' : nm)}</text>`;
+        }
+      }
+    }
+    const fp = ix.get(t.focus), photo = photoFor(t.focus);
+    const count = Object.keys(A).length - 1;
+    $('#tree-canvas').innerHTML = `<div class="fan-wrap">
+      <svg class="fan" viewBox="0 0 760 572" role="img" aria-label="Ancestors of ${esc(fp.n)}: ${count} found in six generations">
+        <defs>${defs}<clipPath id="fanClip"><circle cx="${cx}" cy="${cy}" r="${R[0] - 6}"/></clipPath>
+          <radialGradient id="fanGlow"><stop offset="0" stop-color="#f2c478" stop-opacity=".35"/><stop offset="1" stop-color="#f2c478" stop-opacity="0"/></radialGradient></defs>
+        <circle cx="${cx}" cy="${cy}" r="${R[0] + 30}" fill="url(#fanGlow)"/>
+        ${segs}${labels}
+        <circle class="fan-core" cx="${cx}" cy="${cy}" r="${R[0] - 2}"/>
+        ${photo ? `<image href="${photo}" x="${cx - R[0] + 6}" y="${cy - R[0] + 6}" width="${(R[0] - 6) * 2}" height="${(R[0] - 6) * 2}" clip-path="url(#fanClip)" preserveAspectRatio="xMidYMid slice"/>`
+        : `<text class="fan-mono" x="${cx}" y="${cy + 12}">${esc(initials(fp.n))}</text>`}
+        <text class="fan-focus" x="${cx}" y="${cy + R[0] + 34}">${esc(fp.n)}</text>
+        <text class="fan-focus-years" x="${cx}" y="${cy + R[0] + 56}">${esc(T().lifespan(fp))}</text>
+      </svg>
+      <p class="fan-legend"><span class="lg p"></span>Father’s side <span class="lg m"></span>Mother’s side · tap anyone to step back in time</p>
+    </div>`;
+  }
+
+  // ---- the profile ----
+  function renderPanel() {
+    const t = S.tree, ix = t.ix, pid = t.focus, p = ix.get(pid);
+    if (!p) { $('#tree-panel').innerHTML = ''; return; }
+    const photo = photoFor(pid), rel = relLong(relOf(pid)), me = treeMe();
+    const ev = e => (e ? [e.d, e.p].filter(Boolean).join(' · ') : '');
+    const fact = (ico, label, value) => (value ? `<div class="tp-fact">${icon(ico)}<div><dt>${label}</dt><dd>${esc(value)}</dd></div></div>` : '');
+    const chip = id => {
+      const q = ix.get(id), ph = photoFor(id), r = relShort(relOf(id));
+      return `<button class="tchip" type="button" data-action="tree-focus" data-pid="${esc(id)}">${ph ? `<img src="${ph}" alt="">` : `<span class="tc-mono">${esc(initials(q.n))}</span>`}<span><b>${esc(q.n)}</b><small>${esc([T().lifespan(q), r].filter(Boolean).join(' · '))}</small></span></button>`;
+    };
+    const group = (title, ids, extra) => (ids.length ? `<section class="tp-group"><h3>${title}<span>${ids.length}</span></h3><div class="tp-chips">${ids.map((id, i) => chip(id) + (extra ? extra(id, i) : '')).join('')}</div></section>` : '');
+    const unions = ix.unions(pid).filter(u => u.spouse && ix.get(u.spouse));
+    const marriage = (id, i) => { const u = unions[i], m = u && u.fam.m; return m || (u && u.fam.dv) ? `<p class="tp-marr">${m ? `Married ${esc(ev(m))}` : ''}${u.fam.dv ? `${m ? ' · ' : ''}Divorced` : ''}</p>` : ''; };
+    const age = !p.L && p.b && p.b.y && p.d && p.d.y ? p.d.y - p.b.y : null;
+    const own = t.photos[pid];
+    const canPhoto = !!S.user;
+    const num = /^I\d+$/.test(pid) ? pid.slice(1) : '';
+    const treeNo = t.meta.treeId || ANCESTRY_TREE;
+    $('#tree-panel').innerHTML = `
+      <div class="tp-hero${photo ? ' has-photo' : ''}">
+        ${photo ? `<img class="tp-img" src="${photo}" alt="${esc(p.n)}">` : `<span class="tp-mono">${esc(initials(p.n))}</span>`}
+        ${canPhoto ? `<button class="tp-photo-btn" type="button" data-action="tree-photo" data-pid="${esc(pid)}">${icon('image')}${own ? 'Change photo' : photo ? 'Use a different photo' : 'Add a photo'}</button>` : ''}
+      </div>
+      <div class="tp-body">
+        <h2 class="tp-name">${esc(p.n)}</h2>
+        <p class="tp-years">${esc(T().lifespan(p) || (p.L ? 'Living' : ''))}${age != null ? ` · ${age} years` : ''}</p>
+        ${rel ? `<p class="tp-rel">${icon(rel === 'This is you' ? 'user' : 'heart')}${esc(rel)}</p>` : ''}
+        <dl class="tp-facts">${fact('cake', p.L ? 'Born' : 'Born', p.L ? (p.b ? p.b.d : '') : ev(p.b))}${fact('candle', 'Died', ev(p.d))}${fact('pin', 'Resting place', p.bu)}${p.r ? fact('home', 'Lived in', p.r.map(r => r.p + (r.y ? ` (${r.y})` : '')).join(' · ')) : ''}</dl>
+        ${group('Parents', ix.parents(pid))}
+        ${group(unions.length > 1 ? 'Partners' : 'Partner', unions.map(u => u.spouse), marriage)}
+        ${group('Children', ix.children(pid))}
+        ${group('Brothers &amp; sisters', ix.siblings(pid))}
+        ${researchHTML(pid)}
+        <div class="tp-actions">
+          ${!me ? `<button class="btn btn-sm btn-ghost" type="button" data-action="tree-me" data-pid="${esc(pid)}">${icon('user')}This is me</button>`
+          : me === pid ? `<button class="link-btn" type="button" data-action="tree-unme">That’s not me</button>` : ''}
+          ${num && treeNo ? `<a class="link-btn" href="https://www.ancestry.com/family-tree/person/tree/${encodeURIComponent(treeNo)}/person/${num}/facts" target="_blank" rel="noopener noreferrer">${icon('external')}Open on Ancestry</a>` : ''}
+          ${own && (own.uid === S.user.uid || isAdmin()) ? `<button class="link-btn danger-link" type="button" data-action="tree-photo-remove" data-pid="${esc(pid)}">Remove photo</button>` : ''}
+        </div>
+        ${p.L ? `<p class="tp-note">${icon('shield')}Living relative — only the birth year is kept here.</p>` : ''}
+      </div>`;
+  }
+
+  // ---- "From the archives": research gathered from public records ----
+  const KIND = { grave: ['candle', 'Grave'], obituary: ['note', 'Obituary'], newspaper: ['note', 'Newspaper'], census: ['users', 'Census'], baptism: ['sparkle', 'Baptism'],
+    marriage: ['heart', 'Marriage'], military: ['shield', 'Military'], immigration: ['globe', 'Immigration'], naturalization: ['globe', 'Naturalization'], church: ['book', 'Church record'],
+    book: ['book', 'Book'], photo: ['image', 'Photo'], portrait: ['image', 'Portrait'], other: ['external', 'Record'] };
+  const FACT = { birth: 'Born', death: 'Died', burial: 'Buried', marriage: 'Married', residence: 'Lived', occupation: 'Work', immigration: 'Arrived', military: 'Served', biography: 'Story', other: 'Note' };
+  const CONF = { h: ['h', 'Confirmed'], m: ['m', 'Likely'], l: ['l', 'Possible'] };
+  const safeUrl = u => (/^https:\/\/[^\s"'<>]+$/.test(String(u || '')) ? String(u) : '');
+  const extLink = (u, text) => (safeUrl(u) ? `<a href="${esc(safeUrl(u))}" target="_blank" rel="noopener noreferrer">${esc(text || 'Source')}</a>` : esc(text || ''));
+  function researchHTML(pid) {
+    const r = S.tree.research && S.tree.research[pid];
+    if (!r) return '';
+    const conf = c => { const k = CONF[c] || CONF.l; return `<span class="conf ${k[0]}">${k[1]}</span>`; };
+    const docs = (r.doc || []).map(d => { const k = KIND[d.k] || KIND.other; return `<li class="rdoc">${icon(k[0])}<div>${extLink(d.u, d.t || k[1])}<small>${esc(k[1])}${d.l ? ` · ${esc(d.l)}` : ''}${d.n ? ` · ${esc(d.n)}` : ''}</small></div></li>`; }).join('');
+    const facts = (r.f || []).map(f => `<li class="rfact"><span class="rlabel">${esc(FACT[f.t] || 'Note')}</span><div><p>${esc(f.v)} ${conf(f.c)}${f.d ? ' <span class="conf x">Differs from the tree</span>' : ''}</p><small>${extLink(f.u, f.s)}</small></div></li>`).join('');
+    const rels = (r.rel || []).map(x => `<li class="rrel"><span class="rlabel">Possible ${esc(x.r)}</span><div><p><b>${esc(x.n)}</b>${x.b || x.d ? ` · ${esc([x.b, x.d].filter(Boolean).join('–'))}` : ''} ${conf(x.c)}</p><small>${x.w ? `${esc(x.w)} · ` : ''}${extLink(x.u, x.s)}</small></div></li>`).join('');
+    const count = (r.doc || []).length + (r.f || []).length + (r.rel || []).length;
+    return `<section class="tp-group tp-research"><h3>${icon('book')}From the archives<span>${count}</span></h3>
+      ${docs ? `<ul class="rlist">${docs}</ul>` : ''}
+      ${facts ? `<ul class="rlist">${facts}</ul>` : ''}
+      ${rels ? `<ul class="rlist">${rels}</ul><p class="tp-note">${icon('sparkle')}Not in the tree yet — if it checks out, add it on Ancestry and update the tree here.</p>` : ''}
+      ${r.sv && r.sv.length ? `<p class="rsv"><b>Named in the obituary:</b> ${esc(r.sv.join(' · '))}</p>` : ''}
+      ${r.note ? `<p class="rsv">${esc(r.note)}</p>` : ''}
+    </section>`;
+  }
+  // A research file (from a research pass over public records): { kind: 'agraz-research', people: { id: { f, doc, rel, sv, note } } }
+  async function importResearch(file) {
+    try {
+      const data = JSON.parse(await file.text());
+      if (!data || data.kind !== 'agraz-research' || typeof data.people !== 'object') throw new Error('shape');
+      const cut = (v, n) => String(v == null ? '' : v).slice(0, n);
+      const people = {};
+      Object.entries(data.people).forEach(([pid, r]) => {
+        if (!S.tree.ix.get(pid) || S.tree.ix.get(pid).L || !r) return; // only people in the tree who have passed
+        const out = {};
+        const f = (r.f || []).filter(x => x && x.v).slice(0, 30).map(x => ({ t: cut(x.t, 20), v: cut(x.v, 400), s: cut(x.s, 160), u: safeUrl(x.u), c: ['h', 'm', 'l'].includes(x.c) ? x.c : 'l', d: x.d ? 1 : 0 }));
+        const doc = (r.doc || []).filter(x => x && safeUrl(x.u)).slice(0, 30).map(x => ({ k: cut(x.k, 20), t: cut(x.t, 200), u: safeUrl(x.u), l: cut(x.l, 80), n: cut(x.n, 200) }));
+        const rel = (r.rel || []).filter(x => x && x.n).slice(0, 12).map(x => ({ r: cut(x.r, 20), n: cut(x.n, 120), b: cut(x.b, 40), d: cut(x.d, 40), s: cut(x.s, 160), u: safeUrl(x.u), c: ['h', 'm', 'l'].includes(x.c) ? x.c : 'l', w: cut(x.w, 300) }));
+        const sv = (r.sv || []).slice(0, 30).map(x => cut(x, 120)).filter(Boolean);
+        if (f.length) out.f = f; if (doc.length) out.doc = doc; if (rel.length) out.rel = rel; if (sv.length) out.sv = sv;
+        if (r.note) out.note = cut(r.note, 600);
+        if (Object.keys(out).length) people[pid] = out;
+      });
+      const count = Object.keys(people).length;
+      if (!count) { toast('Nothing in that file matches people in this tree.', true); return; }
+      await col('tree').doc('research').set({ people, count, createdAt: nowIso(), by: myName().slice(0, 80) });
+      S.tree.research = people;
+      renderTree();
+      toast(`Research added for ${count} ${count === 1 ? 'person' : 'people'} — look for “From the archives”`);
+    } catch (e) {
+      toast(denied(e) ? NEED_RULES : 'That file isn’t a research file for this tree.', true);
+    }
+  }
+
+  // ---- search ----
+  function treeSearch() {
+    const q = $('#tree-search').value, list = $('#tree-results');
+    const found = S.tree && S.tree.ix ? T().search(S.tree.ix, q, 10) : [];
+    list.hidden = !found.length && !q.trim();
+    $('#tree-search').setAttribute('aria-expanded', String(!list.hidden));
+    list.innerHTML = found.length ? found.map((p, i) => {
+      const ph = photoFor(p.id), r = relShort(relOf(p.id));
+      return `<li role="option" id="tr-${i}"><button type="button" data-action="tree-focus" data-pid="${esc(p.id)}">${ph ? `<img src="${ph}" alt="">` : `<span class="tc-mono">${esc(initials(p.n))}</span>`}<span><b>${esc(p.n)}</b><small>${esc([T().lifespan(p), r].filter(Boolean).join(' · '))}</small></span></button></li>`;
+    }).join('') : q.trim() ? '<li class="tr-none">Nobody by that name in the tree</li>' : '';
+  }
+  $('#tree-search').addEventListener('input', treeSearch);
+  $('#tree-search').addEventListener('keydown', e => {
+    if (e.key === 'Escape') { $('#tree-results').hidden = true; e.target.value = ''; }
+    if (e.key === 'Enter') { const b = $('#tree-results button'); if (b) { e.preventDefault(); treeFocus(b.dataset.pid); e.target.value = ''; } }
+    if (e.key === 'ArrowDown') { const b = $('#tree-results button'); if (b) { e.preventDefault(); b.focus(); } }
+  });
+  $('#tree-results').addEventListener('keydown', e => {
+    const bs = $$('#tree-results button'), i = bs.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown' && i < bs.length - 1) { e.preventDefault(); bs[i + 1].focus(); }
+    if (e.key === 'ArrowUp') { e.preventDefault(); if (i > 0) bs[i - 1].focus(); else $('#tree-search').focus(); }
+  });
+  document.addEventListener('click', e => { if (!e.target.closest('.tree-find')) { const l = $('#tree-results'); if (l && !l.hidden) l.hidden = true; } });
+
+  // ---- "this is me" ----
+  async function linkMe(pid) {
+    try {
+      await col('users').doc(S.user.uid).update({ treeId: pid });
+      S.me.treeId = pid;
+      if (S.byUid[S.user.uid]) S.byUid[S.user.uid].treeId = pid;
+      S.tree.relCache = new Map();
+      if (pid) { S.tree.focus = pid; toast('Linked — every card now shows how you’re related'); } else toast('Unlinked');
+      renderTree();
+    } catch (e) {
+      toast(denied(e) ? NEED_RULES : 'Couldn’t save that. Please try again.', true);
+    }
+  }
+
+  // ---- importing (admins) ----
+  function treeImportHTML(updating) {
+    if (!isAdmin()) return emptyHTML('pedigree', 'The family tree is on its way', 'Once a family admin adds it from Ancestry, everyone will be here — with photos, stories and how you’re all related.');
+    return `<div class="tree-import card">
+      <div class="ti-art" aria-hidden="true">${icon('pedigree')}</div>
+      <div class="ti-text">
+        <h2>${updating ? 'Update the family tree' : 'Bring in the family tree'}</h2>
+        <p class="muted">Choose the file you exported from Ancestry — the <b>.zip</b> it gives you is fine (or the <b>.ged</b> inside). It’s read right here in your browser, then saved privately for the family.</p>
+        <ol class="mini-steps"><li>On Ancestry, open your tree → <b>Tree settings</b> → <b>Export tree</b>, then download the file.</li><li>Choose that file below.</li></ol>
+        <label class="match-drop ti-drop" for="tree-file">${icon('upload')}<strong>Choose the family tree file</strong><span>.zip or .ged from Ancestry</span></label>
+        <input type="file" id="tree-file" accept=".zip,.ged" class="sr-only">
+        <div id="tree-preview"></div>
+        <p class="tp-note">${icon('shield')}Living relatives are saved with their birth year only — no birthdays or places.</p>
+        ${updating ? '<button class="link-btn" type="button" data-action="tree-update-cancel">Cancel</button>' : ''}
+      </div>
+    </div>`;
+  }
+  async function previewImport(file) {
+    const box = $('#tree-preview');
+    if (!file || !box) return;
+    box.innerHTML = `<p class="muted">Reading ${esc(file.name)}…</p>`;
+    try {
+      await loadTreeLib();
+      const model = T().parse(await T().readFile(file));
+      if (!model.people.length) throw new Error('empty');
+      S.treeDraft = model;
+      box.innerHTML = `<div class="ti-preview">
+        <p><strong>${model.people.length.toLocaleString()} people</strong> in “${esc(model.name || file.name)}” — ${model.families.length.toLocaleString()} families, ${model.generations} generations${model.earliest ? `, back to ${model.earliest}` : ''}. ${model.portraits ? `${model.portraits} have photos on Ancestry you can add next.` : ''}</p>
+        <button class="btn btn-accent" type="button" data-action="tree-import-go" id="tree-import-go">${icon('check')}${S.tree && S.tree.status === 'ready' ? 'Replace the tree' : 'Add the tree'}</button>
+      </div>`;
+    } catch (e) {
+      S.treeDraft = null;
+      box.innerHTML = `<p class="form-msg">That doesn’t look like a family tree export. Choose the .zip or .ged file from Ancestry.</p>`;
+    }
+  }
+  async function importTree(btn) {
+    const model = S.treeDraft;
+    if (!model) return;
+    busy(btn, true, 'Saving the tree…');
+    try {
+      const parts = T().chunk(model);
+      const before = S.tree && S.tree.meta ? S.tree.meta.parts || 0 : 0;
+      const meta = { v: 1, name: (model.name || 'Family tree').slice(0, 80), treeId: model.treeId || '', source: (model.source || 'GEDCOM').slice(0, 40),
+        people: model.people.length, families: model.families.length, portraits: model.portraits || 0, earliest: model.earliest || null,
+        generations: model.generations || 0, parts: parts.length, importedAt: nowIso(), importedBy: myName().slice(0, 80) };
+      const b = db.batch();
+      b.set(col('tree').doc('meta'), meta);
+      parts.forEach((p, i) => b.set(col('tree').doc('part' + i), p));
+      for (let i = parts.length; i < before; i++) b.delete(col('tree').doc('part' + i));
+      await b.commit();
+      S.treeDraft = null;
+      setTreeModel(meta, Object.assign({}, meta, { people: model.people, families: model.families }));
+      renderTree();
+      toast(`The family tree is in — ${model.people.length.toLocaleString()} relatives`);
+    } catch (e) {
+      busy(btn, false);
+      toast(denied(e) ? NEED_RULES : 'Couldn’t save the tree. Please try again.', true);
+    }
+  }
+
+  // ---- photos for one person ----
+  async function saveTreePhoto(pid, file) {
+    try {
+      const img = await compressImage(file, 320, 0.84, 85000, true);
+      await col('treePhotos').doc(pid).set({ img, uid: S.user.uid, by: myName().slice(0, 80), createdAt: nowIso() });
+      S.tree.photos[pid] = { img, uid: S.user.uid };
+      paintTree(false);
+      toast('Photo added to the tree');
+    } catch (e) {
+      toast(denied(e) ? 'Only the person who added this photo (or an admin) can change it.' : 'That photo couldn’t be used — try another one.', true);
+    }
+  }
+  async function removeTreePhoto(pid) {
+    if (!(await confirmBox('Remove this photo?', 'It will be removed from the family tree for everyone.', 'Remove'))) return;
+    try {
+      await col('treePhotos').doc(pid).delete();
+      delete S.tree.photos[pid];
+      paintTree(false);
+      toast('Photo removed');
+    } catch (e) { toast('Couldn’t remove it. Please try again.', true); }
+  }
+  $('#tree-photo-input').addEventListener('change', e => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (f && S.tree && S.tree.photoTarget) saveTreePhoto(S.tree.photoTarget, f);
+  });
+
+  // ---- matching a whole folder of photos to people (admins) ----
+  const matcher = { rows: [], fn: null };
+  const HOW = {
+    exact: 'Exact match — the same photo as on Ancestry',
+    title: 'Matched by its Ancestry title',
+    name: 'Matched by the name in the file name',
+    dims: 'Matched by its size',
+    picked: 'You chose this person',
+    dup: 'Another photo matched this person too — choose who this is',
+    none: 'No match yet — who is this?',
+    bad: 'This photo can’t be read here (try a JPEG or PNG)'
+  };
+  function openMatcher() {
+    if (!S.tree || !S.tree.model) return;
+    matcher.rows = [];
+    matcher.fn = T().photoMatcher(S.tree.model);
+    renderMatcher();
+    $('#match-dialog').showModal();
+  }
+  async function addMatchFiles(files) {
+    const rank = { exact: 4, title: 3, name: 2, dims: 1 };
+    for (const f of Array.from(files || [])) {
+      if (!/^image\//.test(f.type) && !/\.(jpe?g|png|gif|webp|bmp)$/i.test(f.name)) continue;
+      const row = { file: f, name: f.name, size: f.size, w: 0, h: 0, thumb: '', pid: null, how: 'none' };
+      try {
+        const img = await decodeImage(f);
+        row.w = img.naturalWidth; row.h = img.naturalHeight;
+        const c = document.createElement('canvas'), s = Math.min(row.w, row.h);
+        c.width = c.height = 96;
+        c.getContext('2d').drawImage(img, (row.w - s) / 2, (row.h - s) / 3, s, s, 0, 0, 96, 96);
+        row.thumb = c.toDataURL('image/jpeg', 0.7);
+      } catch (e) { row.how = 'bad'; matcher.rows.push(row); continue; }
+      const m = matcher.fn({ name: f.name, size: f.size, w: row.w, h: row.h });
+      if (m) {
+        const clash = matcher.rows.find(r => r.pid === m.pid);
+        if (clash && rank[clash.how] >= rank[m.how]) row.how = 'dup';
+        else { if (clash) { clash.pid = null; clash.how = 'dup'; } row.pid = m.pid; row.how = m.how; }
+      }
+      matcher.rows.push(row);
+    }
+    renderMatcher();
+  }
+  function renderMatcher() {
+    const ix = S.tree.ix, rows = matcher.rows;
+    $('#match-list').innerHTML = rows.map((r, i) => {
+      const p = r.pid && ix.get(r.pid);
+      return `<div class="mrow ${p ? 'ok' : r.how === 'bad' ? 'bad' : 'todo'}">
+        ${r.thumb ? `<img class="mthumb" src="${r.thumb}" alt="">` : `<span class="mthumb">${icon('image')}</span>`}
+        <div class="minfo"><b>${esc(r.name)}</b><small>${HOW[p ? r.how : r.how === 'bad' ? 'bad' : r.how === 'dup' ? 'dup' : 'none']}</small></div>
+        <div class="mwho">${p ? `<span class="mperson">${photoFor(r.pid) ? `<img src="${photoFor(r.pid)}" alt="">` : ''}${esc(p.n)}<small>${esc(T().lifespan(p))}</small></span><button class="link-btn" type="button" data-action="match-change" data-i="${i}">Change</button>`
+          : r.how === 'bad' ? '' : `<div class="mpick"><input class="input match-q" data-i="${i}" placeholder="Who is this?" autocomplete="off" aria-label="Who is in ${esc(r.name)}?"><ul class="match-res" data-i="${i}"></ul></div>`}</div>
+        <button class="icon-btn" type="button" data-action="match-remove" data-i="${i}" aria-label="Leave out ${esc(r.name)}">${icon('x')}</button>
+      </div>`;
+    }).join('');
+    const ok = rows.filter(r => r.pid).length, todo = rows.filter(r => !r.pid && r.how !== 'bad').length;
+    $('#match-summary').textContent = rows.length ? `${ok} matched${todo ? ` · ${todo} still need a name` : ''}` : '';
+    $('#match-save').disabled = !ok;
+    $('#match-save').innerHTML = `${icon('check')}${ok ? `Save ${ok} photo${ok === 1 ? '' : 's'}` : 'Save photos'}`;
+  }
+  async function saveMatches(btn) {
+    const todo = matcher.rows.filter(r => r.pid);
+    if (!todo.length) return;
+    busy(btn, true, `Saving 0 of ${todo.length}…`);
+    let done = 0;
+    try {
+      for (let i = 0; i < todo.length; i += 20) {
+        const slice = todo.slice(i, i + 20), b = db.batch(), out = [];
+        for (const r of slice) {
+          const img = await compressImage(r.file, 320, 0.84, 85000, true);
+          out.push([r.pid, img]);
+          b.set(col('treePhotos').doc(r.pid), { img, uid: S.user.uid, by: myName().slice(0, 80), createdAt: nowIso() });
+        }
+        await b.commit();
+        out.forEach(([pid, img]) => { S.tree.photos[pid] = { img, uid: S.user.uid }; });
+        done += slice.length;
+        btn.textContent = `Saving ${done} of ${todo.length}…`;
+      }
+      $('#match-dialog').close();
+      toast(`${done} photo${done === 1 ? '' : 's'} added to the tree`);
+    } catch (e) {
+      toast(denied(e) ? NEED_RULES : `Saved ${done} — the rest didn’t go through. Please try again.`, true);
+    } finally {
+      busy(btn, false);
+      renderMatcher();
+      if (S.view === 'tree') renderTree();
+    }
+  }
+  $('#match-input').addEventListener('change', e => { addMatchFiles(e.target.files); e.target.value = ''; });
+  const dropMatch = $('[data-drop-match]');
+  ['dragenter', 'dragover'].forEach(ev => dropMatch.addEventListener(ev, e => { e.preventDefault(); dropMatch.classList.add('drag'); }));
+  ['dragleave', 'drop'].forEach(ev => dropMatch.addEventListener(ev, e => { e.preventDefault(); dropMatch.classList.remove('drag'); }));
+  dropMatch.addEventListener('drop', e => addMatchFiles(e.dataTransfer && e.dataTransfer.files));
+  document.addEventListener('input', e => {
+    if (!e.target.classList || !e.target.classList.contains('match-q')) return;
+    const i = e.target.dataset.i, list = $(`.match-res[data-i="${i}"]`);
+    list.innerHTML = T().search(S.tree.ix, e.target.value, 6).map(p =>
+      `<li><button type="button" data-action="match-pick" data-i="${i}" data-pid="${esc(p.id)}">${esc(p.n)} <small>${esc(T().lifespan(p))}</small></button></li>`).join('');
+  });
+
+  // When the security rules are missing, explain exactly how to publish them.
+  function rulesNeededHTML(what) {
+    if (S.rulesOk === undefined && !rulesText) loadRulesText();
+    return `<div class="card rules-needed">
+      <span class="sc-icon sc-accent">${icon('shield')}</span>
+      <h2>${esc(what)} needs the latest security rules</h2>
+      <p class="muted">The rules that keep the family’s data private were updated for this. ${isAdmin() ? 'Publishing them takes a minute:' : 'Ask a family admin to publish them in the Firebase console.'}</p>
+      ${isAdmin() ? `<ol class="mini-steps">
+        <li><button class="btn btn-sm" type="button" data-action="copy-rules">${icon('copy')}Copy the rules</button></li>
+        <li>Open the <a href="https://console.firebase.google.com/project/agrazfamily/firestore/databases/-default-/rules" target="_blank" rel="noopener noreferrer">rules editor</a> in the Firebase console.</li>
+        <li>Select everything in the editor (Ctrl+A, or ⌘A on a Mac), paste, and click <b>Publish</b>.</li>
+        <li>Wait a minute, then <button class="link-btn" type="button" data-action="tree-retry">try again</button>.</li>
+      </ol>` : ''}
+    </div>`;
+  }
+
   const RENDER = {
     home: renderHome, photos: openPhotos, calendar: openCalendar, updates: openUpdates,
     directory: () => { renderDirectory(); if (!S.members.length) loadMembers().catch(() => { $('#people').innerHTML = errorHTML('the directory'); }); },
     recipes: openRecipes, invite: openInvite, vault: openVault, memorial: openMemorial, profile: renderProfile,
-    globe: openGlobe, stories: openStories, capsules: openCapsules
+    globe: openGlobe, stories: openStories, capsules: openCapsules, tree: openTree
   };
 
   /* ===================== Events (delegated) ===================== */
@@ -3506,6 +4192,24 @@
       case 'vault-bio-off': disableBio(); break;
       case 'manage-member': openMemberDialog(t.dataset.uid); break;
       case 'check-rules': S.rulesOk = undefined; renderInvite(); break;
+      case 'tree-retry': S.tree = null; S.rulesOk = undefined; openTree(); break;
+      case 'tree-focus': treeFocus(t.dataset.pid); $('#tree-search').value = ''; break;
+      case 'tree-view': if (S.tree) { S.tree.view = t.dataset.v; $$('.tree-seg button').forEach(b => b.setAttribute('aria-selected', String(b === t))); paintTree(true); } break;
+      case 'tree-back': if (S.tree && S.tree.history.length) { S.tree.focus = S.tree.history.pop(); paintTree(true); } break;
+      case 'tree-home': if (S.tree) treeFocus(treeStart()); break;
+      case 'tree-me': linkMe(t.dataset.pid); break;
+      case 'tree-unme': linkMe(null); break;
+      case 'tree-me-off': try { localStorage.setItem('agraz-tree-me-off', '1'); } catch (err) {} renderTree(); break;
+      case 'tree-update': S.tree.updating = true; renderTree(); window.scrollTo({ top: 0, behavior: REDUCED ? 'auto' : 'smooth' }); break;
+      case 'tree-update-cancel': S.tree.updating = false; S.treeDraft = null; renderTree(); break;
+      case 'tree-import-go': importTree(t); break;
+      case 'tree-photo': S.tree.photoTarget = t.dataset.pid; $('#tree-photo-input').click(); break;
+      case 'tree-photo-remove': removeTreePhoto(t.dataset.pid); break;
+      case 'tree-photos': openMatcher(); break;
+      case 'match-save': saveMatches(t); break;
+      case 'match-remove': matcher.rows.splice(Number(t.dataset.i), 1); renderMatcher(); break;
+      case 'match-change': { const r = matcher.rows[Number(t.dataset.i)]; if (r) { r.pid = null; r.how = 'none'; renderMatcher(); const q = $(`.match-q[data-i="${t.dataset.i}"]`); if (q) q.focus(); } break; }
+      case 'match-pick': { const r = matcher.rows[Number(t.dataset.i)]; if (r) { matcher.rows.forEach(o => { if (o !== r && o.pid === t.dataset.pid) { o.pid = null; o.how = 'dup'; } }); r.pid = t.dataset.pid; r.how = 'picked'; renderMatcher(); } break; }
       case 'copy-rules': copyRules(); break;
       case 'new-story': openRecorder(); break;
       case 'rec-toggle': if (rec.state === 'recording') stopRecording(); else if (rec.state === 'idle') startRecording(); break;

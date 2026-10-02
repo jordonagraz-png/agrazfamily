@@ -2,7 +2,9 @@
    Loaded by tests/ui.test.mjs in place of https://www.gstatic.com/firebasejs/…/firebase-app-compat.js.
    Options (set window.__MOCK before load): signedIn, newUser, empty, bdayToday, admin (false = plain member),
    role ('admin' | 'owner'), requireApproval, noInvite, placed (you're on the Family Globe),
-   oldRules (the latest firestore.rules aren't published: new collections and the owner claim are refused).
+   oldRules (the latest firestore.rules aren't published: new collections and the owner claim are refused),
+   treeDocs ({ meta, part0, … } — an imported family tree), treeId (your place in the tree),
+   memberTreeIds ({ uid: treeId } for other members).
    The test owner key is 'test-owner-key'.
    Optional window.__IMG = { photos: [...dataUrls], memorial: [...], av1 } to use real photos. */
 (function () {
@@ -140,6 +142,10 @@
   Object.assign(store.users.u6, { place: { lat: 26.1, lng: -80.1, label: 'Fort Lauderdale, FL', tz: 'America/New_York' } });
   if (M.placed) store.users.u1.place = { lat: 25.8, lng: -80.2, label: 'Miami, FL', tz: 'America/New_York' };
   store.capsuleLetters.k2.photo = IMG.photos[4];
+  store.tree = M.treeDocs ? JSON.parse(JSON.stringify(M.treeDocs)) : {};
+  store.treePhotos = {};
+  if (M.treeId) store.users.u1.treeId = M.treeId;
+  Object.entries(M.memberTreeIds || {}).forEach(([uid, pid]) => { if (store.users[uid]) store.users[uid].treeId = pid; });
   if (M.empty) ['events', 'updates', 'memories', 'vault', 'memorial', 'recipes', 'tributes', 'candles', 'comments', 'capsules', 'capsuleLetters', 'stories', 'storyAudio'].forEach(k => { store[k] = {}; });
   if (M.newUser) delete store.users.u1;
   if (M.noInvite) delete store.config.invite;
@@ -197,7 +203,7 @@
       startAfter: s => next({ after: s.id }),
       get() {
         if (!member() || c === 'capsuleLetters') return fail('permission-denied');
-        if (M.oldRules && ['capsules', 'stories', 'storyAudio'].includes(c)) return fail('permission-denied');
+        if (M.oldRules && ['capsules', 'stories', 'storyAudio', 'tree', 'treePhotos'].includes(c)) return fail('permission-denied');
         let ids = Object.keys(store[c]).filter(id => o.wheres.every(w => matches(store[c][id], w)));
         if (o.f) ids.sort((a, b) => { const x = store[c][a][o.f], y = store[c][b][o.f]; return (x > y ? 1 : x < y ? -1 : 0) * (o.dir === 'desc' ? -1 : 1); });
         if (o.after) ids = ids.slice(ids.indexOf(o.after) + 1);
@@ -216,6 +222,7 @@
             if (c === 'users' && id !== current.uid && !member()) return fail('permission-denied');
             if (c === 'config' && !(admin() && id === 'invite')) return fail('permission-denied');
             if (c !== 'users' && c !== 'joins' && !member()) return fail('permission-denied');
+            if (M.oldRules && ['tree', 'treePhotos', 'capsules', 'stories', 'storyAudio'].includes(c)) return fail('permission-denied');
             // like firestore.rules: a time capsule's letter stays sealed until its day
             if (c === 'capsuleLetters' && !(store.capsules[id] && store.capsules[id].openAt <= Date.now())) return fail('permission-denied');
             return delay(snapDoc(c, id));
@@ -230,6 +237,8 @@
               if (M.oldRules || store.config.owner || !member() || data.uid !== current.uid || data.key !== 'test-owner-key') return fail('permission-denied');
             } else if (c === 'config' && !(admin() && id === 'invite' && /^[A-Za-z0-9-]{6,64}$/.test(data.code || ''))) return fail('permission-denied');
             if (c === 'capsules' && !(member() && typeof data.openAt === 'number' && data.openAt > Date.now() + 3600e3 && data.uid === current.uid)) return fail('permission-denied');
+            if (c === 'tree' && !admin()) return fail('permission-denied');
+            if (c === 'treePhotos' && !(member() && data.uid === current.uid && /^data:image\//.test(data.img || '') && (!store.treePhotos[id] || store.treePhotos[id].uid === current.uid || admin()))) return fail('permission-denied');
             store[c][id] = clone(data);
             return delay();
           },
@@ -243,7 +252,7 @@
             });
             return delay();
           },
-          delete() { delete store[c][id]; return delay(); }
+          delete() { if (c === 'tree' && !admin()) return fail('permission-denied'); delete store[c][id]; return delay(); }
         };
       }
     };

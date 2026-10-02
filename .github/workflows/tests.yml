@@ -35,6 +35,9 @@ jobs:
           path: ~/.cache/firebase/emulators
           key: firebase-emulators-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
+      - name: Family tree engine tests
+        run: npm run test:tree
+
       - name: Security rules tests
         run: npm run test:rules
 

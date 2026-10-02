@@ -2,3 +2,8 @@ node_modules/
 *.log
 .firebase/
 test-results/
+
+# Family data never goes in this public repo (import it through the hub instead).
+*.ged
+*.zip
+!tests/fixtures/*.ged
