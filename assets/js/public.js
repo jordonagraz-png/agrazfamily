@@ -13,6 +13,14 @@
   if (legacy[h]) { location.replace('/family/#' + legacy[h]); return; }
 
   var REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------- the hero follows the sun (photo chosen + preloaded in <head>) ---------- */
+  var hero = document.getElementById('hero-img');
+  if (hero && window.__heroUrl) {
+    var u = window.__heroUrl;
+    hero.srcset = [800, 1600, 2400].map(function (w) { return u + w + ' ' + w + 'w'; }).join(', ');
+    hero.src = u + '1600';
+  }
   var root = document.documentElement;
 
   /* ---------- theme ---------- */

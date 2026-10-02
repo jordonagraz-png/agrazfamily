@@ -28,10 +28,16 @@
   const JARVIS_DEFAULT = 'http://localhost:8765/index.html';
   const PAGE = 24;
 
-  const VIEWS = ['home', 'photos', 'calendar', 'updates', 'directory', 'vault', 'memorial', 'profile'];
+  const FIRST_YEAR = 2024; // the hub's first photos
+  const VAULT_IDLE_MS = 5 * 60e3; // vault relocks after this long without activity…
+  const VAULT_AWAY_MS = 60e3; // …or after the tab has been in the background this long
+  const NEED_RULES = 'This needs the latest security rules — see README.';
+
+  const VIEWS = ['home', 'photos', 'calendar', 'updates', 'recipes', 'directory', 'vault', 'memorial', 'profile'];
   const ALIASES = { memories: 'photos', events: 'calendar' };
-  const TITLES = { home: 'Home', photos: 'Photos', calendar: 'Calendar', updates: 'Updates', directory: 'Directory', vault: 'Family Vault', memorial: 'In Memory', profile: 'My Profile' };
-  const SECONDARY = ['directory', 'vault', 'memorial', 'profile'];
+  const TITLES = { home: 'Home', photos: 'Photos', calendar: 'Calendar', updates: 'Updates', recipes: 'Recipes', directory: 'Directory', vault: 'Family Vault', memorial: 'In Memory', profile: 'My Profile' };
+  const SECONDARY = ['recipes', 'directory', 'vault', 'memorial', 'profile'];
+  const RECIPE_CATS = { mains: 'Mains', sides: 'Sides', desserts: 'Desserts', breakfast: 'Breakfast', drinks: 'Drinks', other: 'Other' };
   const CATS = {
     emergency: { label: 'Emergency', icon: 'siren' },
     medical: { label: 'Medical', icon: 'medical' },
@@ -59,6 +65,9 @@
   const denied = e => !!e && (e.code === 'permission-denied' || /permission/i.test(e.message || ''));
   const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
   const canHover = window.matchMedia('(hover: hover)').matches;
+  const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const joinNames = names => names.length < 2 ? (names[0] || '') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  const lines = v => String(v || '').split(/\r?\n/).map(x => x.trim()).filter(Boolean);
 
   function initials(name) {
     const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
@@ -189,8 +198,12 @@
     cal: { y: new Date().getFullYear(), m: new Date().getMonth() },
     vaultCat: 'all', revealed: new Set(), editingNote: null,
     lb: { kind: null, list: [], i: 0, opener: null },
-    pending: { photos: [], memorial: [] }, thumbUrls: { photos: [], memorial: [] },
-    avatarDraft: undefined
+    staged: { photos: [], memorial: [] }, thumbUrls: { photos: [], memorial: [] },
+    avatarDraft: undefined, pending: [],
+    comments: {}, openThreads: new Set(), lbThread: false,
+    recipes: null, recipeCat: 'all', openRecipe: null, editingRecipe: null, recipePhoto: undefined,
+    tributes: null, candles: null, otd: null, addcal: null, prefillPost: '', installEvt: null,
+    vaultOpen: false, lastActive: Date.now(), hiddenAt: 0
   };
   const myName = () => (S.me && S.me.name) || (S.user && (S.user.displayName || S.user.email)) || 'Family member';
 
@@ -200,20 +213,22 @@
     login: ['Welcome home', 'Sign in to the private family hub.'],
     join: ['Join the family', 'Create your account with the invite code a family member gave you.'],
     reset: ['Reset your password', 'We’ll email you a secure link to choose a new one.'],
-    finish: ['Almost there', 'Enter the family invite code to finish setting up your account.']
+    finish: ['Almost there', 'Enter the family invite code to finish setting up your account.'],
+    pending: ['You’re almost in', 'Your account is waiting for a family admin.']
   };
   function authMode(mode) {
     $('#auth-title').textContent = AUTH_COPY[mode][0];
     $('#auth-sub').textContent = AUTH_COPY[mode][1];
-    ['login', 'join', 'reset', 'finish'].forEach(m => { $('#form-' + m).hidden = m !== mode; });
+    ['login', 'join', 'reset', 'finish', 'pending'].forEach(m => { $('#form-' + m).hidden = m !== mode; });
     $('#auth-seg').hidden = !(mode === 'login' || mode === 'join');
+    $('.auth-lock').hidden = mode === 'pending';
     $('#tab-login').setAttribute('aria-selected', String(mode === 'login'));
     $('#tab-join').setAttribute('aria-selected', String(mode === 'join'));
     if (mode === 'reset') $('#reset-email').value = $('#login-email').value;
     authMsg('');
     if (canHover && document.body.dataset.state === 'auth') {
       const first = $(`#form-${mode} input`);
-      if (first) setTimeout(() => first.focus(), 30);
+      if (first) first.focus();
     }
   }
   function authMsg(text, ok) {
@@ -283,12 +298,16 @@
     }
     try {
       await cred.user.updateProfile({ displayName: name });
-      await completeMembership(cred.user, name, code);
+      const approved = await completeMembership(cred.user, name, code);
       S.joining = false;
       busy(btn, false);
       form.reset();
-      await enterApp(cred.user);
-      toast(`Welcome to the family, ${firstName(name)}!`);
+      if (approved) {
+        await enterApp(cred.user);
+        toast(`Welcome to the family, ${firstName(name)}!`);
+      } else {
+        showPending(name);
+      }
     } catch (err) {
       // Wrong code: remove the half-made account so the email can be reused.
       if (denied(err)) {
@@ -304,13 +323,26 @@
   });
 
   // The server checks the code (firestore.rules → joins/{uid} must match config/invite)
-  // before it will allow the users/{uid} doc that makes you a member.
+  // before it will allow the users/{uid} doc that makes you a member. We never create
+  // that doc unless the server accepted the code. Returns false if an admin must approve.
   async function completeMembership(user, name, code) {
     const at = nowIso();
-    let joinErr = null;
-    try { await col('joins').doc(user.uid).set({ code, createdAt: at }); } catch (e) { joinErr = e; }
-    try { await col('users').doc(user.uid).set({ name, email: user.email, uid: user.uid, joinedDate: at }); }
-    catch (e) { throw joinErr || e; }
+    try {
+      await col('joins').doc(user.uid).set({ code, createdAt: at });
+    } catch (e) {
+      // Joined before but setup was interrupted? Otherwise the code was wrong.
+      const prior = await col('joins').doc(user.uid).get().catch(() => null);
+      if (!prior || !prior.exists) throw e;
+    }
+    const base = { name, email: user.email, uid: user.uid, joinedDate: at };
+    try {
+      await col('users').doc(user.uid).set(Object.assign({ approved: true }, base));
+      return true;
+    } catch (e) {
+      // The family requires an admin to approve new members.
+      await col('users').doc(user.uid).set(Object.assign({ approved: false }, base));
+      return false;
+    }
   }
 
   $('#form-finish').addEventListener('submit', async e => {
@@ -321,9 +353,13 @@
     busy(btn, true, 'Checking…');
     try {
       const u = auth.currentUser;
-      await completeMembership(u, u.displayName || u.email.split('@')[0], code);
-      await enterApp(u);
-      toast('Welcome to the family!');
+      const name = u.displayName || u.email.split('@')[0];
+      if (await completeMembership(u, name, code)) {
+        await enterApp(u);
+        toast('Welcome to the family!');
+      } else {
+        showPending(name);
+      }
     } catch (err) {
       authMsg(denied(err) ? 'That invite code isn’t right. Please check with a family member.' : 'Couldn’t finish setup. Check your connection and try again.');
     } finally {
@@ -355,12 +391,14 @@
       const wasAuth = document.body.dataset.state === 'auth';
       resetData();
       setScreen('auth');
-      if (!wasAuth || !$('#form-finish').hidden) authMode(location.hash === '#join' ? 'join' : 'login');
+      if (!wasAuth || !$('#form-finish').hidden || !$('#form-pending').hidden) authMode(location.hash === '#join' ? 'join' : 'login');
       return;
     }
     try {
       const snap = await col('users').doc(user.uid).get();
-      if (snap.exists) {
+      if (snap.exists && snap.data().approved === false) {
+        showPending(snap.data().name);
+      } else if (snap.exists) {
         await enterApp(user, snap);
       } else {
         setScreen('auth');
@@ -403,13 +441,21 @@
   }
 
   function resetData() {
-    Object.assign(S, { me: null, members: [], byUid: {}, view: null, events: null, updates: null, vault: null, memorial: null, recent: null, vaultCat: 'all', avatarDraft: undefined });
+    Object.assign(S, {
+      me: null, members: [], byUid: {}, view: null, events: null, updates: null, vault: null, memorial: null, recent: null,
+      vaultCat: 'all', avatarDraft: undefined, pending: [], comments: {}, lbThread: false, recipes: null, recipeCat: 'all',
+      openRecipe: null, tributes: null, candles: null, otd: null, addcal: null, prefillPost: '', vaultOpen: false
+    });
+    S.openThreads.clear();
     S.photos = { items: [], last: null, done: false, loading: false, loaded: false, rendered: 0 };
     S.revealed.clear();
     clearStaging('photos');
     clearStaging('memorial');
     // Don't leave private content in the page after signing out.
-    ['#home-upcoming', '#home-family', '#home-photos', '#home-updates', '#photo-grid', '#cal-grid', '#cal-agenda', '#feed', '#people', '#notes', '#vault-filters', '#memorial-grid'].forEach(s => { const el = $(s); if (el) el.innerHTML = ''; });
+    ['#home-upcoming', '#home-family', '#home-photos', '#home-updates', '#home-bday', '#home-otd-strip', '#photo-grid', '#cal-grid', '#cal-agenda', '#feed',
+      '#people', '#pending-panel', '#notes', '#vault-filters', '#memorial-grid', '#tributes', '#candle-row', '#recipes', '#recipe-filters', '#lb-thread'].forEach(s => { const el = $(s); if (el) el.innerHTML = ''; });
+    ['#home-bday', '#home-otd', '#pending-panel'].forEach(s => { $(s).hidden = true; });
+    paintPendingBadge();
     $('#memorial-cover').innerHTML = icon('candle');
     $$('.view').forEach(v => { v.hidden = true; });
     closeLightbox();
@@ -447,15 +493,19 @@
   /* ===================== Data ===================== */
   async function loadMembers() {
     const snap = await col('users').get();
-    S.members = snap.docs.map(d => Object.assign({}, d.data(), { uid: d.id }))
+    const all = snap.docs.map(d => Object.assign({}, d.data(), { uid: d.id }))
       .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+    S.members = all.filter(m => m.approved !== false);
+    S.pending = all.filter(m => m.approved === false);
     S.byUid = {};
-    S.members.forEach(m => { S.byUid[m.uid] = m; });
+    all.forEach(m => { S.byUid[m.uid] = m; });
     if (S.user && S.byUid[S.user.uid]) { S.me = S.byUid[S.user.uid]; paintMe(); }
+    paintPendingBadge();
     if (S.view === 'home') { renderHomeFamily(); if (S.events) renderHomeUpcoming(); if (S.updates) renderHomeUpdates(); }
     else if (S.view === 'directory') renderDirectory();
-    else if (S.view === 'calendar' && S.events) renderCalendar();
+    else if (S.view === 'calendar' && S.events) { renderCalendar(); renderAgenda(); }
     else if (S.view === 'updates' && S.updates) renderFeed();
+    else if (S.view === 'memorial') { if (S.tributes) renderGuestbook(); if (S.candles) renderCandles(); }
   }
   async function loadEvents(force) {
     if (S.events && !force) return S.events;
@@ -537,6 +587,7 @@
     const bday = it.kind === 'bday';
     const today = it.date === todayStr();
     const when = esc(relDay(it.date)) + (it.time ? ' · ' + esc(fmtTime(it.time)) : '');
+    const rc = bday ? null : rsvpCounts(it);
     const loc = it.location
       ? (compact ? `<span>${icon('pin')}${esc(it.location)}</span>` : `<a href="${esc(mapsUrl(it.location))}" target="_blank" rel="noopener noreferrer"><span>${icon('pin')}${esc(it.location)}</span></a>`)
       : '';
@@ -544,11 +595,12 @@
       <div class="date-badge${bday ? ' is-bday' : ''}${today ? ' is-today' : ''}"><small>${MON[d.getMonth()]}</small><b>${d.getDate()}</b></div>
       <div class="ag-body">
         <div class="ag-title">${esc(it.title)}</div>
-        <div class="ag-meta"><span>${icon(bday ? 'cake' : 'clock')}${when}</span>${loc}</div>
+        <div class="ag-meta"><span>${icon(bday ? 'cake' : 'clock')}${when}</span>${loc}${compact && rc && rc.going.length ? `<span class="going">${icon('users')}${rc.going.length} going</span>` : ''}${compact && rc && rc.mine === 'yes' ? `<span class="going mine">${icon('check')}You’re going</span>` : ''}</div>
         ${!compact && it.description ? `<p class="ag-desc">${esc(it.description)}</p>` : ''}
         ${!compact && it.createdBy ? `<div class="ag-meta"><span>Added by ${esc(it.createdBy)}</span></div>` : ''}
+        ${!compact && !bday ? rsvpHTML(it) : ''}
       </div>
-      ${!compact && !bday ? `<div class="ag-actions"><button class="icon-btn" type="button" data-action="delete-event" data-id="${esc(it.id)}" aria-label="Delete ${esc(it.title)}">${icon('trash')}</button></div>` : ''}
+      ${!compact && !bday ? `<div class="ag-actions"><button class="icon-btn" type="button" data-action="add-cal" data-id="${esc(it.id)}" aria-label="Add ${esc(it.title)} to your calendar">${icon('calendar-plus')}</button><button class="icon-btn del" type="button" data-action="delete-event" data-id="${esc(it.id)}" aria-label="Delete ${esc(it.title)}">${icon('trash')}</button></div>` : ''}
     </div>`;
   }
 
@@ -591,6 +643,10 @@
     else renderHomePhotos();
     if (!S.updates) $('#home-updates').innerHTML = skelRows(3);
     else renderHomeUpdates();
+    renderInstall();
+    if (S.members.length) renderBirthdayBanner();
+    if (S.otd) renderHomeOtd();
+    else loadOnThisDay().then(renderHomeOtd).catch(() => {});
     loadEvents().then(renderHomeUpcoming).catch(() => { if (S.view === 'home') $('#home-upcoming').innerHTML = errorHTML('events'); });
     loadRecent().then(renderHomePhotos).catch(() => { if (S.view === 'home') $('#home-photos').innerHTML = errorHTML('photos'); });
     loadUpdates().then(renderHomeUpdates).catch(() => { if (S.view === 'home') $('#home-updates').innerHTML = errorHTML('updates'); });
@@ -607,6 +663,7 @@
   }
   function renderHomeFamily() {
     if (S.view !== 'home') return;
+    renderBirthdayBanner();
     const el = $('#home-family');
     if (!S.members.length) { el.innerHTML = skelRows(2); return; }
     const me = S.me || {};
@@ -684,7 +741,7 @@
     const files = Array.from(fileList || []).filter(f => /^image\//.test(f.type) || /\.(jpe?g|png|gif|webp|heic|heif)$/i.test(f.name));
     if (!files.length) { toast('Please choose image files.', true); return; }
     clearStaging(kind);
-    S.pending[kind] = files;
+    S.staged[kind] = files;
     const thumbs = $(`#${kind === 'photos' ? 'photo' : 'memorial'}-thumbs`);
     files.slice(0, 14).forEach(f => {
       const url = URL.createObjectURL(f);
@@ -703,7 +760,7 @@
     const pre = kind === 'photos' ? 'photo' : 'memorial';
     S.thumbUrls[kind].forEach(u => URL.revokeObjectURL(u));
     S.thumbUrls[kind] = [];
-    S.pending[kind] = [];
+    S.staged[kind] = [];
     const st = $(`#${pre}-staging`);
     if (!st) return;
     st.hidden = true;
@@ -747,7 +804,7 @@
     throw new Error('too-large');
   }
   async function uploadStaged(kind) {
-    const files = S.pending[kind];
+    const files = S.staged[kind];
     if (!files.length) return;
     const pre = kind === 'photos' ? 'photo' : 'memorial';
     const btn = $(`#${pre}-upload-btn`);
@@ -781,7 +838,7 @@
   }
 
   /* ===================== Lightbox ===================== */
-  function lbList(kind) { return kind === 'photos' ? S.photos.items : kind === 'memorial' ? (S.memorial || []) : (S.recent || []); }
+  function lbList(kind) { return kind === 'photos' ? S.photos.items : kind === 'memorial' ? (S.memorial || []) : kind === 'otd' ? (S.otd || []) : (S.recent || []); }
   function openLightbox(kind, i, opener) {
     S.lb = { kind, list: lbList(kind), i, opener };
     $('#lightbox').hidden = false;
@@ -800,6 +857,25 @@
     $('#lb-meta').textContent = [it.uploadedBy && `Shared by ${it.uploadedBy}`, fmtDate(it.createdAt), `${i + 1} of ${list.length}`].filter(Boolean).join(' · ');
     $('.lb-prev').hidden = list.length < 2;
     $('.lb-next').hidden = list.length < 2;
+    paintLbSocial();
+  }
+  // Hearts + comments for album photos (the memorial gallery stays quiet).
+  function paintLbSocial() {
+    const { list, i, kind } = S.lb;
+    const it = list[i];
+    const social = it && kind !== 'memorial';
+    const parent = social ? `memories/${it.id}` : '';
+    $('#lb-actions').innerHTML = social
+      ? heartBtn('memories', it, true) + `<button type="button" class="react light" data-action="lb-thread" aria-expanded="${S.lbThread}">${icon('chat')}<span>${esc(commentLabel(parent))}</span></button>`
+      : '';
+    if (social && !S.comments[parent]) loadComments([parent]).then(() => { if (!$('#lightbox').hidden && S.lb.list[S.lb.i] === it) paintLbSocial(); });
+    const panel = $('#lb-thread');
+    const show = social && S.lbThread;
+    panel.hidden = !show;
+    $('#lightbox').classList.toggle('with-thread', !!show);
+    panel.innerHTML = show
+      ? `<header class="lb-thread-head"><strong>Comments</strong><button class="icon-btn" type="button" data-action="lb-thread" aria-label="Close comments">${icon('x')}</button></header><div class="thread">${S.comments[parent] ? threadHTML(parent) : skelRows(2)}</div>`
+      : '';
   }
   function stepLightbox(d) {
     const n = S.lb.list.length;
@@ -811,6 +887,9 @@
     const lb = $('#lightbox');
     if (lb.hidden) return;
     lb.hidden = true;
+    S.lbThread = false;
+    lb.classList.remove('with-thread');
+    $('#lb-thread').hidden = true;
     $('#lb-img').removeAttribute('src');
     document.body.style.overflow = '';
     if (S.lb.opener && document.contains(S.lb.opener)) S.lb.opener.focus();
@@ -828,6 +907,7 @@
       if (isMem) { await loadMemorial(true); if (S.view === 'memorial') renderMemorial(); }
       else {
         S.recent = null;
+        S.otd = null;
         await loadPhotos(true);
         if (S.view === 'photos') renderPhotos(true);
         if (S.view === 'home') { await loadRecent(true); renderHomePhotos(); }
@@ -911,7 +991,7 @@
     f.reset();
     $('#ev-date').value = DAY.test(date || '') ? date : todayStr();
     $('#event-dialog').showModal();
-    if (canHover) setTimeout(() => $('#ev-title').focus(), 40);
+    if (canHover) $('#ev-title').focus();
   }
   $('#event-form').addEventListener('submit', async e => {
     e.preventDefault();
@@ -959,11 +1039,19 @@
   /* ===================== Updates ===================== */
   function openUpdates() {
     paintMe();
+    const withComments = () => loadComments((S.updates || []).map(p => `updates/${p.id}`)).then(() => { if (S.view === 'updates') renderFeed(); });
     if (!S.updates) {
       $('#feed').innerHTML = skelRows(4);
-      loadUpdates().then(() => { if (S.view === 'updates') renderFeed(); }).catch(() => { $('#feed').innerHTML = errorHTML('updates'); });
+      loadUpdates().then(() => { if (S.view === 'updates') { renderFeed(); withComments(); } }).catch(() => { $('#feed').innerHTML = errorHTML('updates'); });
     } else {
       renderFeed();
+      withComments();
+    }
+    if (S.prefillPost) {
+      postText.value = S.prefillPost;
+      S.prefillPost = '';
+      postText.dispatchEvent(new Event('input'));
+      setTimeout(() => { postText.focus(); postText.setSelectionRange(postText.value.length, postText.value.length); }, 60);
     }
   }
   function renderFeed() {
@@ -972,13 +1060,17 @@
       ? list.map(p => {
         const person = S.byUid[p.uid] || { name: p.author, uid: p.uid };
         const mine = S.user && p.uid === S.user.uid;
+        const parent = `updates/${p.id}`;
+        const open = S.openThreads.has(parent);
         return `<article class="card post">
           ${avatarHTML(person, 44)}
-          <div>
+          <div class="post-main">
             <div class="post-head"><strong>${esc(person.name || p.author || 'Family member')}</strong><time datetime="${esc(p.createdAt)}">${esc(timeAgo(p.createdAt))}</time>
               ${mine ? `<span class="post-actions"><button class="icon-btn" type="button" data-action="delete-update" data-id="${esc(p.id)}" aria-label="Delete your update">${icon('trash')}</button></span>` : ''}
             </div>
             <p class="post-text">${esc(p.text)}</p>
+            <div class="post-foot">${heartBtn('updates', p)}<button type="button" class="react" data-action="toggle-thread" data-parent="${esc(parent)}" aria-expanded="${open}">${icon('chat')}<span>${esc(commentLabel(parent))}</span></button></div>
+            <div class="thread" data-thread="${esc(parent)}"${open ? '' : ' hidden'}>${open ? threadHTML(parent) : ''}</div>
           </div>
         </article>`;
       }).join('')
@@ -1000,6 +1092,7 @@
       toast('Shared with the family');
       await loadUpdates(true);
       renderFeed();
+      await loadComments(S.updates.map(x => `updates/${x.id}`));
     } catch (err) {
       toast('Couldn’t post your update. Please try again.', true);
     } finally {
@@ -1020,6 +1113,7 @@
 
   /* ===================== Directory ===================== */
   function renderDirectory() {
+    renderPending();
     const el = $('#people');
     if (!S.members.length) { el.innerHTML = skelRows(3); return; }
     const q = $('#dir-search').value.trim().toLowerCase();
@@ -1047,6 +1141,15 @@
 
   /* ===================== Vault ===================== */
   function openVault() {
+    $('#vault-lock').hidden = S.vaultOpen;
+    $('#vault-content').hidden = !S.vaultOpen;
+    $('#vault-actions').hidden = !S.vaultOpen;
+    if (!S.vaultOpen) {
+      $('#vault-msg').textContent = '';
+      $('#vault-user').value = (S.user && S.user.email) || '';
+      if (canHover) $('#vault-pass').focus();
+      return;
+    }
     if (!S.vault) {
       $('#notes').innerHTML = skelRows(3);
       loadVault().then(() => { if (S.view === 'vault') renderVault(); }).catch(err => {
@@ -1098,7 +1201,7 @@
     $('#note-cat').value = n && CATS[n.category] ? n.category : (S.vaultCat !== 'all' ? S.vaultCat : 'emergency');
     $('#note-body').value = n ? n.body || '' : '';
     $('#note-dialog').showModal();
-    if (canHover) setTimeout(() => $('#note-title').focus(), 40);
+    if (canHover) $('#note-title').focus();
   }
   $('#note-form').addEventListener('submit', async e => {
     e.preventDefault();
@@ -1142,6 +1245,18 @@
 
   /* ===================== In Memory ===================== */
   function openMemorial() {
+    paintMe();
+    if (S.candles) renderCandles();
+    loadCandles().then(() => { if (S.view === 'memorial') renderCandles(); }).catch(() => { if (S.view === 'memorial') renderCandles(); });
+    if (S.tributes) renderGuestbook();
+    else {
+      $('#tributes').innerHTML = skelRows(2);
+      loadTributes().then(() => { if (S.view === 'memorial') renderGuestbook(); }).catch(err => {
+        $('#tributes').innerHTML = denied(err)
+          ? emptyHTML('heart', 'The guestbook isn’t set up yet', 'A family admin needs to publish the latest security rules (see README).')
+          : errorHTML('memories');
+      });
+    }
     if (!S.memorial) {
       $('#memorial-grid').innerHTML = '<div class="skel skel-tile"></div>'.repeat(4);
       loadMemorial().then(() => { if (S.view === 'memorial') renderMemorial(); }).catch(() => { $('#memorial-grid').innerHTML = errorHTML('photos'); });
@@ -1242,10 +1357,625 @@
     }
   });
 
+  /* ===================== Approvals (admins) ===================== */
+  const isAdmin = () => !!(S.me && S.me.role === 'admin');
+  function showPending(name) {
+    setScreen('auth');
+    authMode('pending');
+    $('#pending-who').textContent = `Thanks for joining, ${firstName(name)}! A family admin needs to approve your account — you’ll be let in as soon as they do.`;
+  }
+  async function checkApproval(btn) {
+    busy(btn, true, 'Checking…');
+    try {
+      const u = auth.currentUser;
+      const snap = await col('users').doc(u.uid).get();
+      if (snap.exists && snap.data().approved !== false) {
+        await enterApp(u, snap);
+        toast('You’re in — welcome to the family!');
+      } else {
+        authMsg('Still waiting for approval. Check back a little later.');
+      }
+    } catch (e) {
+      authMsg('Couldn’t check right now. Please try again.');
+    } finally {
+      busy(btn, false);
+    }
+  }
+  function paintPendingBadge() {
+    const n = isAdmin() ? S.pending.length : 0;
+    $$('[data-pending-badge]').forEach(b => { b.hidden = !n; b.textContent = n || ''; });
+  }
+  function renderPending() {
+    const el = $('#pending-panel');
+    if (!isAdmin() || !S.pending.length) { el.hidden = true; el.innerHTML = ''; return; }
+    el.hidden = false;
+    el.innerHTML = `<div class="pending-head"><span class="sc-icon sc-gold">${icon('hourglass')}</span><div><strong>Waiting for your approval</strong><p class="muted">${plural(S.pending.length, 'person')} joined with the invite code. Approve the people you know.</p></div></div>`
+      + S.pending.map(m => `<div class="pending-row">${avatarHTML(m, 44)}<div class="pending-who"><strong>${esc(m.name || 'New member')}</strong><small>${esc(m.email || '')}${m.joinedDate ? ` · joined ${esc(timeAgo(m.joinedDate))}` : ''}</small></div><div class="pending-actions"><button class="btn btn-ghost btn-sm" type="button" data-action="decline-member" data-uid="${esc(m.uid)}">Decline</button><button class="btn btn-accent btn-sm" type="button" data-action="approve-member" data-uid="${esc(m.uid)}">${icon('check')}Approve</button></div></div>`).join('');
+  }
+  async function decideMember(uid, approve, btn) {
+    const m = S.pending.find(x => x.uid === uid);
+    if (!m) return;
+    if (!approve && !(await confirmBox(`Decline ${m.name || 'this person'}?`, 'Their request will be removed. To block them for good, also disable their account in the Firebase console.', 'Decline'))) return;
+    busy(btn, true);
+    try {
+      if (approve) await col('users').doc(uid).update({ approved: true });
+      else await col('users').doc(uid).delete();
+      toast(approve ? `${firstName(m.name)} is in — welcome to the family!` : 'Request declined');
+      await loadMembers();
+    } catch (e) {
+      busy(btn, false);
+      toast(denied(e) ? NEED_RULES : 'Couldn’t update. Please try again.', true);
+    }
+  }
+
+  /* ===================== RSVPs + add to calendar ===================== */
+  const RSVP_LABEL = { yes: 'Going', maybe: 'Maybe', no: 'Can’t go' };
+  function rsvpCounts(ev) {
+    const r = ev.rsvp || {};
+    return {
+      going: Object.keys(r).filter(u => r[u] === 'yes' && S.byUid[u]),
+      maybe: Object.keys(r).filter(u => r[u] === 'maybe' && S.byUid[u]),
+      mine: S.user ? r[S.user.uid] : undefined
+    };
+  }
+  function rsvpHTML(ev) {
+    const { going, maybe, mine } = rsvpCounts(ev);
+    const btn = v => `<button type="button" class="rsvp-btn${mine === v ? ' on' : ''}" data-action="rsvp" data-id="${esc(ev.id)}" data-v="${v}" aria-pressed="${mine === v}">${v === 'yes' ? icon('check') : ''}${RSVP_LABEL[v]}</button>`;
+    const summary = [going.length && `${going.length} going`, maybe.length && `${maybe.length} maybe`].filter(Boolean).join(' · ');
+    return `<div class="rsvp"><div class="rsvp-btns" role="group" aria-label="Are you going to ${esc(ev.title)}?">${btn('yes')}${btn('maybe')}${btn('no')}</div>${summary ? `<div class="rsvp-who"><span class="rsvp-faces">${going.slice(0, 6).map(u => avatarHTML(S.byUid[u], 28)).join('')}</span><span>${esc(summary)}</span></div>` : ''}</div>`;
+  }
+  async function setRsvp(id, v) {
+    const ev = (S.events || []).find(e => e.id === id);
+    if (!ev || !RSVP_LABEL[v] || !S.user) return;
+    const prev = Object.assign({}, ev.rsvp);
+    const repaint = () => {
+      if (S.view === 'calendar') renderAgenda(); else if (S.view === 'home') renderHomeUpcoming();
+      const b = $$('[data-action="rsvp"]').find(x => x.dataset.id === id && x.dataset.v === v);
+      if (b) b.focus({ preventScroll: true });
+    };
+    ev.rsvp = Object.assign({}, prev, { [S.user.uid]: v });
+    repaint();
+    try {
+      await col('events').doc(id).update({ ['rsvp.' + S.user.uid]: v });
+      if (v === 'yes' && prev[S.user.uid] !== 'yes') toast('You’re going — see you there!');
+    } catch (e) {
+      ev.rsvp = prev;
+      repaint();
+      toast(denied(e) ? NEED_RULES : 'Couldn’t save your RSVP. Please try again.', true);
+    }
+  }
+  function eventTimes(ev) {
+    const ymd = d => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
+    const day = parseDay(ev.date);
+    if (/^\d{2}:\d{2}$/.test(ev.time || '')) {
+      const [h, m] = ev.time.split(':').map(Number);
+      const start = new Date(day.getFullYear(), day.getMonth(), day.getDate(), h, m);
+      const end = new Date(start.getTime() + 2 * 3600e3);
+      const f = d => `${ymd(d)}T${pad(d.getHours())}${pad(d.getMinutes())}00`;
+      return { allDay: false, start: f(start), end: f(end) };
+    }
+    return { allDay: true, start: ymd(day), end: ymd(new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1)) };
+  }
+  const icsText = v => String(v || '').replace(/\\/g, '\\\\').replace(/\r?\n/g, '\\n').replace(/([,;])/g, '\\$1');
+  function icsFold(line) {
+    const enc = new TextEncoder();
+    let out = '', cur = '', bytes = 0;
+    for (const ch of line) {
+      const n = enc.encode(ch).length;
+      if (bytes + n > 74) { out += cur + '\r\n '; cur = ''; bytes = 1; }
+      cur += ch;
+      bytes += n;
+    }
+    return out + cur;
+  }
+  function buildICS(ev) {
+    const t = eventTimes(ev);
+    const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
+    const out = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Agraz Family//Family Hub//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'BEGIN:VEVENT',
+      `UID:${ev.id}@agrazfamily.com`, `DTSTAMP:${stamp}`,
+      t.allDay ? `DTSTART;VALUE=DATE:${t.start}` : `DTSTART:${t.start}`,
+      t.allDay ? `DTEND;VALUE=DATE:${t.end}` : `DTEND:${t.end}`,
+      `SUMMARY:${icsText(ev.title)}`];
+    if (ev.location) out.push(`LOCATION:${icsText(ev.location)}`);
+    out.push(`DESCRIPTION:${icsText([ev.description, 'From the Agraz Family Hub — https://www.agrazfamily.com/family/#calendar'].filter(Boolean).join('\n\n'))}`, 'END:VEVENT', 'END:VCALENDAR');
+    return out.map(icsFold).join('\r\n') + '\r\n';
+  }
+  function googleCalUrl(ev) {
+    const t = eventTimes(ev);
+    const q = new URLSearchParams({ action: 'TEMPLATE', text: ev.title, dates: `${t.start}/${t.end}`, details: ev.description || '', location: ev.location || '' });
+    return `https://calendar.google.com/calendar/render?${q}`;
+  }
+  function openAddCal(id) {
+    const ev = (S.events || []).find(e => e.id === id);
+    if (!ev) return;
+    S.addcal = ev;
+    $('#addcal-event').textContent = `${ev.title} · ${relDay(ev.date)}${ev.time ? ' · ' + fmtTime(ev.time) : ''}`;
+    $('#addcal-google').href = googleCalUrl(ev);
+    $('#addcal-dialog').showModal();
+  }
+  function downloadICS() {
+    const ev = S.addcal;
+    if (!ev) return;
+    const url = URL.createObjectURL(new Blob([buildICS(ev)], { type: 'text/calendar;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${String(ev.title).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'event'}.ics`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    $('#addcal-dialog').close();
+    toast('Invite downloaded — open it to add it to your calendar');
+  }
+  $('#addcal-google').addEventListener('click', () => setTimeout(() => $('#addcal-dialog').close(), 150));
+
+  /* ===================== Hearts + comments ===================== */
+  const heartCount = it => Object.keys(it.hearts || {}).filter(k => it.hearts[k] === true).length;
+  const hearted = it => !!(S.user && it.hearts && it.hearts[S.user.uid] === true);
+  function heartBtn(colName, it, light) {
+    const on = hearted(it), n = heartCount(it);
+    return `<button type="button" class="react heart${on ? ' on' : ''}${light ? ' light' : ''}" data-action="heart" data-col="${colName}" data-id="${esc(it.id)}" aria-pressed="${on}" aria-label="${on ? 'Remove your heart' : 'Send a heart'}${n ? ` (${n})` : ''}">${icon(on ? 'heart-fill' : 'heart')}<span>${n || ''}</span></button>`;
+  }
+  function itemsFor(colName, id) {
+    const lists = colName === 'updates' ? [S.updates || []] : [S.photos.items, S.recent || [], S.otd || []];
+    const out = [];
+    lists.forEach(l => l.forEach(x => { if (x.id === id && !out.includes(x)) out.push(x); }));
+    return out;
+  }
+  function repaintHearts(colName, id, it, pop) {
+    $$('[data-action="heart"]').filter(b => b.dataset.col === colName && b.dataset.id === id).forEach(b => {
+      const hadFocus = document.activeElement === b;
+      const tmp = document.createElement('div');
+      tmp.innerHTML = heartBtn(colName, it, b.classList.contains('light'));
+      const nb = tmp.firstElementChild;
+      if (pop && !REDUCED) nb.classList.add('pop');
+      b.replaceWith(nb);
+      if (hadFocus) nb.focus({ preventScroll: true });
+    });
+  }
+  async function toggleHeart(colName, id) {
+    const items = itemsFor(colName, id);
+    if (!items.length || !S.user) return;
+    const uid = S.user.uid, was = hearted(items[0]);
+    const apply = (v, pop) => { items.forEach(x => { x.hearts = Object.assign({}, x.hearts, { [uid]: v }); }); repaintHearts(colName, id, items[0], pop); };
+    apply(!was, !was);
+    try { await col(colName).doc(id).update({ ['hearts.' + uid]: !was }); }
+    catch (e) { apply(was, false); toast(denied(e) ? NEED_RULES : 'Couldn’t send your heart. Please try again.', true); }
+  }
+  async function loadComments(parents, force) {
+    const need = parents.filter(p => force || !S.comments[p]);
+    for (let i = 0; i < need.length; i += 30) {
+      const chunk = need.slice(i, i + 30);
+      try {
+        const snap = await col('comments').where('parent', 'in', chunk).get();
+        chunk.forEach(p => { S.comments[p] = []; });
+        snap.docs.forEach(d => { const c = Object.assign({ id: d.id }, d.data()); if (S.comments[c.parent]) S.comments[c.parent].push(c); });
+        chunk.forEach(p => S.comments[p].sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt))));
+      } catch (e) {
+        chunk.forEach(p => { S.comments[p] = S.comments[p] || []; });
+      }
+    }
+  }
+  const commentLabel = parent => { const n = (S.comments[parent] || []).length; return n ? plural(n, 'comment') : 'Comment'; };
+  function commentHTML(c) {
+    const p = S.byUid[c.uid] || { name: c.author, uid: c.uid };
+    const mine = S.user && c.uid === S.user.uid;
+    return `<div class="comment">${avatarHTML(p, 28)}<div class="comment-bubble"><div class="comment-head"><strong>${esc(p.name || c.author || 'Family member')}</strong><time>${esc(timeAgo(c.createdAt))}</time></div><p>${esc(c.text)}</p></div>${mine ? `<button class="icon-btn comment-del" type="button" data-action="delete-comment" data-id="${esc(c.id)}" data-parent="${esc(c.parent)}" aria-label="Delete your comment">${icon('trash')}</button>` : ''}</div>`;
+  }
+  function threadHTML(parent) {
+    return (S.comments[parent] || []).map(commentHTML).join('')
+      + `<form class="comment-form" data-parent="${esc(parent)}">${avatarHTML(S.me, 28)}<input class="comment-input" name="text" maxlength="2000" placeholder="Write a comment…" aria-label="Write a comment" autocomplete="off"><button class="icon-btn" type="submit" aria-label="Post comment">${icon('send')}</button></form>`;
+  }
+  function repaintThread(parent) {
+    if (parent.startsWith('memories/')) { if (!$('#lightbox').hidden) paintLbSocial(); return; }
+    const box = $$('[data-thread]').find(el => el.dataset.thread === parent);
+    if (box && !box.hidden) box.innerHTML = threadHTML(parent);
+    $$('[data-action="toggle-thread"]').filter(b => b.dataset.parent === parent).forEach(b => { b.querySelector('span').textContent = commentLabel(parent); });
+  }
+  async function postComment(form) {
+    const parent = form.dataset.parent;
+    const input = form.querySelector('input');
+    const text = input.value.trim();
+    if (!text) return;
+    const btn = form.querySelector('button');
+    btn.disabled = true;
+    const c = { parent, text, uid: S.user.uid, author: myName(), createdAt: nowIso() };
+    try {
+      const ref = await col('comments').add(c);
+      (S.comments[parent] = S.comments[parent] || []).push(Object.assign({ id: ref.id }, c));
+      repaintThread(parent);
+      const nf = $$('.comment-form').find(f => f.dataset.parent === parent);
+      if (nf) nf.querySelector('input').focus();
+    } catch (e) {
+      btn.disabled = false;
+      toast(denied(e) ? NEED_RULES : 'Couldn’t post your comment. Please try again.', true);
+    }
+  }
+  async function deleteComment(id, parent) {
+    if (!(await confirmBox('Delete your comment?', 'This can’t be undone.'))) return;
+    try {
+      await col('comments').doc(id).delete();
+      S.comments[parent] = (S.comments[parent] || []).filter(c => c.id !== id);
+      repaintThread(parent);
+    } catch (e) {
+      toast('Couldn’t delete the comment.', true);
+    }
+  }
+  document.addEventListener('submit', e => {
+    const f = e.target.closest && e.target.closest('.comment-form');
+    if (!f) return;
+    e.preventDefault();
+    postComment(f);
+  });
+
+  /* ===================== Birthdays ===================== */
+  function renderBirthdayBanner() {
+    const el = $('#home-bday');
+    const t = parseDay(todayStr());
+    const people = birthdaysBetween(t, t).map(b => S.byUid[b.uid]).filter(Boolean);
+    if (!people.length) { el.hidden = true; el.innerHTML = ''; return; }
+    const me = people.find(m => S.user && m.uid === S.user.uid);
+    const others = people.filter(m => m !== me);
+    const title = !others.length ? `Happy birthday, ${firstName(me.name)}!` : `It’s ${joinNames(others.map(m => firstName(m.name)))}’s birthday!`;
+    const sub = !others.length ? 'The whole family is celebrating you today.'
+      : me ? `And happy birthday to you too, ${firstName(me.name)}!` : 'Send some love — it’ll make their day.';
+    el.innerHTML = `<div class="bday-banner"><div class="bday-faces">${people.map(m => avatarHTML(m, 64)).join('')}</div><div class="bday-text"><p class="bday-eyebrow">${icon('gift')}Today</p><h2>${esc(title)}</h2><p>${esc(sub)}</p></div>${others.length ? `<button class="btn btn-light" type="button" data-action="bday-wish" data-uid="${esc(others[0].uid)}">${icon('heart')}Send wishes</button>` : ''}</div>`;
+    el.hidden = false;
+    const key = `agraz-confetti-${todayStr()}`;
+    let seen = false;
+    try { seen = localStorage.getItem(key) === '1'; localStorage.setItem(key, '1'); } catch (e) {}
+    if (!seen && !REDUCED) setTimeout(confetti, 450);
+  }
+  function confetti() {
+    const c = document.createElement('canvas');
+    c.className = 'confetti';
+    c.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(c);
+    const ctx = c.getContext('2d');
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const W = c.width = innerWidth * dpr, H = c.height = innerHeight * dpr;
+    const colors = ['#f2a27a', '#7fc6b2', '#d6ad72', '#a94f2b', '#2b6b66', '#f4ede2', '#e58c63'];
+    const bits = Array.from({ length: 170 }, (_, i) => ({
+      x: Math.random() * W, y: -Math.random() * H * 0.6 - 20 * dpr,
+      w: (5 + Math.random() * 6) * dpr, h: (8 + Math.random() * 8) * dpr,
+      vx: (Math.random() - 0.5) * 2.4 * dpr, vy: (2 + Math.random() * 3) * dpr,
+      r: Math.random() * Math.PI * 2, vr: (Math.random() - 0.5) * 0.24, c: colors[i % colors.length]
+    }));
+    const t0 = performance.now();
+    (function frame(now) {
+      const el = now - t0;
+      ctx.clearRect(0, 0, W, H);
+      ctx.globalAlpha = Math.max(0, 1 - Math.max(0, el - 2800) / 900);
+      bits.forEach(b => {
+        b.x += b.vx + Math.sin((el / 300) + b.r) * 0.6 * dpr;
+        b.y += b.vy;
+        b.vy += 0.025 * dpr;
+        b.r += b.vr;
+        ctx.save();
+        ctx.translate(b.x, b.y);
+        ctx.rotate(b.r);
+        ctx.fillStyle = b.c;
+        ctx.fillRect(-b.w / 2, -b.h / 2, b.w, b.h * Math.abs(Math.cos(b.r)));
+        ctx.restore();
+      });
+      if (el < 3700) requestAnimationFrame(frame); else c.remove();
+    })(t0);
+  }
+
+  /* ===================== On this day ===================== */
+  async function loadOnThisDay() {
+    if (S.otd) return S.otd;
+    const now = new Date();
+    const out = [];
+    for (let y = now.getFullYear() - 1; y >= FIRST_YEAR && out.length < 8; y--) {
+      const from = new Date(y, now.getMonth(), now.getDate() - 3).toISOString();
+      const to = new Date(y, now.getMonth(), now.getDate() + 4).toISOString();
+      const snap = await col('memories').where('createdAt', '>=', from).where('createdAt', '<', to).orderBy('createdAt', 'desc').limit(8).get();
+      snap.docs.forEach(d => { const m = Object.assign({ id: d.id }, d.data()); if (okImg(m.imageData)) out.push(m); });
+    }
+    return (S.otd = out.slice(0, 8));
+  }
+  function renderHomeOtd() {
+    if (S.view !== 'home') return;
+    const card = $('#home-otd');
+    const list = S.otd || [];
+    if (!list.length) { card.hidden = true; return; }
+    const years = [...new Set(list.map(m => new Date(m.createdAt).getFullYear()))].sort();
+    $('#home-otd-sub').textContent = `Shared by the family this week in ${joinNames(years.map(String))}`;
+    $('#home-otd-strip').replaceChildren(...list.map((m, i) => {
+      const tile = photoTile(m, i, 'otd');
+      tile.className = 'otd-tile';
+      const ago = new Date().getFullYear() - new Date(m.createdAt).getFullYear();
+      const tag = document.createElement('span');
+      tag.className = 'otd-tag';
+      tag.textContent = ago === 1 ? '1 year ago' : `${ago} years ago`;
+      tile.appendChild(tag);
+      return tile;
+    }));
+    card.hidden = false;
+  }
+
+  /* ===================== Install the app ===================== */
+  const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); S.installEvt = e; if (S.view === 'home') renderInstall(); });
+  function renderInstall() {
+    const card = $('#home-install');
+    let dismissed = false;
+    try { dismissed = localStorage.getItem('agraz-install-dismissed') === '1'; } catch (e) {}
+    if (dismissed || isStandalone() || !(isIOS() || S.installEvt)) { card.hidden = true; return; }
+    $('#install-how').textContent = S.installEvt ? 'Open it like an app, one tap from your home screen.' : 'In Safari, tap the Share button, then “Add to Home Screen.”';
+    $('#install-btn').hidden = !S.installEvt;
+    card.hidden = false;
+  }
+  async function installApp() {
+    if (!S.installEvt) return;
+    S.installEvt.prompt();
+    const choice = await S.installEvt.userChoice.catch(() => null);
+    S.installEvt = null;
+    $('#home-install').hidden = true;
+    if (choice && choice.outcome === 'accepted') toast('Installed — look for the Family Hub on your home screen');
+  }
+
+  /* ===================== Recipes ===================== */
+  async function loadRecipes(force) {
+    if (S.recipes && !force) return S.recipes;
+    const snap = await col('recipes').orderBy('title', 'asc').get();
+    S.recipes = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    return S.recipes;
+  }
+  function openRecipes() {
+    if (S.recipes) { renderRecipes(); return; }
+    $('#recipes').innerHTML = '<div class="skel recipe-skel"></div>'.repeat(3);
+    loadRecipes().then(() => { if (S.view === 'recipes') renderRecipes(); }).catch(err => {
+      $('#recipes').innerHTML = denied(err)
+        ? emptyHTML('book', 'The recipe book isn’t set up yet', 'A family admin needs to publish the latest security rules (see README).')
+        : errorHTML('recipes');
+    });
+  }
+  const recipePhotoHTML = r => okImg(r.photo)
+    ? `<img src="${r.photo}" alt="" loading="lazy" decoding="async">`
+    : `<span class="recipe-ph ph-${RECIPE_CATS[r.category] ? r.category : 'other'}">${icon('utensils')}</span>`;
+  const recipeMeta = r => [r.by && `From ${r.by}`, r.time, r.servings && `Serves ${r.servings}`].filter(Boolean).join(' · ');
+  function renderRecipes() {
+    const all = S.recipes || [];
+    const q = $('#recipe-search').value.trim().toLowerCase();
+    const counts = { all: all.length };
+    Object.keys(RECIPE_CATS).forEach(c => { counts[c] = all.filter(r => r.category === c).length; });
+    $('#recipe-filters').innerHTML = all.length ? ['all'].concat(Object.keys(RECIPE_CATS)).filter(c => c === 'all' || counts[c]).map(c =>
+      `<button type="button" data-action="recipe-filter" data-cat="${c}" aria-pressed="${S.recipeCat === c}">${c === 'all' ? 'All' : RECIPE_CATS[c]}<span>${counts[c]}</span></button>`).join('') : '';
+    const list = all.filter(r => (S.recipeCat === 'all' || r.category === S.recipeCat)
+      && (!q || [r.title, r.by, r.ingredients].some(v => String(v || '').toLowerCase().includes(q))));
+    if (!list.length) {
+      $('#recipes').innerHTML = all.length
+        ? emptyHTML('search', 'No recipes match', 'Try another search or category.')
+        : emptyHTML('book', 'Start the family recipe book', 'Save Grandma’s flan, the holiday tamales, and every dish we can’t live without.', '<button class="btn btn-ghost btn-sm" type="button" data-action="new-recipe">Add the first recipe</button>');
+      return;
+    }
+    $('#recipes').innerHTML = list.map(r => `<button type="button" class="recipe-card" data-action="open-recipe" data-id="${esc(r.id)}">
+      <span class="recipe-photo">${recipePhotoHTML(r)}</span>
+      <span class="recipe-info"><span class="recipe-cat">${esc(RECIPE_CATS[r.category] || 'Other')}</span><strong>${esc(r.title)}</strong>${recipeMeta(r) ? `<small>${esc(recipeMeta(r))}</small>` : ''}</span>
+    </button>`).join('');
+  }
+  $('#recipe-search').addEventListener('input', () => renderRecipes());
+  function openRecipe(id) {
+    const r = (S.recipes || []).find(x => x.id === id);
+    if (!r) return;
+    S.openRecipe = r.id;
+    $('#rv-hero').innerHTML = recipePhotoHTML(r);
+    $('#rv-hero').classList.toggle('no-photo', !okImg(r.photo));
+    $('#rv-cat').textContent = RECIPE_CATS[r.category] || 'Other';
+    $('#rv-title').textContent = r.title;
+    $('#rv-meta').textContent = recipeMeta(r);
+    const ing = lines(r.ingredients), steps = lines(r.steps);
+    $('#rv-ingredients').innerHTML = ing.length
+      ? ing.map(x => `<li><label class="check"><input type="checkbox"><span>${esc(x)}</span></label></li>`).join('')
+      : '<li class="muted">No ingredients listed yet.</li>';
+    $('#rv-steps').innerHTML = steps.length ? steps.map(x => `<li>${esc(x)}</li>`).join('') : '<li class="muted">No steps written down yet.</li>';
+    $('#rv-credit').textContent = `Added by ${r.author || 'a family member'}${r.updatedBy && r.updatedBy !== r.author ? ` · last edited by ${r.updatedBy}` : ''}`;
+    const d = $('#recipe-dialog');
+    if (!d.open) d.showModal();
+    d.scrollTop = 0;
+  }
+  function paintRecipePhoto(src) {
+    const box = $('#rf-photo-preview');
+    if (okImg(src)) { const img = document.createElement('img'); img.src = src; img.alt = ''; box.replaceChildren(img); }
+    else box.innerHTML = icon('utensils');
+    $('#rf-photo-remove').hidden = !okImg(src);
+  }
+  function openRecipeForm(id) {
+    const r = id ? (S.recipes || []).find(x => x.id === id) : null;
+    S.editingRecipe = r ? r.id : null;
+    S.recipePhoto = undefined;
+    $('#recipe-form').reset();
+    $('#rf-title').textContent = r ? 'Edit recipe' : 'Add a recipe';
+    $('#rf-name').value = r ? r.title || '' : '';
+    $('#rf-by').value = r ? r.by || '' : '';
+    $('#rf-cat').value = r && RECIPE_CATS[r.category] ? r.category : (S.recipeCat !== 'all' ? S.recipeCat : 'mains');
+    $('#rf-time').value = r ? r.time || '' : '';
+    $('#rf-serves').value = r ? r.servings || '' : '';
+    $('#rf-ingredients').value = r ? r.ingredients || '' : '';
+    $('#rf-steps').value = r ? r.steps || '' : '';
+    paintRecipePhoto(r && okImg(r.photo) ? r.photo : '');
+    if ($('#recipe-dialog').open) $('#recipe-dialog').close();
+    $('#recipe-form-dialog').showModal();
+    if (canHover) $('#rf-name').focus();
+  }
+  $('#rf-photo-input').addEventListener('change', async e => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    try { S.recipePhoto = await compressImage(f, 1200, 0.8, 380000); paintRecipePhoto(S.recipePhoto); }
+    catch (err) { toast('That image couldn’t be used. Try a JPG or PNG.', true); }
+    e.target.value = '';
+  });
+  $('#recipe-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const title = $('#rf-name').value.trim();
+    if (!title) { toast('Please give the recipe a name.', true); $('#rf-name').focus(); return; }
+    const data = {
+      title, by: $('#rf-by').value.trim(), category: $('#rf-cat').value, time: $('#rf-time').value.trim(), servings: $('#rf-serves').value.trim(),
+      ingredients: $('#rf-ingredients').value.trim(), steps: $('#rf-steps').value.trim(), updatedAt: nowIso(), updatedBy: myName()
+    };
+    if (S.recipePhoto !== undefined) data.photo = S.recipePhoto;
+    const btn = $('#rf-save');
+    const editing = S.editingRecipe;
+    busy(btn, true, 'Saving…');
+    try {
+      let id = editing;
+      if (id) await col('recipes').doc(id).update(data);
+      else id = (await col('recipes').add(Object.assign({ uid: S.user.uid, author: myName(), createdAt: data.updatedAt }, data))).id;
+      $('#recipe-form-dialog').close();
+      toast(editing ? 'Recipe updated' : 'Added to the family recipe book');
+      await loadRecipes(true);
+      renderRecipes();
+      openRecipe(id);
+    } catch (err) {
+      toast(denied(err) ? NEED_RULES : 'Couldn’t save the recipe. Please try again.', true);
+    } finally {
+      busy(btn, false);
+    }
+  });
+  async function deleteRecipe() {
+    const r = (S.recipes || []).find(x => x.id === S.openRecipe);
+    if (!r) return;
+    if (!(await confirmBox('Delete this recipe?', `“${r.title}” will be removed from the family recipe book.`))) return;
+    try {
+      await col('recipes').doc(r.id).delete();
+      $('#recipe-dialog').close();
+      toast('Recipe deleted');
+      await loadRecipes(true);
+      renderRecipes();
+    } catch (e) {
+      toast('Couldn’t delete the recipe.', true);
+    }
+  }
+  function printRecipe() {
+    document.body.classList.add('printing-recipe');
+    window.addEventListener('afterprint', () => document.body.classList.remove('printing-recipe'), { once: true });
+    window.print();
+  }
+
+  /* ===================== Memorial: candles + guestbook ===================== */
+  async function loadCandles(force) {
+    if (S.candles && !force) return S.candles;
+    const snap = await col('candles').get();
+    S.candles = snap.docs.map(d => Object.assign({ uid: d.id }, d.data())).sort((a, b) => String(a.litAt).localeCompare(String(b.litAt)));
+    return S.candles;
+  }
+  function renderCandles() {
+    const list = S.candles || [];
+    const mine = !!(S.user && list.some(c => c.uid === S.user.uid));
+    $('#candle-row').innerHTML = list.length
+      ? list.slice(0, 36).map(() => '<span class="mini-candle"><span class="flame"></span></span>').join('')
+      : '<span class="mini-candle unlit"></span>';
+    const names = list.map(c => (S.user && c.uid === S.user.uid) ? 'you' : firstName((S.byUid[c.uid] && S.byUid[c.uid].name) || c.name));
+    const shown = names.slice(0, 3);
+    $('#candles-who').textContent = !list.length ? 'Be the first to light a candle in his memory.'
+      : `${plural(list.length, 'candle')} lit by ${list.length > 3 ? `${shown.join(', ')} and ${plural(list.length - 3, 'other')}` : joinNames(shown)}.`;
+    const btn = $('#candle-btn');
+    btn.disabled = mine;
+    btn.innerHTML = `<span class="flame" aria-hidden="true"></span>${mine ? 'Your candle is lit' : 'Light a candle'}`;
+  }
+  async function lightCandle(btn) {
+    busy(btn, true, 'Lighting…');
+    try {
+      await col('candles').doc(S.user.uid).set({ name: myName(), litAt: nowIso() });
+      await loadCandles(true);
+      toast('Your candle is lit');
+    } catch (e) {
+      toast(denied(e) ? NEED_RULES : 'Couldn’t light the candle. Please try again.', true);
+    } finally {
+      busy(btn, false);
+      renderCandles();
+    }
+  }
+  async function loadTributes(force) {
+    if (S.tributes && !force) return S.tributes;
+    const snap = await col('tributes').orderBy('createdAt', 'desc').get();
+    S.tributes = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    return S.tributes;
+  }
+  function renderGuestbook() {
+    const list = S.tributes || [];
+    $('#tributes').innerHTML = list.length ? list.map(t => {
+      const p = S.byUid[t.uid] || { name: t.author, uid: t.uid };
+      const mine = S.user && t.uid === S.user.uid;
+      return `<figure class="card tribute"><blockquote>${esc(t.text)}</blockquote><figcaption>${avatarHTML(p, 36)}<span class="tribute-who"><strong>${esc(p.name || t.author || 'Family member')}</strong><small>${esc(fmtDate(t.createdAt))}</small></span>${mine ? `<button class="icon-btn" type="button" data-action="delete-tribute" data-id="${esc(t.id)}" aria-label="Delete your memory">${icon('trash')}</button>` : ''}</figcaption></figure>`;
+    }).join('') : emptyHTML('heart', 'No memories shared yet', 'Be the first to share a story about Hector.');
+  }
+  $('#tribute-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const box = $('#tribute-text');
+    const text = box.value.trim();
+    if (!text) { box.focus(); return; }
+    const btn = $('#tribute-btn');
+    busy(btn, true, 'Sharing…');
+    try {
+      await col('tributes').add({ text, uid: S.user.uid, author: myName(), createdAt: nowIso() });
+      box.value = '';
+      toast('Thank you for sharing');
+      await loadTributes(true);
+      renderGuestbook();
+    } catch (err) {
+      toast(denied(err) ? NEED_RULES : 'Couldn’t share your memory. Please try again.', true);
+    } finally {
+      busy(btn, false);
+    }
+  });
+  async function deleteTribute(id) {
+    if (!(await confirmBox('Delete your memory?', 'It will be removed from the guestbook.'))) return;
+    try {
+      await col('tributes').doc(id).delete();
+      await loadTributes(true);
+      renderGuestbook();
+    } catch (e) {
+      toast('Couldn’t delete it. Please try again.', true);
+    }
+  }
+
+  /* ===================== Vault lock ===================== */
+  $('#vault-lock').addEventListener('submit', async e => {
+    e.preventDefault();
+    const pass = $('#vault-pass').value;
+    if (!pass) { $('#vault-msg').textContent = 'Enter your password to unlock the vault.'; return; }
+    const btn = $('#vault-unlock');
+    busy(btn, true, 'Unlocking…');
+    try {
+      await S.user.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(S.user.email, pass));
+      $('#vault-pass').value = '';
+      S.vaultOpen = true;
+      S.lastActive = Date.now();
+      openVault();
+    } catch (err) {
+      const c = err && err.code;
+      $('#vault-msg').textContent = c === 'auth/too-many-requests' ? 'Too many attempts. Please wait a few minutes and try again.'
+        : c === 'auth/network-request-failed' ? 'Can’t reach the server. Check your connection.' : 'That password isn’t right.';
+    } finally {
+      busy(btn, false);
+    }
+  });
+  function lockVault(message) {
+    if (!S.vaultOpen) return;
+    S.vaultOpen = false;
+    S.vault = null;
+    S.revealed.clear();
+    $('#notes').innerHTML = '';
+    $('#vault-filters').innerHTML = '';
+    if ($('#note-dialog').open) $('#note-dialog').close();
+    if (S.view === 'vault') openVault();
+    if (message) toast(message);
+  }
+  ['pointerdown', 'keydown', 'touchstart', 'wheel'].forEach(ev => window.addEventListener(ev, () => { S.lastActive = Date.now(); }, { passive: true, capture: true }));
+  setInterval(() => { if (S.vaultOpen && Date.now() - S.lastActive > VAULT_IDLE_MS) lockVault('The vault locked itself after 5 minutes of inactivity'); }, 15000);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) S.hiddenAt = Date.now();
+    else if (S.vaultOpen && S.hiddenAt && Date.now() - S.hiddenAt > VAULT_AWAY_MS) lockVault('The vault locked while you were away');
+  });
+
   const RENDER = {
     home: renderHome, photos: openPhotos, calendar: openCalendar, updates: openUpdates,
     directory: () => { renderDirectory(); if (!S.members.length) loadMembers().catch(() => { $('#people').innerHTML = errorHTML('the directory'); }); },
-    vault: openVault, memorial: openMemorial, profile: renderProfile
+    recipes: openRecipes, vault: openVault, memorial: openMemorial, profile: renderProfile
   };
 
   /* ===================== Events (delegated) ===================== */
@@ -1276,7 +2006,7 @@
       case 'more': $('#more-sheet').showModal(); break;
       case 'retry': {
         if (!S.view) break;
-        const stale = { home: ['events', 'updates', 'recent'], calendar: ['events'], updates: ['updates'], vault: ['vault'], memorial: ['memorial'] }[S.view] || [];
+        const stale = { home: ['events', 'updates', 'recent'], calendar: ['events'], updates: ['updates'], vault: ['vault'], memorial: ['memorial', 'tributes', 'candles'], recipes: ['recipes'] }[S.view] || [];
         stale.forEach(k => { S[k] = null; });
         if (S.view === 'photos') S.photos.loaded = false;
         if (!S.members.length) loadMembers().catch(() => {});
@@ -1311,6 +2041,53 @@
         paintAvatar($('#profile-avatar'), Object.assign({}, S.me, { avatar: '' }));
         $('#avatar-remove').hidden = true;
         break;
+      case 'check-approval': checkApproval(t); break;
+      case 'approve-member': decideMember(t.dataset.uid, true, t); break;
+      case 'decline-member': decideMember(t.dataset.uid, false, t); break;
+      case 'rsvp': setRsvp(id, t.dataset.v); break;
+      case 'add-cal': openAddCal(id); break;
+      case 'addcal-ics': downloadICS(); break;
+      case 'heart': toggleHeart(t.dataset.col, id); break;
+      case 'toggle-thread': {
+        const parent = t.dataset.parent;
+        const open = !S.openThreads.has(parent);
+        if (open) S.openThreads.add(parent); else S.openThreads.delete(parent);
+        t.setAttribute('aria-expanded', String(open));
+        const box = $$('[data-thread]').find(el => el.dataset.thread === parent);
+        if (box) {
+          box.hidden = !open;
+          box.innerHTML = open ? threadHTML(parent) : '';
+          if (open) box.querySelector('input').focus();
+        }
+        break;
+      }
+      case 'lb-thread':
+        S.lbThread = !S.lbThread;
+        paintLbSocial();
+        if (S.lbThread) { const inp = $('#lb-thread input'); if (inp) inp.focus(); }
+        break;
+      case 'delete-comment': deleteComment(id, t.dataset.parent); break;
+      case 'bday-wish': {
+        const m = S.byUid[t.dataset.uid];
+        S.prefillPost = `Happy birthday, ${firstName(m && m.name)}! 🎉 `;
+        if (S.view === 'updates') openUpdates(); else location.hash = 'updates';
+        break;
+      }
+      case 'install-app': installApp(); break;
+      case 'dismiss-install':
+        try { localStorage.setItem('agraz-install-dismissed', '1'); } catch (err) {}
+        $('#home-install').hidden = true;
+        break;
+      case 'new-recipe': openRecipeForm(null); break;
+      case 'open-recipe': openRecipe(id); break;
+      case 'edit-recipe': openRecipeForm(S.openRecipe); break;
+      case 'delete-recipe': deleteRecipe(); break;
+      case 'print-recipe': printRecipe(); break;
+      case 'recipe-filter': S.recipeCat = t.dataset.cat; renderRecipes(); break;
+      case 'remove-recipe-photo': S.recipePhoto = ''; paintRecipePhoto(''); break;
+      case 'light-candle': lightCandle(t); break;
+      case 'delete-tribute': deleteTribute(id); break;
+      case 'lock-vault': lockVault('Vault locked'); break;
       case 'reset-self':
         try { await auth.sendPasswordResetEmail(S.user.email); toast(`Reset link sent to ${S.user.email}`); }
         catch (err) { toast('Couldn’t send the email. Please try again later.', true); }
@@ -1327,10 +2104,11 @@
   $('#more-sheet').addEventListener('click', e => { if (e.target.closest('a')) $('#more-sheet').close(); });
 
   document.addEventListener('keydown', e => {
-    if ($('#lightbox').hidden) return;
-    if (e.key === 'Escape') closeLightbox();
-    else if (e.key === 'ArrowLeft') stepLightbox(-1);
-    else if (e.key === 'ArrowRight') stepLightbox(1);
+    if ($('#lightbox').hidden || $('dialog[open]')) return;
+    const typing = e.target.matches && e.target.matches('input, textarea');
+    if (e.key === 'Escape') { if (typing) e.target.blur(); else closeLightbox(); }
+    else if (!typing && e.key === 'ArrowLeft') stepLightbox(-1);
+    else if (!typing && e.key === 'ArrowRight') stepLightbox(1);
   });
 
   // File pickers + drag and drop

@@ -7,7 +7,7 @@
 <meta name="description" content="Welcome to the home of the Agraz family — our story, what our name means, the things we hold dear, and a private hub where the family stays connected.">
 <meta name="theme-color" content="#0c1c21">
 <link rel="canonical" href="https://www.agrazfamily.com/">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-m8kZttxbHYodDgIJdVNZmOcXhvSEbglVNLyZZNOWZnY='; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://images.unsplash.com; connect-src 'self'; base-uri 'self'; form-action 'self'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-2z7w+JQbtm9ZcxoXLldjJ+DGGIkhk/phn+MGCtZTgmQ='; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://images.unsplash.com; connect-src 'self'; base-uri 'self'; form-action 'self'; object-src 'none'">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 
 <meta property="og:type" content="website">
@@ -27,12 +27,11 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 
-<script>try{var t=localStorage.getItem('agraz-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}document.documentElement.classList.add('js')</script>
+<script>try{var t=localStorage.getItem('agraz-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}var d=document.documentElement,h=new Date().getHours(),k=h>=5&&h<10?'dawn':h>=10&&h<16?'day':h>=16&&h<20?'dusk':'night',p={dawn:'1473116763249-2faaef81ccda',day:'1471922694854-ff1b63b20054',dusk:'1439405326854-014607f694d7',night:'1534447677768-be436bb09401'}[k],u='https://images.unsplash.com/photo-'+p+'?auto=format&fit=crop&q=70&w=',l=document.createElement('link');d.setAttribute('data-tod',k);d.classList.add('js');l.rel='preload';l.as='image';l.setAttribute('imagesrcset',u+'800 800w, '+u+'1600 1600w, '+u+'2400 2400w');l.setAttribute('imagesizes','100vw');l.setAttribute('fetchpriority','high');document.head.appendChild(l);window.__heroUrl=u</script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://images.unsplash.com">
-<link rel="preload" as="image" href="https://images.unsplash.com/photo-1439405326854-014607f694d7?auto=format&fit=crop&w=1600&q=70" imagesrcset="https://images.unsplash.com/photo-1439405326854-014607f694d7?auto=format&fit=crop&w=800&q=70 800w, https://images.unsplash.com/photo-1439405326854-014607f694d7?auto=format&fit=crop&w=1600&q=70 1600w, https://images.unsplash.com/photo-1439405326854-014607f694d7?auto=format&fit=crop&w=2400&q=70 2400w" imagesizes="100vw" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/css/base.css">
 <link rel="stylesheet" href="/assets/css/public.css">
@@ -85,10 +84,9 @@
 <!-- ======================= Hero ======================= -->
 <section class="hero" aria-labelledby="hero-title">
   <div class="hero-media" aria-hidden="true">
-    <img
-      src="https://images.unsplash.com/photo-1439405326854-014607f694d7?auto=format&fit=crop&w=1600&q=70"
-      srcset="https://images.unsplash.com/photo-1439405326854-014607f694d7?auto=format&fit=crop&w=800&q=70 800w, https://images.unsplash.com/photo-1439405326854-014607f694d7?auto=format&fit=crop&w=1600&q=70 1600w, https://images.unsplash.com/photo-1439405326854-014607f694d7?auto=format&fit=crop&w=2400&q=70 2400w"
-      sizes="100vw" alt="" fetchpriority="high" decoding="async">
+    <!-- The hero follows the sun: the startup script in <head> picks a dawn, day, dusk or night photo. -->
+    <img id="hero-img" alt="" sizes="100vw" fetchpriority="high" decoding="async">
+    <noscript><img src="https://images.unsplash.com/photo-1439405326854-014607f694d7?auto=format&amp;fit=crop&amp;w=1600&amp;q=70" alt=""></noscript>
   </div>
   <div class="hero-inner">
     <p class="eyebrow hero-eyebrow">Where the ocean meets home</p>

@@ -5,21 +5,23 @@ rules_version = '2';
 //
 //  PUBLISH THESE in the Firebase console (Firestore Database → Rules → Publish)
 //  or with the CLI:  firebase deploy --only firestore:rules
-//  See README.md for the one-time setup (the invite code lives in config/invite).
+//  See README.md for the one-time setup (invite code, admins, approval).
 //
 //  These rules are the ONLY thing that keeps family data private. The website
 //  is public code; nothing secret is in it.
 //
 //  Membership model
 //  ----------------
-//  • You are a family member if a document exists at users/{your uid}.
-//  • That document can only be created after you've written joins/{your uid}
-//    containing the correct invite code — and the code is checked HERE, on the
-//    server, against config/invite (which no browser can read).
-//  • To remove someone: delete their users/{uid} doc in the console (and
-//    optionally disable their account under Authentication → Users).
-//  • To change the invite code: edit the "code" field of config/invite.
-//    Existing members are unaffected.
+//  • You are a family member if users/{your uid} exists and isn't waiting for
+//    approval (approved != false).
+//  • That doc can only be created after you've written joins/{your uid} with
+//    the correct invite code, which is checked HERE against config/invite
+//    (a doc no browser can read).
+//  • If config/invite has requireApproval: true, new members start with
+//    approved: false and an admin (users/{uid}.role == "admin", set in the
+//    console) approves them in the Directory.
+//  • To remove someone: delete their users/{uid} doc (admins can do this from
+//    the site too) and disable their account under Authentication → Users.
 // ============================================================================
 
 service cloud.firestore {
@@ -27,8 +29,18 @@ service cloud.firestore {
 
     function signedIn() { return request.auth != null; }
 
+    function myUserPath() { return /databases/$(database)/documents/users/$(request.auth.uid); }
+
     function isMember() {
-      return signedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+      return signedIn() && exists(myUserPath()) && get(myUserPath()).data.get('approved', true) == true;
+    }
+
+    function isAdmin() {
+      return isMember() && get(myUserPath()).data.get('role', '') == 'admin';
+    }
+
+    function approvalRequired() {
+      return get(/databases/$(database)/documents/config/invite).data.get('requireApproval', false) == true;
     }
 
     // A base64 image data URL (what the site produces), under `max` characters.
@@ -42,7 +54,19 @@ service cloud.firestore {
       return !(k in d) || (d[k] is string && d[k].size() <= max);
     }
 
-    // ---- Private settings (invite code). Edited only in the Firebase console. ----
+    function str(s, min, max) { return s is string && s.size() >= min && s.size() <= max; }
+
+    // A member may only change their own entry in a per-person map field such as
+    // hearts {uid: true} or rsvp {uid: "yes"} — nothing else on the document.
+    function onlyMyEntry(field, allowed) {
+      let before = resource.data.get(field, {});
+      let after = request.resource.data.get(field, {});
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([field])
+        && after.diff(before).affectedKeys().hasOnly([request.auth.uid])
+        && (!(request.auth.uid in after) || after[request.auth.uid] in allowed);
+    }
+
+    // ---- Private settings (invite code, approval switch). Console only. ----
     match /config/{doc} {
       allow read, write: if false;
     }
@@ -53,79 +77,105 @@ service cloud.firestore {
                     && request.resource.data.keys().hasOnly(['code', 'createdAt'])
                     && request.resource.data.code is string
                     && request.resource.data.code == get(/databases/$(database)/documents/config/invite).data.code;
-      allow read, update, delete: if false;
+      // You may check your own join (to finish an interrupted sign-up); never anyone else's.
+      allow get: if signedIn() && request.auth.uid == uid;
+      allow list, update, delete: if false;
     }
 
     // ---- Member profiles (the family directory) ----
     match /users/{uid} {
       function validProfile(d) {
-        return d.keys().hasOnly(['name', 'email', 'uid', 'joinedDate', 'phone', 'birthday', 'address', 'bio', 'avatar'])
+        return d.keys().hasOnly(['name', 'email', 'uid', 'joinedDate', 'phone', 'birthday', 'address', 'bio', 'avatar', 'approved', 'role'])
           && d.uid == uid
-          && d.name is string && d.name.size() > 0 && d.name.size() <= 80
+          && str(d.name, 1, 80)
           && optStr(d, 'email', 254) && optStr(d, 'joinedDate', 40)
           && optStr(d, 'phone', 40) && optStr(d, 'birthday', 10)
           && optStr(d, 'address', 300) && optStr(d, 'bio', 280)
           && (!('avatar' in d) || d.avatar == '' || isImage(d.avatar, 150000));
       }
-      // Members see the whole family; anyone signed in may check their own doc
-      // (that's how the site knows whether to ask for the invite code).
+      // Members see the whole family; anyone signed in may read their own doc
+      // (that's how the site knows to ask for the code or show "waiting").
       allow read: if isMember() || (signedIn() && request.auth.uid == uid);
       allow create: if signedIn() && request.auth.uid == uid
                     && exists(/databases/$(database)/documents/joins/$(uid))
                     && validProfile(request.resource.data)
-                    && request.resource.data.email == request.auth.token.email;
+                    && request.resource.data.email == request.auth.token.email
+                    && !('role' in request.resource.data)
+                    && request.resource.data.approved is bool
+                    && (request.resource.data.approved == false || !approvalRequired());
+      // Your own profile: anything except your email, approval or role.
       allow update: if signedIn() && request.auth.uid == uid
                     && validProfile(request.resource.data)
-                    && request.resource.data.get('email', '') == resource.data.get('email', '');
-      allow delete: if signedIn() && request.auth.uid == uid;
+                    && request.resource.data.get('email', '') == resource.data.get('email', '')
+                    && request.resource.data.get('approved', true) == resource.data.get('approved', true)
+                    && request.resource.data.get('role', '') == resource.data.get('role', '');
+      // Admins: approve (or un-approve) someone.
+      allow update: if isAdmin() && request.auth.uid != uid
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['approved'])
+                    && request.resource.data.approved is bool;
+      allow delete: if signedIn() && (request.auth.uid == uid || isAdmin());
     }
 
-    // ---- Shared photo album ----
+    // ---- Shared photo album (+ hearts) ----
     match /memories/{id} {
       allow read:   if isMember();
       allow create: if isMember()
                     && request.resource.data.uid == request.auth.uid
                     && isImage(request.resource.data.imageData, 950000)
                     && request.resource.data.caption is string
-                    && request.resource.data.caption.size() < 2000;
+                    && request.resource.data.caption.size() < 2000
+                    && !('hearts' in request.resource.data);
+      allow update: if isMember() && onlyMyEntry('hearts', [true, false]);
       // Shared family album: any member may remove a photo. To limit this to the
       // uploader, use:  allow delete: if isMember() && resource.data.uid == request.auth.uid;
       allow delete: if isMember();
     }
 
-    // ---- Family calendar ----
+    // ---- Family calendar (+ RSVPs) ----
     match /events/{id} {
       allow read:   if isMember();
       allow create: if isMember()
                     && request.resource.data.uid == request.auth.uid
-                    && request.resource.data.title is string
-                    && request.resource.data.title.size() > 0
-                    && request.resource.data.title.size() < 200
+                    && str(request.resource.data.title, 1, 199)
                     && request.resource.data.date is string
                     && request.resource.data.date.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
                     && request.resource.data.description is string
                     && request.resource.data.description.size() < 5000
                     && optStr(request.resource.data, 'time', 5)
-                    && optStr(request.resource.data, 'location', 200);
+                    && optStr(request.resource.data, 'location', 200)
+                    && !('rsvp' in request.resource.data);
+      allow update: if isMember() && onlyMyEntry('rsvp', ['yes', 'maybe', 'no']);
       allow delete: if isMember();
     }
 
-    // ---- Updates feed ----
+    // ---- Updates feed (+ hearts) ----
     match /updates/{id} {
       allow read:   if isMember();
       allow create: if isMember()
                     && request.resource.data.uid == request.auth.uid
-                    && request.resource.data.text is string
-                    && request.resource.data.text.size() > 0
-                    && request.resource.data.text.size() < 5000;
+                    && str(request.resource.data.text, 1, 4999)
+                    && !('hearts' in request.resource.data);
+      allow update: if isMember() && onlyMyEntry('hearts', [true, false]);
       allow delete: if isMember();
+    }
+
+    // ---- Comments on updates and photos ----
+    match /comments/{id} {
+      allow read:   if isMember();
+      allow create: if isMember()
+                    && request.resource.data.keys().hasOnly(['parent', 'text', 'uid', 'author', 'createdAt'])
+                    && request.resource.data.uid == request.auth.uid
+                    && str(request.resource.data.text, 1, 2000)
+                    && request.resource.data.parent is string
+                    && request.resource.data.parent.matches('(updates|memories)/[A-Za-z0-9_-]{1,64}');
+      allow delete: if isMember() && resource.data.uid == request.auth.uid;
     }
 
     // ---- Family Vault: shared notes (emergency contacts, doctors, household info) ----
     match /vault/{id} {
       function validNote(d) {
         return d.keys().hasOnly(['title', 'body', 'category', 'uid', 'author', 'createdAt', 'updatedAt', 'updatedBy'])
-          && d.title is string && d.title.size() > 0 && d.title.size() <= 120
+          && str(d.title, 1, 120)
           && d.body is string && d.body.size() <= 8000
           && d.category in ['emergency', 'medical', 'household', 'documents', 'other'];
       }
@@ -139,6 +189,27 @@ service cloud.firestore {
       allow delete: if isMember();
     }
 
+    // ---- Family Recipe Book ----
+    match /recipes/{id} {
+      function validRecipe(d) {
+        return d.keys().hasOnly(['title', 'by', 'category', 'time', 'servings', 'ingredients', 'steps', 'photo', 'uid', 'author', 'createdAt', 'updatedAt', 'updatedBy'])
+          && str(d.title, 1, 120)
+          && optStr(d, 'by', 80) && optStr(d, 'time', 40) && optStr(d, 'servings', 40)
+          && d.category in ['mains', 'sides', 'desserts', 'breakfast', 'drinks', 'other']
+          && d.ingredients is string && d.ingredients.size() <= 6000
+          && d.steps is string && d.steps.size() <= 12000
+          && (!('photo' in d) || d.photo == '' || isImage(d.photo, 400000));
+      }
+      allow read:   if isMember();
+      allow create: if isMember()
+                    && request.resource.data.uid == request.auth.uid
+                    && validRecipe(request.resource.data);
+      allow update: if isMember()
+                    && validRecipe(request.resource.data)
+                    && request.resource.data.uid == resource.data.uid;
+      allow delete: if isMember();
+    }
+
     // ---- In Memory of Hector Agraz: private family photos ----
     match /memorial/{id} {
       allow read:   if isMember();
@@ -147,6 +218,25 @@ service cloud.firestore {
                     && isImage(request.resource.data.imageData, 950000)
                     && request.resource.data.order is number;
       allow delete: if isMember();
+    }
+
+    // ---- Memorial guestbook: memories shared about Hector ----
+    match /tributes/{id} {
+      allow read:   if isMember();
+      allow create: if isMember()
+                    && request.resource.data.keys().hasOnly(['text', 'uid', 'author', 'createdAt'])
+                    && request.resource.data.uid == request.auth.uid
+                    && str(request.resource.data.text, 1, 4000);
+      allow delete: if isMember() && resource.data.uid == request.auth.uid;
+    }
+
+    // ---- Memorial candles: one per person ----
+    match /candles/{uid} {
+      allow read:   if isMember();
+      allow create: if isMember() && request.auth.uid == uid
+                    && request.resource.data.keys().hasOnly(['name', 'litAt'])
+                    && str(request.resource.data.name, 1, 80);
+      allow delete: if isMember() && request.auth.uid == uid;
     }
 
     // Everything else is closed.
