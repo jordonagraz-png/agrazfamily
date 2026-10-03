@@ -101,6 +101,21 @@ never reaches a server) and cleared from the address bar on arrival. Every
 the Family Hub" waits at the foot. One-tap tree links and invite links survive
 the detour. After that, the hub opens directly for the rest of the visit.
 
+## The seasons, with a little Midwest in them
+
+Both pages follow the calendar (`<html data-season>`, set in `<head>`): spring
+from March 20, summer from June 21, autumn from September 22 and winter from
+December 21. Each season shifts the accent colors (summer keeps the house
+terracotta and sea), sends weather across the hero photo and the welcome banner
+(blossoms, fireflies, falling leaves, snow), and dresses a heartland scene: a
+red barn with a barn quilt, a silo, a windmill and an AGRAZ water tower, along
+the top of the public footer and as a postcard in the hub's sidebar. The hub's
+taglines and ribbon mix in seasonal and Midwest lines ("Sweater weather and
+Sunday suppers", "Ope — come on in, there's always room"). Add `?season=winter`
+(or spring, summer, autumn) to the address to preview another season. With
+reduced motion the weather holds still. It all lives in `assets/css/seasons.css`
+and `assets/js/seasons.js`.
+
 ## What's in the Family Hub
 
 - **Home** — greeting, what's coming up, birthdays, recent photos and updates,
@@ -200,7 +215,7 @@ later, export again and tap **Update** on the Family Tree page.
 file in the browser and saves it, so there's no file to choose. The key is only
 in the link: the part of an address after `#` is never sent to a server, and the
 hub clears it from the address bar. The service worker never caches the file.
-Delete the `.bin` once the tree is in.
+Delete the `.bin` once the tree is in (the family's was deleted on October 3, 2026).
 
 **Everything in the export:** besides names, dates and places, each profile
 lists the person's **records** (every source citation in the export, such as

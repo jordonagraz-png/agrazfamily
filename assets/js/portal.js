@@ -918,8 +918,16 @@
       ${missing.length ? `<div class="nudge">${icon('sparkle')}<span>Add your ${esc(missing.slice(0, 2).join(' and '))} so the family can reach — and celebrate — you. <a href="#profile">Update profile</a></span></div>` : ''}`;
   }
   // ---- the welcome banner: the public site's words, and moments from the album ----
-  const TAGLINES = ['Where the ocean meets home', 'Home is wherever we’re together', 'Every path leads back to the shore', 'A name that’s still growing', 'Little moments, big love', 'Different branches, the same roots', 'Rooted in love and always growing'];
-  const RIBBON = ['Gather often', 'Golden hours', 'Remember well', 'The family table', 'Show up', 'Every birthday', 'Keep growing', 'Slow mornings', 'Salt air', 'Where the ocean meets home', 'Little moments, big love'];
+  // …and the season, with a little Midwest in it (<html data-season> is set in <head>)
+  const SEASON_WORDS = {
+    spring: [['Tulips, thunderstorms and fresh starts', 'Mud boots by the door, lilacs on the table'], ['Lilac season', 'Spring thaw', 'The garden’s going in', 'Rain on the tin roof']],
+    summer: [['Porch lights, fireflies and sweet corn', 'Lake days and long golden evenings'], ['Sweet corn season', 'County fair', 'Fireflies in a jar', 'Lake days']],
+    autumn: [['Sweater weather and Sunday suppers', 'Apple orchards, hayrides and Friday night lights'], ['Harvest moon', 'Apple cider', 'Hayrides', 'Pumpkin patch', 'Sweater weather']],
+    winter: [['Hot cocoa and a full house', 'Bundle up — there’s soup on the stove'], ['First snow', 'Hot cocoa', 'The sledding hill', 'Hotdish night', 'Christmas lights']]
+  }[document.documentElement.getAttribute('data-season')] || [[], []];
+  const weave = (a, b) => { const out = []; for (let i = 0; i < Math.max(a.length, b.length); i++) { if (a[i]) out.push(a[i]); if (b[i]) out.push(b[i]); } return out; };
+  const TAGLINES = weave(SEASON_WORDS[0].concat(['From the shore to the heartland', 'Ope — come on in, there’s always room']), ['Where the ocean meets home', 'Home is wherever we’re together', 'Every path leads back to the shore', 'A name that’s still growing', 'Little moments, big love', 'Different branches, the same roots', 'Rooted in love and always growing', 'The porch light’s always on']);
+  const RIBBON = weave(SEASON_WORDS[1].concat(['Sunday supper', 'There’s always room at the table', 'The long Midwest goodbye']), ['Gather often', 'Golden hours', 'Remember well', 'The family table', 'Show up', 'Every birthday', 'Keep growing', 'Slow mornings', 'Salt air', 'Where the ocean meets home', 'Little moments, big love']);
   const MOMENTS = [
     ['1473116763249-2faaef81ccda', 'Golden hours'], ['1504674900247-0877df9cc836', 'The family table'], ['1530103862676-de8c9debad1d', 'Every birthday'],
     ['1499793983690-e29da59ef1c2', 'Slow mornings'], ['1471922694854-ff1b63b20054', 'Salt air']

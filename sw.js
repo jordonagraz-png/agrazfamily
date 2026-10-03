@@ -2,11 +2,11 @@
    Same-origin files: network-first (updates always show), cached copy when offline.
    Google Fonts: cache-first. Everything else (Firebase, Firestore, photos) goes
    straight to the network untouched — private data is never cached here. */
-const CACHE = 'agraz-202610022224';
+const CACHE = 'agraz-202610031151';
 const SHELL = [
   '/', '/family/', '/404.html',
-  '/assets/css/base.css', '/assets/css/public.css', '/assets/css/portal.css', '/assets/css/signature.css',
-  '/assets/js/public.js', '/assets/js/portal.js', '/assets/js/globe.js', '/assets/js/tree.js', '/assets/js/livephoto.js', '/assets/js/signature.js', '/assets/js/games/gull.js', '/assets/js/games/neveria.js', '/assets/data/land.bin', '/assets/icons.svg',
+  '/assets/css/base.css', '/assets/css/public.css', '/assets/css/portal.css', '/assets/css/signature.css', '/assets/css/seasons.css',
+  '/assets/js/public.js', '/assets/js/portal.js', '/assets/js/globe.js', '/assets/js/tree.js', '/assets/js/livephoto.js', '/assets/js/signature.js', '/assets/js/seasons.js', '/assets/js/games/gull.js', '/assets/js/games/neveria.js', '/assets/data/land.bin', '/assets/icons.svg',
   '/favicon.svg', '/manifest.webmanifest'
 ];
 
