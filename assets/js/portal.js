@@ -335,7 +335,7 @@
       } catch (e2) {
         S.joining = false;
         busy(btn, false);
-        return welcomeBack(email);
+        return welcomeBack(email, name, code);
       }
     }
     try {
@@ -375,13 +375,23 @@
       busy(btn, false);
     }
   });
-  // Signing up with an email that already has an account, and a different password.
-  function welcomeBack(email) {
+  // Signing up with an email that already has an account, and a different password. Removing someone
+  // from the hub keeps their sign-in (only Firebase can delete it), so this is how they come back.
+  // Their name and code are kept on this device, so after the reset "Finish joining" is one tap.
+  function welcomeBack(email, name, code) {
+    try { localStorage.setItem('agraz-rejoin', JSON.stringify({ email: email.toLowerCase(), name, code })); } catch (e) {}
     authMode('reset');
     $('#reset-email').value = email;
     $('#auth-title').textContent = 'Welcome back';
-    $('#auth-sub').textContent = 'This email already has an account here, but that password doesn’t match it. Send yourself a link to choose a new password, then sign in with it. You may be asked for the invite code again.';
+    $('#auth-sub').textContent = 'This email has signed up here before. Being removed from the hub doesn’t delete that sign-in, and its password isn’t the one you just typed. Tap Send reset link, choose a new password from the email, then sign in with it. Your invite code will be filled in for you.';
   }
+  function rejoinInfo(email) {
+    try {
+      const r = JSON.parse(localStorage.getItem('agraz-rejoin') || 'null');
+      return r && email && r.email === email.toLowerCase() ? r : null;
+    } catch (e) { return null; }
+  }
+  const forgetRejoin = () => { try { localStorage.removeItem('agraz-rejoin'); } catch (e) {} };
   // Firebase emails a link to choose a new password. Its "Continue" button comes back to the hub
   // when this address is on Firebase's list of authorized domains; otherwise the email goes without it.
   async function sendReset(email) {
@@ -409,10 +419,12 @@
     const base = { name, email: user.email, uid: user.uid, joinedDate: at };
     try {
       await col('users').doc(user.uid).set(Object.assign({ approved: true }, base));
+      forgetRejoin();
       return true;
     } catch (e) {
       // The family requires an admin to approve new members.
       await col('users').doc(user.uid).set(Object.assign({ approved: false }, base));
+      forgetRejoin();
       return false;
     }
   }
@@ -425,7 +437,8 @@
     busy(btn, true, 'Checking…');
     try {
       const u = auth.currentUser;
-      const name = u.displayName || u.email.split('@')[0];
+      const rj = rejoinInfo(u.email);
+      const name = (rj && rj.name) || u.displayName || u.email.split('@')[0];
       if (await completeMembership(u, name, code)) {
         await enterApp(u);
         toast('Welcome to the family!');
@@ -447,9 +460,9 @@
     busy(btn, true, 'Sending…');
     try {
       await sendReset(email);
-      authMsg('If that email has an account, a reset link is on its way. Check your inbox.', true);
+      authMsg('If that email has an account, a reset link is on its way. Check your inbox, and your spam folder too.', true);
     } catch (err) {
-      if (err && err.code === 'auth/user-not-found') authMsg('If that email has an account, a reset link is on its way. Check your inbox.', true);
+      if (err && err.code === 'auth/user-not-found') authMsg('If that email has an account, a reset link is on its way. Check your inbox, and your spam folder too.', true);
       else authMsg(authErr(err));
     } finally {
       busy(btn, false);
@@ -476,6 +489,8 @@
         setScreen('auth');
         authMode('finish');
         $('#finish-who').textContent = `You’re signed in as ${user.email}.`;
+        const rj = rejoinInfo(user.email);
+        if (rj && rj.code && !$('#finish-code').value) $('#finish-code').value = rj.code;
       }
     } catch (err) {
       setScreen('auth');
@@ -2774,7 +2789,7 @@
   async function removeMember() {
     const m = S.byUid[S.managing];
     if (!m || !canRemove(m)) return;
-    if (!(await confirmBox(`Remove ${m.name || 'this member'}?`, 'They’ll lose access to the family hub right away. If they just can’t sign in, use Send password reset instead. They can come back later by signing up again with the same email and the invite code. To block them for good, also disable their account in the Firebase console (Authentication → Users).', 'Remove'))) return;
+    if (!(await confirmBox(`Remove ${m.name || 'this member'}?`, 'They’ll lose access to the family hub right away. Their sign-in (email and password) stays in Firebase, so if they just can’t sign in, use Send password reset instead. They can come back later by signing up again with the same email and the invite code. To delete or block their sign-in for good, use the Firebase console (Authentication → Users).', 'Remove'))) return;
     try {
       await col('users').doc(m.uid).delete();
       $('#member-dialog').close();
@@ -2793,7 +2808,7 @@
     busy(btn, true, 'Sending…');
     try {
       await sendReset(m.email);
-      toast(`Password reset link sent to ${m.email}`);
+      toast(`Password reset link sent to ${m.email}. Ask them to check spam too.`);
     } catch (e) {
       toast(resetErr(e), true);
     } finally {
@@ -2809,7 +2824,7 @@
     busy(btn, true, 'Sending…');
     try {
       await sendReset(email);
-      msg.textContent = `Reset link sent to ${email}. Once they’ve chosen a new password they can sign in. If they were removed, they’ll be asked for the invite code.`;
+      msg.textContent = `Reset link sent to ${email} (ask them to check spam too). Once they’ve chosen a new password they can sign in. If they were removed, they’ll be asked for the invite code.`;
       msg.classList.add('ok');
       input.value = '';
     } catch (e) {

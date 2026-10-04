@@ -175,6 +175,17 @@ try {
     await f.waitForTimeout(SLOW * 400);
     ok((await f.textContent('#auth-msg')).includes('reset link is on its way') && await store(f, () => window.__resets.some(x => x.email === 'back@example.com')), 'one tap sends them a reset link');
     ok(await store(f, () => window.__resets[0].url === location.origin + '/family/'), 'the reset email leads back to the hub');
+    // …they choose a new password from the email and sign in: the code they typed is waiting for them.
+    await f.click('#form-reset [data-auth=login]');
+    await f.fill('#login-email', 'back@example.com');
+    await f.fill('#login-pass', 'password123');
+    await f.click('#form-login button[type=submit]');
+    await f.waitForTimeout(SLOW * 800);
+    ok(!(await f.isHidden('#form-finish')) && await f.inputValue('#finish-code') === 'seashell', 'after the reset and signing in, their invite code is already filled in');
+    await f.click('#form-finish button[type=submit]');
+    await f.waitForTimeout(SLOW * 1000);
+    ok(await state(f) === 'app' && await store(f, () => window.__store.users.r1.name === 'Elena Ruiz'), 'one tap on Finish joining and they’re back in, under the name they typed');
+    ok(await f.evaluate(() => !localStorage.getItem('agraz-rejoin')), 'the remembered code is cleared once they’re in');
     await done(f, 'coming back (forgot password)');
   }
 
