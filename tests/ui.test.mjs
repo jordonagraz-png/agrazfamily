@@ -146,6 +146,38 @@ try {
     await done(a, 'approval flow');
   }
 
+  console.log('— coming back after being removed');
+  {
+    // Their account outlived their removal: signing up again with the same email and old password lets them back in.
+    const r = await open('/family/#join', { signedIn: false, newUser: true, returning: { email: 'back@example.com', uid: 'r1', name: 'Elena Ruiz' } });
+    await r.fill('#join-name', 'Elena Ruiz');
+    await r.fill('#join-email', 'back@example.com');
+    await r.fill('#join-pass', 'password123');
+    await r.fill('#join-code', 'seashell');
+    await r.click('#form-join button[type=submit]');
+    await r.waitForTimeout(SLOW * 1200);
+    ok(await state(r) === 'app', 'signing up again with an email from before (and its password) lets a removed member back in');
+    ok(await store(r, () => window.__store.users.r1 && window.__store.users.r1.email === 'back@example.com'), 'their member doc is back');
+    ok(await r.evaluate(() => !!firebase.auth().currentUser), 'their old account is kept, never deleted');
+    await done(r, 'coming back');
+
+    // Forgot the password too: they're offered a reset link instead of "already exists".
+    const f = await open('/family/#join', { signedIn: false, newUser: true, returning: { email: 'back@example.com', uid: 'r1' } });
+    await f.fill('#join-name', 'Elena Ruiz');
+    await f.fill('#join-email', 'back@example.com');
+    await f.fill('#join-pass', 'forgotten-it');
+    await f.fill('#join-code', 'seashell');
+    await f.click('#form-join button[type=submit]');
+    await f.waitForTimeout(SLOW * 600);
+    ok(!(await f.isHidden('#form-reset')) && (await f.textContent('#auth-title')) === 'Welcome back', 'a returning email with a forgotten password gets "Welcome back", not "already exists"');
+    ok(await f.inputValue('#reset-email') === 'back@example.com', 'their email is filled in for the reset link');
+    await f.click('#form-reset button[type=submit]');
+    await f.waitForTimeout(SLOW * 400);
+    ok((await f.textContent('#auth-msg')).includes('reset link is on its way') && await store(f, () => window.__resets.some(x => x.email === 'back@example.com')), 'one tap sends them a reset link');
+    ok(await store(f, () => window.__resets[0].url === location.origin + '/family/'), 'the reset email leads back to the hub');
+    await done(f, 'coming back (forgot password)');
+  }
+
   console.log('— admin approvals');
   {
     const p = await open('/family/#directory', { signedIn: true });
@@ -366,6 +398,14 @@ try {
     await p.check('#invite-approval');
     await p.waitForTimeout(SLOW * 400);
     ok(await store(p, () => window.__store.config.invite.requireApproval === true), 'approval switch saves');
+    await p.fill('#help-reset-email', 'not-an-email');
+    await p.click('#help-reset-form button[type=submit]');
+    await p.waitForTimeout(SLOW * 100);
+    ok((await p.textContent('#help-reset-msg')).includes('valid email') && await store(p, () => !window.__resets.length), '"Help someone sign in" checks the email first');
+    await p.fill('#help-reset-email', 'removed@example.com');
+    await p.click('#help-reset-form button[type=submit]');
+    await p.waitForTimeout(SLOW * 400);
+    ok((await p.textContent('#help-reset-msg')).includes('Reset link sent to removed@example.com') && await store(p, () => window.__resets[0].email === 'removed@example.com'), '"Help someone sign in" sends a reset link to anyone, even someone removed');
     ok((await p.textContent('.invite-how')).includes('You approve them'), '"How it works" reflects approval');
     await p.click('#invite-body [data-action=approve-member][data-uid=u7]');
     await p.waitForTimeout(SLOW * 800);
@@ -482,6 +522,11 @@ try {
     ok(await store(p, () => window.__store.users.u3.phone === '(786) 555-0199' && window.__store.users.u3.role === 'admin'), 'owner edits Daniel’s details and makes him an admin');
     ok((await p.textContent('#people')).includes('Admin'), 'new admin gets an Admin badge');
     await p.click('[data-action=manage-member][data-uid=u5]');
+    await p.waitForTimeout(SLOW * 200);
+    await p.click('#md-reset');
+    await p.waitForTimeout(SLOW * 400);
+    ok(await store(p, () => window.__resets.length === 1 && window.__resets[0].email === window.__store.users.u5.email), 'the owner sends a member a password reset link');
+    ok((await p.textContent('#toast')).includes('Password reset link sent'), 'and is told it was sent');
     await p.click('#md-remove');
     await p.click('#confirm-ok');
     await p.waitForTimeout(SLOW * 600);

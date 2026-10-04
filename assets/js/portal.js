@@ -317,16 +317,39 @@
     busy(btn, true, 'Creating your account…');
     authMsg('');
     S.joining = true;
-    let cred;
+    let cred, returning = false;
     try {
       await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
       cred = await auth.createUserWithEmailAndPassword(email, pass);
     } catch (err) {
-      S.joining = false;
-      busy(btn, false);
-      return authMsg(authErr(err));
+      // Been here before (removed from the hub and now coming back, say)? Their account is still
+      // there, so try the password they typed; if that's not it, help them choose a new one.
+      if (!err || err.code !== 'auth/email-already-in-use') {
+        S.joining = false;
+        busy(btn, false);
+        return authMsg(authErr(err));
+      }
+      try {
+        cred = await auth.signInWithEmailAndPassword(email, pass);
+        returning = true;
+      } catch (e2) {
+        S.joining = false;
+        busy(btn, false);
+        return welcomeBack(email);
+      }
     }
     try {
+      if (returning) {
+        const snap = await col('users').doc(cred.user.uid).get();
+        if (snap.exists) { // still in the family: just let them in
+          S.joining = false;
+          busy(btn, false);
+          form.reset();
+          if (snap.data().approved === false) showPending(snap.data().name);
+          else { await enterApp(cred.user, snap); toast(`Welcome back, ${firstName(snap.data().name)}!`); }
+          return;
+        }
+      }
       await cred.user.updateProfile({ displayName: name });
       const approved = await completeMembership(cred.user, name, code);
       S.joining = false;
@@ -334,23 +357,42 @@
       form.reset();
       if (approved) {
         await enterApp(cred.user);
-        toast(`Welcome to the family, ${firstName(name)}!`);
+        toast(returning ? `Welcome back, ${firstName(name)}!` : `Welcome to the family, ${firstName(name)}!`);
       } else {
         showPending(name);
       }
     } catch (err) {
-      // Wrong code: remove the half-made account so the email can be reused.
+      // Wrong code: remove the half-made account so the email can be reused (never an account from before).
       if (denied(err)) {
-        try { await cred.user.delete(); } catch (_) { await auth.signOut().catch(() => {}); }
+        if (returning) await auth.signOut().catch(() => {});
+        else try { await cred.user.delete(); } catch (_) { await auth.signOut().catch(() => {}); }
         authMsg('That invite code isn’t right. Please check with a family member.');
       } else {
         await auth.signOut().catch(() => {});
-        authMsg('Your account was created, but setup didn’t finish. Sign in to try again.');
+        authMsg(returning ? 'Couldn’t finish setting you back up. Sign in to try again.' : 'Your account was created, but setup didn’t finish. Sign in to try again.');
       }
       S.joining = false;
       busy(btn, false);
     }
   });
+  // Signing up with an email that already has an account, and a different password.
+  function welcomeBack(email) {
+    authMode('reset');
+    $('#reset-email').value = email;
+    $('#auth-title').textContent = 'Welcome back';
+    $('#auth-sub').textContent = 'This email already has an account here, but that password doesn’t match it. Send yourself a link to choose a new password, then sign in with it. You may be asked for the invite code again.';
+  }
+  // Firebase emails a link to choose a new password. Its "Continue" button comes back to the hub
+  // when this address is on Firebase's list of authorized domains; otherwise the email goes without it.
+  async function sendReset(email) {
+    try {
+      await auth.sendPasswordResetEmail(email, { url: `${location.origin}/family/` });
+    } catch (e) {
+      if (e && /continue-uri|unauthorized-domain/.test(e.code || '')) await auth.sendPasswordResetEmail(email);
+      else throw e;
+    }
+  }
+  const resetErr = e => (e && e.code === 'auth/user-not-found' ? 'No account uses that email. They can sign up with the invite code instead.' : e && /invalid-email|missing-email/.test(e.code || '') ? 'Please enter a valid email address.' : e && e.code === 'auth/too-many-requests' ? 'Too many emails sent. Please wait a few minutes and try again.' : 'Couldn’t send the email. Please try again later.');
 
   // The server checks the code (firestore.rules → joins/{uid} must match config/invite)
   // before it will allow the users/{uid} doc that makes you a member. We never create
@@ -404,7 +446,7 @@
     const btn = submitBtn(e.currentTarget);
     busy(btn, true, 'Sending…');
     try {
-      await auth.sendPasswordResetEmail(email);
+      await sendReset(email);
       authMsg('If that email has an account, a reset link is on its way. Check your inbox.', true);
     } catch (err) {
       if (err && err.code === 'auth/user-not-found') authMsg('If that email has an account, a reset link is on its way. Check your inbox.', true);
@@ -1919,6 +1961,7 @@
   document.addEventListener('submit', e => {
     if (e.target.id === 'custom-code-form') { e.preventDefault(); saveCustomCode(); return; }
     if (e.target.id === 'owner-form') { e.preventDefault(); claimFromInvite(); return; }
+    if (e.target.id === 'help-reset-form') { e.preventDefault(); helpReset(); return; }
     const f = e.target.closest && e.target.closest('.comment-form');
     if (!f) return;
     e.preventDefault();
@@ -2524,6 +2567,16 @@
           <li><strong>${req ? 'You approve them' : 'They’re in'}</strong><span>${req ? 'Tap Approve here or in the Directory. They’ll get in right away.' : 'They see the family hub straight away.'}</span></li>
         </ol>
       </article>
+      <article class="card invite-help">
+        <h2 class="card-title">${icon('key')}Help someone sign in</h2>
+        <p class="muted">Forgot their password? Send them a link to choose a new one. It works for anyone, including someone you removed: once they’re signed in again, the hub asks them for the invite code.</p>
+        <form class="inline-form help-reset" id="help-reset-form" novalidate>
+          <label class="sr-only" for="help-reset-email">Their email</label>
+          <input class="input" id="help-reset-email" type="email" inputmode="email" autocomplete="off" placeholder="their@email.com">
+          <button class="btn btn-sm" type="submit">Send reset link</button>
+        </form>
+        <p class="form-msg" id="help-reset-msg" role="status" aria-live="polite"></p>
+      </article>
       ${rulesCardHTML()}
     </div>`;
     renderQr(link);
@@ -2689,6 +2742,7 @@
     $('#md-admin-row').hidden = !isOwner();
     $('#md-admin').checked = m.role === 'admin';
     $('#md-remove').hidden = !canRemove(m);
+    $('#md-reset').hidden = !m.email;
     $('#member-dialog').showModal();
     if (canHover) $('#md-name').focus();
   }
@@ -2720,7 +2774,7 @@
   async function removeMember() {
     const m = S.byUid[S.managing];
     if (!m || !canRemove(m)) return;
-    if (!(await confirmBox(`Remove ${m.name || 'this member'}?`, 'They’ll lose access to the family hub right away. To block them for good, also disable their account in the Firebase console (Authentication → Users).', 'Remove'))) return;
+    if (!(await confirmBox(`Remove ${m.name || 'this member'}?`, 'They’ll lose access to the family hub right away. If they just can’t sign in, use Send password reset instead. They can come back later by signing up again with the same email and the invite code. To block them for good, also disable their account in the Firebase console (Authentication → Users).', 'Remove'))) return;
     try {
       await col('users').doc(m.uid).delete();
       $('#member-dialog').close();
@@ -2728,6 +2782,40 @@
       await loadMembers();
     } catch (e) {
       toast(denied(e) ? NEED_RULES : 'Couldn’t remove them. Please try again.', true);
+    }
+  }
+
+  // Admins can't see or set anyone's password; Firebase emails them a link to choose a new one.
+  async function resetMember() {
+    const m = S.byUid[S.managing];
+    if (!m || !m.email || !canManage(m)) return;
+    const btn = $('#md-reset');
+    busy(btn, true, 'Sending…');
+    try {
+      await sendReset(m.email);
+      toast(`Password reset link sent to ${m.email}`);
+    } catch (e) {
+      toast(resetErr(e), true);
+    } finally {
+      busy(btn, false);
+    }
+  }
+  // On the Invite page: send a reset link to any email, including someone who was removed.
+  async function helpReset() {
+    const input = $('#help-reset-email'), btn = $('#help-reset-form button[type="submit"]'), msg = $('#help-reset-msg');
+    const email = input.value.trim();
+    msg.classList.remove('ok');
+    if (!/^\S+@\S+\.\S+$/.test(email)) { msg.textContent = 'Please enter a valid email address.'; input.focus(); return; }
+    busy(btn, true, 'Sending…');
+    try {
+      await sendReset(email);
+      msg.textContent = `Reset link sent to ${email}. Once they’ve chosen a new password they can sign in. If they were removed, they’ll be asked for the invite code.`;
+      msg.classList.add('ok');
+      input.value = '';
+    } catch (e) {
+      msg.textContent = resetErr(e);
+    } finally {
+      busy(btn, false);
     }
   }
 
@@ -5003,6 +5091,7 @@
         break;
       }
       case 'remove-member': removeMember(); break;
+      case 'reset-member': resetMember(); break;
       case 'copy-invite-link': copyText(inviteLink(), 'Invite link copied — paste it in a text or email'); break;
       case 'copy-invite-code': copyText(S.invite.code, 'Invite code copied'); break;
       case 'copy-invite-message': copyText(inviteMessage(), 'Invite message copied — paste it anywhere'); break;
@@ -5021,7 +5110,7 @@
         break;
       }
       case 'reset-self':
-        try { await auth.sendPasswordResetEmail(S.user.email); toast(`Reset link sent to ${S.user.email}`); }
+        try { await sendReset(S.user.email); toast(`Reset link sent to ${S.user.email}`); }
         catch (err) { toast('Couldn’t send the email. Please try again later.', true); }
         break;
     }

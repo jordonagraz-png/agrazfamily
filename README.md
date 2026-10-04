@@ -70,8 +70,19 @@ Everything lives in the hub under **Invite family** (sidebar, the phone's
   them right on the Invite page or in the Directory (a badge shows how many
   are waiting).
 - **Remove someone:** admins can decline/remove from the site, or delete their
-  document in the `users` collection. To block them for good, also disable
+  document in the `users` collection. Removing takes them out of the hub but
+  keeps their sign-in account, so they can come back later: they sign up again
+  with the same email and the invite code. If their old password works they're
+  straight back in. If it doesn't, the hub says "Welcome back" and offers them a
+  reset link instead of "already exists". To block them for good, also disable
   their account under Authentication → Users.
+- **Reset someone's password:** nobody can see or set another person's password,
+  but admins can have Firebase email them a link to choose a new one. Use **Send
+  password reset** on their card in the Directory, or **Help someone sign in** on
+  the Invite page for any email, including someone you removed. The email comes
+  from Firebase (`noreply@agrazfamily.firebaseapp.com`). To bring them back to the
+  hub afterwards, add `www.agrazfamily.com` under Authentication → Settings →
+  Authorized domains. Until then the email is sent without the link back.
 
 ### Owner and admins
 

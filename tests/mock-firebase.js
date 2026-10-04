@@ -5,7 +5,9 @@
    oldRules (the latest firestore.rules aren't published: new collections and the owner claim are refused),
    treeDocs ({ meta, part0, … } — an imported family tree), treeId (your place in the tree),
    memberTreeIds ({ uid: treeId } for other members), scores ({ 'uid_game': { uid, game, best, name, at } }),
-   treePhotos ({ pid: { img, uid } } — photos already on the tree).
+   treePhotos ({ pid: { img, uid } } — photos already on the tree),
+   returning ({ email, uid, name } — an account that already exists but has no member doc, e.g. someone removed;
+   its old join is kept unless joined: false). Reset emails are recorded in window.__resets.
    The test owner key is 'test-owner-key'.
    Optional window.__IMG = { photos: [...dataUrls], memorial: [...], av1 } to use real photos. */
 (function () {
@@ -151,6 +153,8 @@
   if (M.empty) ['events', 'updates', 'memories', 'vault', 'memorial', 'recipes', 'tributes', 'candles', 'comments', 'capsules', 'capsuleLetters', 'stories', 'storyAudio'].forEach(k => { store[k] = {}; });
   if (M.newUser) delete store.users.u1;
   if (M.noInvite) delete store.config.invite;
+  if (M.returning && M.returning.joined !== false) store.joins[M.returning.uid] = { code: 'an-old-code', createdAt: '2025-01-01T00:00:00.000Z' };
+  window.__resets = [];
 
   let current = M.signedIn ? Object.assign({}, ME) : null;
   const listeners = [];
@@ -169,17 +173,19 @@
     setPersistence: () => delay(null, 5),
     signInWithEmailAndPassword(email, pass) {
       if (pass !== 'password123') return fail('auth/invalid-credential');
-      current = mkUser(Object.assign({}, ME, { email }));
+      const back = M.returning && M.returning.email === email;
+      current = mkUser(back ? { uid: M.returning.uid, email, displayName: M.returning.name || null } : Object.assign({}, ME, { email }));
       setTimeout(emit, 10);
       return delay({ user: current });
     },
     createUserWithEmailAndPassword(email) {
+      if (M.returning && M.returning.email === email) return fail('auth/email-already-in-use');
       current = mkUser({ uid: 'new1', email, displayName: null });
       setTimeout(emit, 10);
       return delay({ user: current });
     },
     signOut() { current = null; setTimeout(emit, 10); return delay(); },
-    sendPasswordResetEmail: () => delay()
+    sendPasswordResetEmail(email, settings) { window.__resets.push({ email, url: settings && settings.url }); return delay(); }
   };
 
   let auto = 1;
