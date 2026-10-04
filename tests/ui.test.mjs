@@ -950,11 +950,11 @@ try {
     await done(shaky, 'family tree (shaky connection)');
 
     // A longer outage: it says so, then keeps trying by itself and opens once the connection is back.
+    // (The app's retry pauses are real time, so watch for each moment rather than sleeping past it.)
     const outage = await open('/family/#tree', { signedIn: true, admin: false, treeDocs, treeTrouble: { fail: 5 } });
-    await outage.waitForTimeout(SLOW * 10500);
-    ok((await outage.textContent('#tree-body')).includes('keep trying by ourselves'), 'after a longer outage it says it will keep trying');
-    await outage.waitForTimeout(SLOW * 6500);
-    ok(!!(await outage.$('.tcard')), '…and the tree opens by itself, no refresh needed');
+    const until = (fn, ms) => outage.waitForFunction(fn, null, { timeout: ms, polling: 100 }).then(() => true, () => false);
+    ok(await until(() => (document.querySelector('#tree-body') || {}).textContent.includes('keep trying by ourselves'), 25000), 'after a longer outage it says it will keep trying');
+    ok(await until(() => !!document.querySelector('#tree-canvas .tcard'), 30000), '…and the tree opens by itself, no refresh needed');
     await done(outage, 'family tree (outage)');
 
     // Signing out forgets the tree on this device.
