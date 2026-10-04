@@ -174,7 +174,7 @@ try {
     await f.click('#form-reset button[type=submit]');
     await f.waitForTimeout(SLOW * 400);
     ok((await f.textContent('#auth-msg')).includes('reset link is on its way') && await store(f, () => window.__resets.some(x => x.email === 'back@example.com')), 'one tap sends them a reset link');
-    ok(await store(f, () => window.__resets[0].url === location.origin + '/family/'), 'the reset email leads back to the hub');
+    ok(await store(f, () => !window.__resets[0].url), 'the reset email is sent plain (no continue link Firebase could refuse)');
     // …they choose a new password from the email and sign in: the code they typed is waiting for them.
     await f.click('#form-reset [data-auth=login]');
     await f.fill('#login-email', 'back@example.com');

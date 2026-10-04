@@ -83,9 +83,9 @@ Everything lives in the hub under **Invite family** (sidebar, the phone's
   but admins can have Firebase email them a link to choose a new one. Use **Send
   password reset** on their card in the Directory, or **Help someone sign in** on
   the Invite page for any email, including someone you removed. The email comes
-  from Firebase (`noreply@agrazfamily.firebaseapp.com`). To bring them back to the
-  hub afterwards, add `www.agrazfamily.com` under Authentication → Settings →
-  Authorized domains. Until then the email is sent without the link back.
+  from Firebase (`noreply@agrazfamily.firebaseapp.com`) and often lands in spam.
+  If it never arrives, delete their sign-in in the Firebase console
+  (Authentication → Users → **⋮ → Delete account**) and have them sign up again.
 
 ### Owner and admins
 

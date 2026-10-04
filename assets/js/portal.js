@@ -392,16 +392,10 @@
     } catch (e) { return null; }
   }
   const forgetRejoin = () => { try { localStorage.removeItem('agraz-rejoin'); } catch (e) {} };
-  // Firebase emails a link to choose a new password. Its "Continue" button comes back to the hub
-  // when this address is on Firebase's list of authorized domains; otherwise the email goes without it.
-  async function sendReset(email) {
-    try {
-      await auth.sendPasswordResetEmail(email, { url: `${location.origin}/family/` });
-    } catch (e) {
-      if (e && /continue-uri|unauthorized-domain/.test(e.code || '')) await auth.sendPasswordResetEmail(email);
-      else throw e;
-    }
-  }
+  // Firebase emails a link to choose a new password. It's sent plain: a "continue to the site" link
+  // only works for domains on Firebase's authorized list, and Firebase can quietly drop the email
+  // (reporting success) when it isn't.
+  const sendReset = email => auth.sendPasswordResetEmail(email);
   const resetErr = e => (e && e.code === 'auth/user-not-found' ? 'No account uses that email. They can sign up with the invite code instead.' : e && /invalid-email|missing-email/.test(e.code || '') ? 'Please enter a valid email address.' : e && e.code === 'auth/too-many-requests' ? 'Too many emails sent. Please wait a few minutes and try again.' : 'Couldn’t send the email. Please try again later.');
 
   // The server checks the code (firestore.rules → joins/{uid} must match config/invite)
@@ -460,7 +454,7 @@
     busy(btn, true, 'Sending…');
     try {
       await sendReset(email);
-      authMsg('If that email has an account, a reset link is on its way. Check your inbox, and your spam folder too.', true);
+      authMsg('If that email has an account, a reset link is on its way from noreply@agrazfamily.firebaseapp.com. Check your inbox and spam folder. Nothing after 10 minutes? Ask a family admin to delete your old sign-in, then sign up again.', true);
     } catch (err) {
       if (err && err.code === 'auth/user-not-found') authMsg('If that email has an account, a reset link is on its way. Check your inbox, and your spam folder too.', true);
       else authMsg(authErr(err));
