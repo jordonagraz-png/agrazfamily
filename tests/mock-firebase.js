@@ -8,6 +8,8 @@
    treePhotos ({ pid: { img, uid } } — photos already on the tree),
    returning ({ email, uid, name } — an account that already exists but has no member doc, e.g. someone removed;
    its old join is kept unless joined: false). Reset emails are recorded in window.__resets.
+   treeTrouble ({ fail: n, hang: n } — the first n reads of tree docs fail as "unavailable", or never answer).
+   Reads of tree docs are counted in window.__treeReads.
    The test owner key is 'test-owner-key'.
    Optional window.__IMG = { photos: [...dataUrls], memorial: [...], av1 } to use real photos. */
 (function () {
@@ -155,6 +157,8 @@
   if (M.noInvite) delete store.config.invite;
   if (M.returning && M.returning.joined !== false) store.joins[M.returning.uid] = { code: 'an-old-code', createdAt: '2025-01-01T00:00:00.000Z' };
   window.__resets = [];
+  window.__treeReads = 0;
+  const trouble = Object.assign({ fail: 0, hang: 0 }, M.treeTrouble || {});
 
   let current = M.signedIn ? Object.assign({}, ME) : null;
   const listeners = [];
@@ -233,6 +237,11 @@
             if (M.oldRules && ['tree', 'treePhotos', 'capsules', 'stories', 'storyAudio', 'scores'].includes(c)) return fail('permission-denied');
             // like firestore.rules: a time capsule's letter stays sealed until its day
             if (c === 'capsuleLetters' && !(store.capsules[id] && store.capsules[id].openAt <= Date.now())) return fail('permission-denied');
+            if (c === 'tree') {
+              window.__treeReads++;
+              if (trouble.hang > 0) { trouble.hang--; return new Promise(() => {}); }
+              if (trouble.fail > 0) { trouble.fail--; return fail('unavailable'); }
+            }
             return delay(snapDoc(c, id));
           },
           set(data) {

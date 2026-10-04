@@ -206,6 +206,46 @@
   const auth = firebase.auth();
   const db = firebase.firestore();
   const col = name => db.collection(name);
+  // Reads that matter (the family tree) shouldn't fail on a passing hiccup: each try gets a time
+  // limit, and a dropped or stalled read is tried again with a growing pause. A refusal from the
+  // security rules is final.
+  const TRANSIENT = /unavailable|deadline|timeout|timed out|internal|aborted|cancelled|resource-exhausted|unknown|offline|network/i;
+  async function sturdy(read, tries = 4, limit = 20000) {
+    for (let i = 0; ; i++) {
+      let timer;
+      try {
+        return await Promise.race([read(), new Promise((_, no) => { timer = setTimeout(() => no(Object.assign(new Error('timed out'), { code: 'deadline-exceeded' })), limit); })]);
+      } catch (e) {
+        if (denied(e) || i >= tries - 1 || !TRANSIENT.test(`${e && e.code} ${e && e.message}`)) throw e;
+        await new Promise(r => setTimeout(r, 600 * Math.pow(2, i)));
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+  }
+  // ---- a copy of the family tree on this device ----
+  // The tree rarely changes, so after the first visit it opens straight from here and is only
+  // downloaded again when an admin updates it. Kept only for "Keep me signed in"; cleared on sign-out.
+  const deviceStore = (() => {
+    let dbp = null;
+    const open = () => dbp || (dbp = new Promise((resolve, reject) => {
+      const r = indexedDB.open('agraz-hub', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('kv');
+      r.onsuccess = () => resolve(r.result);
+      r.onerror = () => reject(r.error);
+    }).catch(e => { dbp = null; throw e; }));
+    const run = (mode, fn) => open().then(idb => new Promise((resolve, reject) => {
+      const tx = idb.transaction('kv', mode), req = fn(tx.objectStore('kv'));
+      tx.oncomplete = () => resolve(req && req.result);
+      tx.onerror = tx.onabort = () => reject(tx.error);
+    }));
+    return {
+      get: k => run('readonly', st => st.get(k)).catch(() => null),
+      put: (k, v) => run('readwrite', st => st.put(v, k)).catch(() => {}),
+      clear: () => run('readwrite', st => st.clear()).catch(() => {})
+    };
+  })();
+  const keepOnDevice = () => { try { return 'indexedDB' in window && localStorage.getItem('agraz-remember') !== '0'; } catch (e) { return false; } };
 
   /* ===================== State ===================== */
   const S = {
@@ -294,6 +334,7 @@
     try {
       const P = firebase.auth.Auth.Persistence;
       await auth.setPersistence($('#login-remember').checked ? P.LOCAL : P.SESSION);
+      try { localStorage.setItem('agraz-remember', $('#login-remember').checked ? '1' : '0'); } catch (e) {}
       await auth.signInWithEmailAndPassword(email, pass);
     } catch (err) {
       authMsg(authErr(err));
@@ -320,6 +361,7 @@
     let cred, returning = false;
     try {
       await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+      try { localStorage.setItem('agraz-remember', '1'); } catch (e) {}
       cred = await auth.createUserWithEmailAndPassword(email, pass);
     } catch (err) {
       // Been here before (removed from the hub and now coming back, say)? Their account is still
@@ -469,6 +511,7 @@
     if (!user) {
       const wasAuth = document.body.dataset.state === 'auth';
       resetData();
+      deviceStore.clear();
       setScreen('auth');
       if (!wasAuth || !$('#form-finish').hidden || !$('#form-pending').hidden) authMode(location.hash.startsWith('#join') ? 'join' : 'login');
       return;
@@ -632,11 +675,22 @@
   }, { rootMargin: '0px 0px -4% 0px' }) : null;
   function tagReveals() {
     if (!rio || performance.now() > revealUntil) return;
+    let tagged = false;
     $$(REVEAL).forEach(el => {
-      if (revealed.has(el) || el.closest('[hidden]')) return;
+      if (revealed.has(el) || el.closest('[hidden]') || el.closest('#view-tree')) return;
       revealed.add(el);
       el.classList.add('rv');
       rio.observe(el);
+      tagged = true;
+    });
+    if (tagged) setTimeout(unstick, 2600);
+  }
+  // Safety net: anything on screen still waiting to rise in (the observer can miss an element that
+  // moved during a page change) simply appears.
+  function unstick() {
+    $$('.rv:not(.rv-in)').forEach(el => {
+      const r = el.getBoundingClientRect();
+      if (r.bottom > 0 && r.top < innerHeight && r.width) { rio.unobserve(el); el.classList.remove('rv'); }
     });
   }
   if (rio) new MutationObserver(() => { if (performance.now() < revealUntil) requestAnimationFrame(tagReveals); }).observe($('.main'), { childList: true, subtree: true });
@@ -3786,20 +3840,76 @@
   const capFirst = x => x.charAt(0).toUpperCase() + x.slice(1);
   const vtName = pid => 'tp-' + String(pid).replace(/[^A-Za-z0-9_-]/g, '');
 
+  // Open from this device when there's a copy (instantly), otherwise download it; either way,
+  // check in the background that it's still the latest.
   async function loadTree() {
     await loadTreeLib();
-    const metaSnap = await col('tree').doc('meta').get();
+    const saved = keepOnDevice() ? await deviceStore.get('tree') : null;
+    if (saved && S.user && saved.uid === S.user.uid && saved.meta && Array.isArray(saved.people) && saved.people.length) {
+      setTreeModel(saved.meta, Object.assign({}, saved.meta, { people: saved.people, families: saved.families || [] }), saved.research);
+      S.tree.checking = refreshTree(saved.meta);
+      return;
+    }
+    await fetchTree();
+  }
+  async function fetchTree() {
+    const metaSnap = await sturdy(() => col('tree').doc('meta').get(), 5, 10000);
     if (!metaSnap.exists) { S.tree = { status: 'empty', photos: {} }; return; }
     const meta = metaSnap.data();
-    const snaps = await Promise.all(Array.from({ length: Math.max(1, Math.min(20, meta.parts || 1)) }, (_, i) => col('tree').doc('part' + i).get()));
+    const snaps = await Promise.all(Array.from({ length: Math.max(1, Math.min(20, meta.parts || 1)) }, (_, i) => sturdy(() => col('tree').doc('part' + i).get(), 5, 30000)));
     const model = Object.assign({}, meta, { people: [], families: [] });
     snaps.forEach(s => { if (s.exists) { const d = s.data(); model.people.push(...(d.people || [])); model.families.push(...(d.families || [])); } });
-    setTreeModel(meta, model);
-    try { const r = await col('tree').doc('research').get(); if (r.exists) S.tree.research = r.data().people || {}; } catch (e) {}
+    let research;
+    try { const r = await sturdy(() => col('tree').doc('research').get(), 3); research = r.exists ? r.data().people || {} : {}; } catch (e) {}
+    setTreeModel(meta, model, research);
+    keepTreeOnDevice();
   }
-  function setTreeModel(meta, model) {
+  // Is the copy on this device still the latest? If an admin has updated the tree since, swap it in
+  // (staying with the same person); if only the research changed, just that.
+  async function refreshTree(had) {
+    try {
+      const metaSnap = await sturdy(() => col('tree').doc('meta').get(), 5, 10000);
+      const t = S.tree;
+      if (!t || t.status !== 'ready') return;
+      if (!metaSnap.exists) {
+        deviceStore.put('tree', null);
+        S.tree = { status: 'empty', photos: {} };
+        if (S.view === 'tree') renderTree();
+        return;
+      }
+      const meta = metaSnap.data();
+      if (meta.importedAt !== had.importedAt || meta.parts !== had.parts || meta.people !== had.people) {
+        const keep = { focus: t.focus, view: t.view };
+        await fetchTree();
+        if (S.tree.ix && S.tree.ix.get(keep.focus)) { S.tree.focus = keep.focus; S.tree.view = keep.view; }
+        if (S.view === 'tree') renderTree();
+        return;
+      }
+      const r = await sturdy(() => col('tree').doc('research').get(), 3);
+      const research = r.exists ? r.data().people || {} : {};
+      if (S.tree === t && JSON.stringify(research) !== JSON.stringify(t.research || {})) {
+        t.research = research;
+        keepTreeOnDevice();
+        if (S.view === 'tree') paintTree(false);
+      }
+    } catch (e) {
+      // Can't reach the database right now: keep showing the copy on this device. Turned away: forget it.
+      if (denied(e)) { deviceStore.clear(); S.tree = { status: 'denied', photos: {} }; if (S.view === 'tree') renderTree(); }
+    }
+  }
+  function keepTreeOnDevice() {
+    const t = S.tree;
+    if (!keepOnDevice() || !S.user || !t || t.status !== 'ready') return;
+    deviceStore.put('tree', { uid: S.user.uid, meta: t.meta, people: t.model.people, families: t.model.families, research: t.research || {} });
+  }
+  function keepTreePhotosOnDevice() {
+    const t = S.tree;
+    if (!keepOnDevice() || !S.user || !t || !t.photos) return;
+    deviceStore.put('treePhotos', { uid: S.user.uid, photos: t.photos });
+  }
+  function setTreeModel(meta, model, research) {
     const prev = S.tree || {};
-    S.tree = { status: 'ready', meta, model, ix: T().index(model), photos: prev.photos || {}, research: prev.research || {}, view: prev.view || 'family', history: [], relCache: new Map(), memorialThumb: prev.memorialThumb || '', ghosts: new Map(),
+    S.tree = { status: 'ready', meta, model, ix: T().index(model), photos: prev.photos || {}, research: research || prev.research || {}, view: prev.view || 'family', history: [], relCache: new Map(), memorialThumb: prev.memorialThumb || '', ghosts: new Map(),
       counts: model.people.reduce((c, p) => { c.records += (p.src || []).length; c.media += (p.md || []).length; return c; }, { records: 0, media: 0 }) };
     S.tree.focus = treeStart();
     S.tree.photosLoaded = loadTreePhotos();
@@ -3814,23 +3924,34 @@
     return best;
   }
   async function loadTreePhotos() {
+    const t = S.tree;
+    const repaint = () => {
+      if (S.view !== 'tree' || S.tree !== t || t.status !== 'ready') return;
+      paintTree(false);
+      const n = t.model.people.reduce((k, p) => k + (photoFor(p.id) ? 1 : 0), 0), el = $('#ts-photos');
+      if (el) { el.dataset.count = n; el.textContent = n.toLocaleString(); }
+    };
+    // The photos kept on this device first, then the latest from the database.
+    const saved = keepOnDevice() && !Object.keys(t.photos).length ? await deviceStore.get('treePhotos') : null;
+    const kept = saved && S.user && saved.uid === S.user.uid && saved.photos && S.tree === t ? Object.keys(saved.photos) : [];
+    if (kept.length) { Object.assign(t.photos, saved.photos); repaint(); }
     try {
-      const snap = await col('treePhotos').get();
-      snap.docs.forEach(d => { const v = d.data(); if (okImg(v.img)) S.tree.photos[d.id] = { img: v.img, uid: v.uid }; });
+      const snap = await sturdy(() => col('treePhotos').get(), 3, 45000);
+      const fresh = {};
+      snap.docs.forEach(d => { const v = d.data(); if (okImg(v.img)) fresh[d.id] = { img: v.img, uid: v.uid }; });
+      kept.forEach(k => { if (!fresh[k]) delete t.photos[k]; }); // removed since this device last looked
+      Object.assign(t.photos, fresh);
+      keepTreePhotosOnDevice();
     } catch (e) { /* photos are a bonus */ }
     // The memorial's first photo stands in for the home person, if they have no photo yet.
-    if (!S.tree.memorialThumb && S.tree.ix && S.tree.ix.get(HOME_PERSON)) {
+    if (!t.memorialThumb && t.ix && t.ix.get(HOME_PERSON)) {
       try {
         const snap = await col('memorial').orderBy('order').limit(1).get();
         const src = snap.docs.length && snap.docs[0].data().imageData;
-        if (okImg(src)) S.tree.memorialThumb = await thumbOf(src, 320);
+        if (okImg(src)) t.memorialThumb = await thumbOf(src, 320);
       } catch (e) {}
     }
-    if (S.view === 'tree' && S.tree.status === 'ready') {
-      paintTree(false);
-      const n = S.tree.model.people.reduce((k, p) => k + (photoFor(p.id) ? 1 : 0), 0), el = $('#ts-photos');
-      if (el) { el.dataset.count = n; el.textContent = n.toLocaleString(); }
-    }
+    repaint();
   }
   function thumbOf(src, size) {
     return new Promise(resolve => {
@@ -3863,23 +3984,41 @@
   const relLong = r => (!r ? '' : r === 'you' ? 'This is you' : /^your /.test(r) || / of your /.test(r) ? capFirst(r) : `Your ${r}`);
   const relShort = r => (!r ? '' : r === 'you' ? 'You' : capFirst(r.replace(/^your /, '')));
 
+  // One load at a time, however often the page is opened while it's on its way.
+  let treeLoading = null;
   async function openTree() {
     const body = $('#tree-body');
     if (!S.tree || !S.tree.status || S.tree.status === 'error' || S.tree.status === 'denied') {
       body.innerHTML = '<div class="tree-skel"><div class="skel"></div><div class="skel"></div></div>';
       $('#tree-head').hidden = true;
-      try { await loadTree(); }
-      catch (e) { S.tree = { status: denied(e) ? 'denied' : 'error', photos: {} }; }
+      if (!treeLoading) {
+        treeLoading = loadTree()
+          .catch(e => { S.tree = { status: denied(e) ? 'denied' : 'error', photos: {} }; })
+          .finally(() => { treeLoading = null; });
+      }
+      await treeLoading;
     }
     if (S.treeKey) { const key = S.treeKey; S.treeKey = null; await unlockTree(key); }
     if (S.view === 'tree') renderTree();
   }
+  // If the tree couldn't load, it keeps trying by itself (after 5 s, 15 s, 30 s, then every minute),
+  // and straight away when the connection or the tab comes back.
+  let treeRetries = 0, treeRetryTimer = 0;
+  const retryTree = () => { clearTimeout(treeRetryTimer); if (S.me && S.view === 'tree' && S.tree && S.tree.status === 'error' && !treeLoading && !document.hidden) openTree(); };
+  function scheduleTreeRetry() {
+    clearTimeout(treeRetryTimer);
+    treeRetryTimer = setTimeout(retryTree, [5000, 15000, 30000][treeRetries] || 60000);
+    treeRetries++;
+  }
+  window.addEventListener('online', retryTree);
+  document.addEventListener('visibilitychange', retryTree);
   function renderTree() {
     const t = S.tree || {}, body = $('#tree-body');
     $('#tree-head').hidden = t.status !== 'ready';
     $('#tree-photos-btn').hidden = !isAdmin();
     if (t.status === 'denied') { body.innerHTML = rulesNeededHTML('The family tree'); return; }
-    if (t.status === 'error') { body.innerHTML = errorHTML('the family tree'); return; }
+    if (t.status === 'error') { body.innerHTML = errorHTML('the family tree').replace('Check your connection and try again.', 'Check your connection. We’ll keep trying by ourselves.'); scheduleTreeRetry(); return; }
+    treeRetries = 0;
     if (t.status === 'empty') { body.innerHTML = treeImportHTML(); return; }
     body.innerHTML = `${t.updating ? treeImportHTML(true) : ''}${treeStatsHTML()}${treeMeBannerHTML()}
       <div class="tree-layout">
@@ -3906,10 +4045,18 @@
   function paintTree(animate) {
     const t = S.tree;
     if (!t || t.status !== 'ready' || !$('#tree-canvas')) return;
+    // Each part draws on its own, so one that trips can't leave the whole page blank.
+    const part = (fn, sel) => {
+      try { fn(); } catch (e) {
+        const el = $(sel);
+        if (el) el.innerHTML = '<p class="muted tree-oops">This part couldn’t be drawn. <button class="link-btn" type="button" data-action="tree-retry">Reload the tree</button></p>';
+        setTimeout(() => { throw e; });
+      }
+    };
     const draw = () => {
-      if (t.view === 'fan') renderFan(); else renderFamily();
-      renderStory();
-      renderPanel();
+      part(() => { if (t.view === 'fan') renderFan(); else renderFamily(); }, '#tree-canvas');
+      part(renderStory, '#tree-story');
+      part(renderPanel, '#tree-panel');
       const back = $('#tree-back');
       if (back) back.hidden = !t.history.length;
     };
@@ -3947,7 +4094,7 @@
       const end = Number(el.dataset.count), t0 = performance.now();
       if (!end) return;
       (function step(now) {
-        const k = Math.min(1, (now - t0) / 1100), v = Math.round(end * (1 - Math.pow(1 - k, 3)));
+        const k = Math.max(0, Math.min(1, (now - t0) / 1100)), v = Math.round(end * (1 - Math.pow(1 - k, 3)));
         el.textContent = v.toLocaleString();
         if (k < 1 && el.isConnected) requestAnimationFrame(step);
       })(t0);
@@ -4419,6 +4566,7 @@
     if (count) {
       await col('tree').doc('research').set({ people, count, createdAt: nowIso(), by: myName().slice(0, 80) });
       S.tree.research = people;
+      keepTreeOnDevice();
     }
     return count;
   }
@@ -4518,6 +4666,7 @@
     for (let i = parts.length; i < before; i++) b.delete(col('tree').doc('part' + i));
     await b.commit();
     setTreeModel(meta, Object.assign({}, meta, { people: model.people, families: model.families }));
+    keepTreeOnDevice();
   }
   async function importTree(btn) {
     const model = S.treeDraft;
@@ -4609,6 +4758,7 @@
       const img = await compressImage(file, 320, 0.84, 85000, true);
       await col('treePhotos').doc(pid).set({ img, uid: S.user.uid, by: myName().slice(0, 80), createdAt: nowIso() });
       S.tree.photos[pid] = { img, uid: S.user.uid };
+      keepTreePhotosOnDevice();
       paintTree(false);
       toast('Photo added to the tree');
     } catch (e) {
@@ -4620,6 +4770,7 @@
     try {
       await col('treePhotos').doc(pid).delete();
       delete S.tree.photos[pid];
+      keepTreePhotosOnDevice();
       paintTree(false);
       toast('Photo removed');
     } catch (e) { toast('Couldn’t remove it. Please try again.', true); }

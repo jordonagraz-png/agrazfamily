@@ -918,7 +918,52 @@ try {
     ok(await mbr.isHidden('#tree-photos-btn') && !(await mbr.$('[data-action=tree-update]')), 'only admins add photos in bulk or update the tree');
     ok(await mbr.$eval('.tcard[data-pid="I10"] img', i => i.src.startsWith('data:image/')), 'a member’s profile photo appears on their card in the tree');
     ok((await mbr.textContent('.tree-me')).includes('Jordon Agraz'), 'members can find themselves too');
+    // The next visit opens straight from this device, then checks the database for anything newer.
+    ok(await mbr.evaluate(() => window.__treeReads) === 3, 'the first visit downloads the tree (details, people, research)');
+    await mbr.reload({ waitUntil: 'domcontentloaded' });
+    await mbr.waitForTimeout(SLOW * 1200);
+    ok(!!(await mbr.$('.tcard[data-pid="I10"]')) && await mbr.evaluate(() => window.__treeReads) === 2, 'the next visit opens from this device and only checks it’s still the latest');
+    ok(!(await mbr.$('#view-tree .rv')), 'nothing on the tree page waits on a scroll animation to appear');
+    // Pretend an admin has updated the tree since this device saved it.
+    await mbr.evaluate(() => new Promise(done => {
+      const r = indexedDB.open('agraz-hub', 1);
+      r.onsuccess = () => {
+        const tx = r.result.transaction('kv', 'readwrite'), st = tx.objectStore('kv'), g = st.get('tree');
+        g.onsuccess = () => { const v = g.result; v.meta.importedAt = '2020-01-01T00:00:00.000Z'; v.people.find(p => p.id === 'I10').n = 'Old Name'; st.put(v, 'tree'); };
+        tx.oncomplete = done;
+      };
+    }));
+    await mbr.reload({ waitUntil: 'domcontentloaded' });
+    await mbr.waitForTimeout(SLOW * 1500);
+    ok(!(await mbr.textContent('#tree-body')).includes('Old Name') && await mbr.evaluate(() => window.__treeReads) === 4, 'when the tree has been updated since, the new one is downloaded and shown by itself');
     await done(mbr, 'family tree (member)');
+
+    // A shaky connection: the first reads are dropped. The tree still opens, without a refresh.
+    const shaky = await open('/family/#tree', { signedIn: true, admin: false, treeDocs, treeTrouble: { fail: 2 } });
+    await shaky.waitForTimeout(SLOW * 4500);
+    ok(!!(await shaky.$('.tcard')) && !(await shaky.$('#tree-body .tree-skel')), 'dropped reads are retried by themselves: the tree opens without a refresh');
+    // Hopping away and back while it loads starts no second download.
+    await go(shaky, 'home');
+    await go(shaky, 'tree');
+    await shaky.waitForTimeout(SLOW * 800);
+    ok(!!(await shaky.$('.tcard')), 'and it’s still there after hopping to another page and back');
+    await done(shaky, 'family tree (shaky connection)');
+
+    // A longer outage: it says so, then keeps trying by itself and opens once the connection is back.
+    const outage = await open('/family/#tree', { signedIn: true, admin: false, treeDocs, treeTrouble: { fail: 5 } });
+    await outage.waitForTimeout(SLOW * 10500);
+    ok((await outage.textContent('#tree-body')).includes('keep trying by ourselves'), 'after a longer outage it says it will keep trying');
+    await outage.waitForTimeout(SLOW * 6500);
+    ok(!!(await outage.$('.tcard')), '…and the tree opens by itself, no refresh needed');
+    await done(outage, 'family tree (outage)');
+
+    // Signing out forgets the tree on this device.
+    const out = await open('/family/#tree', { signedIn: true, admin: false, treeDocs });
+    await out.waitForTimeout(SLOW * 1200);
+    await out.evaluate(() => firebase.auth().signOut());
+    await out.waitForTimeout(SLOW * 600);
+    ok(await out.evaluate(() => new Promise(done => { const r = indexedDB.open('agraz-hub', 1); r.onsuccess = () => { const g = r.result.transaction('kv').objectStore('kv').get('tree'); g.onsuccess = () => done(!g.result); }; })), 'signing out removes the tree from this device');
+    await done(out, 'family tree (sign out)');
 
     const none = await open('/family/#tree', { signedIn: true, admin: false });
     await none.waitForTimeout(SLOW * 1000);

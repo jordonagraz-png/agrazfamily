@@ -222,6 +222,15 @@ settings** → **Export tree**, download the file, then in the hub go to
 and saved to the private database — never to this repository. To refresh it
 later, export again and tap **Update** on the Family Tree page.
 
+**Opening it, quickly and reliably:** the first visit downloads the tree; after
+that it opens straight from a copy kept on the device (IndexedDB) and only
+downloads again when an admin has updated it. Research and photos are checked
+quietly in the background. The copy is kept only for "Keep me signed in" and is
+deleted on sign-out. Each read has a time limit and is retried if it's dropped
+or stalls. If the database still can't be reached, the page says so and keeps
+trying by itself (and right away when the connection or the tab comes back), so
+nobody has to refresh.
+
 **One-tap link (optional):** `node tools/lock-tree.mjs "Family Tree.zip"
 [research.json]` locks the tree, and its research if you give it, into
 `assets/data/tree-import.bin` (gzip + AES-256-GCM). It then prints a private link,
