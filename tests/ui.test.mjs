@@ -178,6 +178,33 @@ try {
     await done(f, 'coming back (forgot password)');
   }
 
+  console.log('— keeping up with updates');
+  {
+    // The server now has a newer hub than the one this tab is running.
+    const newer = async page => page.route(BASE + '/family/', async route => {
+      if (route.request().resourceType() !== 'fetch') return route.continue();
+      const r = await route.fetch();
+      await route.fulfill({ response: r, body: (await r.text()).replace(/portal\.js\?v=\d+/, 'portal.js?v=299912312359') });
+    });
+    const a = await open('/family/', { signedIn: false });
+    await newer(a);
+    await a.evaluate(() => { window.__old = true; window.dispatchEvent(new Event('focus')); });
+    await a.waitForTimeout(SLOW * 1500);
+    ok(await a.evaluate(() => !window.__old), 'an older hub on the sign-in screen refreshes itself when a newer one is published');
+    await a.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await a.waitForTimeout(SLOW * 800);
+    ok(!!(await a.$('.update-bar')), '…once: after that it offers a Refresh button instead of reloading again');
+    await done(a, 'updates (sign-in screen)');
+
+    const b = await open('/family/#home', { signedIn: true });
+    await b.waitForTimeout(SLOW * 600);
+    await newer(b);
+    await b.evaluate(() => { window.__old = true; window.dispatchEvent(new Event('focus')); });
+    await b.waitForTimeout(SLOW * 800);
+    ok(await b.evaluate(() => window.__old === true) && !!(await b.$('.update-bar [data-action=reload-app]')), 'signed in, it never reloads by itself: a bar offers Refresh');
+    await done(b, 'updates (signed in)');
+  }
+
   console.log('— admin approvals');
   {
     const p = await open('/family/#directory', { signedIn: true });

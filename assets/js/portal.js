@@ -5092,6 +5092,7 @@
       }
       case 'remove-member': removeMember(); break;
       case 'reset-member': resetMember(); break;
+      case 'reload-app': location.reload(); break;
       case 'copy-invite-link': copyText(inviteLink(), 'Invite link copied — paste it in a text or email'); break;
       case 'copy-invite-code': copyText(S.invite.code, 'Invite code copied'); break;
       case 'copy-invite-message': copyText(inviteMessage(), 'Invite message copied — paste it anywhere'); break;
@@ -5142,6 +5143,40 @@
   });
   // Don't let a missed drop navigate away from the hub.
   ['dragover', 'drop'].forEach(ev => window.addEventListener(ev, e => { if (!e.target.closest || !e.target.closest('[data-drop]')) e.preventDefault(); }));
+
+  // ---- Keep up with updates ----
+  // A tab left open, or a page the browser reuses for up to 10 minutes, can be running an older hub.
+  // Whenever the hub comes into view, ask the server which version is current. If it's newer, refresh:
+  // straight away on the sign-in screen (nothing to lose), otherwise with a one-tap bar.
+  const stampOf = v => Number((/v=(\d+)/.exec(v || '') || [])[1] || 0);
+  let newerSeen = false;
+  async function checkForUpdate() {
+    if (newerSeen || !stampOf(ASSET_V) || document.hidden) return;
+    let live;
+    try {
+      const html = await (await fetch('/family/', { cache: 'no-store' })).text();
+      live = (/\/assets\/js\/portal\.js(\?v=\d+)/.exec(html) || [])[1];
+    } catch (e) { return; }
+    if (!live || stampOf(live) <= stampOf(ASSET_V)) return;
+    newerSeen = true;
+    let tried = '';
+    try { tried = sessionStorage.getItem('agraz-reloaded-for') || ''; } catch (e) {}
+    const typing = $$('#auth input[type="password"]').some(i => i.value);
+    if (document.body.dataset.state !== 'app' && !typing && tried !== live) {
+      try { sessionStorage.setItem('agraz-reloaded-for', live); } catch (e) {}
+      location.reload();
+      return;
+    }
+    const bar = document.createElement('div');
+    bar.className = 'update-bar';
+    bar.setAttribute('role', 'status');
+    bar.innerHTML = `<span>${icon('sparkle')}The family hub has just been updated.</span><button class="btn btn-sm btn-accent" type="button" data-action="reload-app">Refresh</button>`;
+    document.body.appendChild(bar);
+  }
+  document.addEventListener('visibilitychange', checkForUpdate);
+  window.addEventListener('focus', checkForUpdate);
+  setTimeout(checkForUpdate, 3000);
+  setInterval(checkForUpdate, 15 * 60 * 1000);
 
   // Links + misc
   paintThemeSeg();

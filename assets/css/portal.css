@@ -449,6 +449,9 @@ dialog::backdrop { background: rgba(7, 17, 20, .55); backdrop-filter: blur(4px);
 .toast { position: fixed; left: 50%; bottom: 28px; z-index: 300; transform: translate(-50%, 24px); opacity: 0; visibility: hidden; transition: transform .4s var(--ease-out), opacity .3s, visibility 0s .4s; max-width: min(92vw, 440px); padding: 13px 20px; border-radius: var(--r-pill); background: var(--ink); color: var(--paper); font-size: var(--fs-sm); font-weight: 500; box-shadow: var(--shadow-lg); pointer-events: none; text-align: center; }
 .toast.show { transform: translate(-50%, 0); opacity: 1; visibility: visible; transition: transform .4s var(--ease-out), opacity .3s; }
 .toast.err { background: var(--danger); color: #fff; }
+.update-bar { position: fixed; top: calc(14px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 310; display: flex; align-items: center; gap: 12px; padding: 8px 8px 8px 16px; border-radius: var(--r-pill); background: var(--ink); color: var(--paper); font-size: var(--fs-sm); font-weight: 500; box-shadow: var(--shadow-lg); max-width: min(94vw, 520px); }
+.update-bar > span { display: inline-flex; align-items: center; gap: 8px; }
+.update-bar .i { width: 16px; height: 16px; color: var(--gold); }
 .toast.has-actions { pointer-events: auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 12px; border-radius: var(--r-lg); max-width: min(94vw, 560px); }
 .toast-actions { display: inline-flex; flex-wrap: wrap; gap: 8px; }
 .toast-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: var(--r-pill); background: rgba(255, 255, 255, .18); color: inherit; font-weight: 600; font-size: .82rem; text-decoration: none; }

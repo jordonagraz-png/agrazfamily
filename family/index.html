@@ -25,23 +25,23 @@
 <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/css/base.css?v=202610041338">
-<link rel="stylesheet" href="/assets/css/portal.css?v=202610041338">
-<link rel="stylesheet" href="/assets/css/signature.css?v=202610041338">
-<link rel="stylesheet" href="/assets/css/seasons.css?v=202610041338">
+<link rel="stylesheet" href="/assets/css/base.css?v=202610041353">
+<link rel="stylesheet" href="/assets/css/portal.css?v=202610041353">
+<link rel="stylesheet" href="/assets/css/signature.css?v=202610041353">
+<link rel="stylesheet" href="/assets/css/seasons.css?v=202610041353">
 </head>
 <body data-state="loading">
 
 <!-- ======================= Splash ======================= -->
 <div class="splash" aria-hidden="true">
-  <svg class="splash-mark"><use href="/assets/icons.svg?v=202610041338#logo"/></svg>
+  <svg class="splash-mark"><use href="/assets/icons.svg?v=202610041353#logo"/></svg>
 </div>
 
 <!-- ======================= Sign in ======================= -->
 <section class="auth" id="auth" aria-labelledby="auth-title">
   <div class="auth-art">
     <a class="brand" href="/" aria-label="Back to the Agraz Family homepage">
-      <svg class="brand-mark" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#logo"/></svg>
+      <svg class="brand-mark" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#logo"/></svg>
       <span class="brand-word"><span class="brand-name">Agraz</span><span class="brand-sub">Family Hub</span></span>
     </a>
     <div class="auth-quote">
@@ -51,9 +51,9 @@
   </div>
 
   <div class="auth-panel">
-    <a class="auth-back" href="/"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#arrow-l"/></svg> agrazfamily.com</a>
+    <a class="auth-back" href="/"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#arrow-l"/></svg> agrazfamily.com</a>
     <div class="auth-card">
-      <div class="auth-lock"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#lock"/></svg></div>
+      <div class="auth-lock"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#lock"/></svg></div>
       <h1 class="auth-title" id="auth-title">Welcome home</h1>
       <p class="auth-sub" id="auth-sub">Sign in to the private family hub.</p>
 
@@ -71,11 +71,11 @@
           <label class="label" for="login-pass">Password <button type="button" class="link-btn" data-auth="reset">Forgot password?</button></label>
           <div class="pass-wrap">
             <input class="input" type="password" id="login-pass" autocomplete="current-password" placeholder="Your password" required>
-            <button type="button" class="pass-toggle" data-action="toggle-pass" aria-label="Show password"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#eye"/></svg></button>
+            <button type="button" class="pass-toggle" data-action="toggle-pass" aria-label="Show password"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#eye"/></svg></button>
           </div>
         </div>
         <label class="check"><input type="checkbox" id="login-remember" checked><span>Keep me signed in on this device</span></label>
-        <button class="btn btn-lg btn-block" type="submit">Sign in <svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#arrow-r"/></svg></button>
+        <button class="btn btn-lg btn-block" type="submit">Sign in <svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#arrow-r"/></svg></button>
       </form>
 
       <form class="auth-form" id="form-join" role="tabpanel" aria-labelledby="tab-join" novalidate hidden>
@@ -91,7 +91,7 @@
           <label class="label" for="join-pass">Create a password <span class="opt">8+ characters</span></label>
           <div class="pass-wrap">
             <input class="input" type="password" id="join-pass" autocomplete="new-password" placeholder="Choose a password" minlength="8" required>
-            <button type="button" class="pass-toggle" data-action="toggle-pass" aria-label="Show password"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#eye"/></svg></button>
+            <button type="button" class="pass-toggle" data-action="toggle-pass" aria-label="Show password"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#eye"/></svg></button>
           </div>
         </div>
         <div class="field">
@@ -107,7 +107,7 @@
           <input class="input" type="email" id="reset-email" autocomplete="username" inputmode="email" placeholder="you@example.com" required>
         </div>
         <button class="btn btn-lg btn-block" type="submit">Send reset link</button>
-        <button type="button" class="link-btn center" data-auth="login"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#arrow-l"/></svg> Back to sign in</button>
+        <button type="button" class="link-btn center" data-auth="login"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#arrow-l"/></svg> Back to sign in</button>
       </form>
 
       <form class="auth-form" id="form-finish" novalidate hidden>
@@ -121,7 +121,7 @@
       </form>
 
       <div class="auth-form" id="form-pending" hidden>
-        <div class="pending-illo" aria-hidden="true"><svg class="i"><use href="/assets/icons.svg?v=202610041338#hourglass"/></svg></div>
+        <div class="pending-illo" aria-hidden="true"><svg class="i"><use href="/assets/icons.svg?v=202610041353#hourglass"/></svg></div>
         <p class="auth-note" id="pending-who"></p>
         <button class="btn btn-lg btn-block" type="button" data-action="check-approval">Check again</button>
         <button type="button" class="link-btn center" data-action="signout">Sign out</button>
@@ -129,7 +129,7 @@
 
       <p class="form-msg" id="auth-msg" role="alert" aria-live="assertive"></p>
     </div>
-    <p class="auth-foot"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#shield"/></svg> Encrypted sign-in. Only invited family members can see what’s inside.</p>
+    <p class="auth-foot"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#shield"/></svg> Encrypted sign-in. Only invited family members can see what’s inside.</p>
   </div>
 </section>
 
@@ -137,30 +137,30 @@
 <div class="app" id="app">
   <aside class="sidebar" aria-label="Family hub navigation">
     <a class="brand side-brand" href="#home">
-      <svg class="brand-mark" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#logo"/></svg>
+      <svg class="brand-mark" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#logo"/></svg>
       <span class="brand-word"><span class="brand-name">Agraz</span><span class="brand-sub">Family Hub</span></span>
     </a>
     <nav class="side-nav">
       <p class="side-label">Family</p>
-      <a href="#home" data-nav="home"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#home"/></svg>Home</a>
-      <a href="#photos" data-nav="photos"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#image"/></svg>Photos</a>
-      <a href="#calendar" data-nav="calendar"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#calendar"/></svg>Calendar</a>
-      <a href="#updates" data-nav="updates"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#chat"/></svg>Updates</a>
-      <a href="#globe" data-nav="globe"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#earth"/></svg>Family Globe</a>
-      <a href="#games" data-nav="games"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#game"/></svg>Games</a>
+      <a href="#home" data-nav="home"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#home"/></svg>Home</a>
+      <a href="#photos" data-nav="photos"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#image"/></svg>Photos</a>
+      <a href="#calendar" data-nav="calendar"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#calendar"/></svg>Calendar</a>
+      <a href="#updates" data-nav="updates"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#chat"/></svg>Updates</a>
+      <a href="#globe" data-nav="globe"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#earth"/></svg>Family Globe</a>
+      <a href="#games" data-nav="games"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#game"/></svg>Games</a>
       <p class="side-label">Keepsakes</p>
-      <a href="#tree" data-nav="tree"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#pedigree"/></svg>Family Tree</a>
-      <a href="#stories" data-nav="stories"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#mic"/></svg>Voice Stories</a>
-      <a href="#capsules" data-nav="capsules"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#letter"/></svg>Time Capsules<span class="badge" data-capsule-badge hidden></span></a>
-      <a href="#recipes" data-nav="recipes"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#book"/></svg>Recipes</a>
-      <a href="#memorial" data-nav="memorial"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#candle"/></svg>In Memory</a>
+      <a href="#tree" data-nav="tree"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#pedigree"/></svg>Family Tree</a>
+      <a href="#stories" data-nav="stories"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#mic"/></svg>Voice Stories</a>
+      <a href="#capsules" data-nav="capsules"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#letter"/></svg>Time Capsules<span class="badge" data-capsule-badge hidden></span></a>
+      <a href="#recipes" data-nav="recipes"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#book"/></svg>Recipes</a>
+      <a href="#memorial" data-nav="memorial"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#candle"/></svg>In Memory</a>
       <p class="side-label">Private</p>
-      <a href="#directory" data-nav="directory"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#users"/></svg>Directory</a>
-      <a href="#invite" data-nav="invite"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#user-plus"/></svg>Invite family<span class="badge" data-pending-badge hidden></span></a>
-      <a href="#vault" data-nav="vault"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#key"/></svg>Family Vault</a>
+      <a href="#directory" data-nav="directory"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#users"/></svg>Directory</a>
+      <a href="#invite" data-nav="invite"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#user-plus"/></svg>Invite family<span class="badge" data-pending-badge hidden></span></a>
+      <a href="#vault" data-nav="vault"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#key"/></svg>Family Vault</a>
       <p class="side-label">Links</p>
-      <button type="button" data-action="jarvis"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#cpu"/></svg>JARVIS<span class="pill">AI</span><svg class="i ext" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#external"/></svg></button>
-      <a href="/"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#globe"/></svg>Public site</a>
+      <button type="button" data-action="jarvis"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#cpu"/></svg>JARVIS<span class="pill">AI</span><svg class="i ext" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#external"/></svg></button>
+      <a href="/"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#globe"/></svg>Public site</a>
     </nav>
     <div class="side-user">
       <a class="side-me" href="#profile" data-nav="profile">
@@ -169,10 +169,10 @@
       </a>
       <div class="side-user-actions">
         <button class="icon-btn theme-toggle" type="button" data-action="toggle-theme" aria-label="Switch color theme">
-          <svg class="i i-moon" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#moon"/></svg>
-          <svg class="i i-sun" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#sun"/></svg>
+          <svg class="i i-moon" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#moon"/></svg>
+          <svg class="i i-sun" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#sun"/></svg>
         </button>
-        <button class="icon-btn" type="button" data-action="signout" aria-label="Sign out"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#logout"/></svg></button>
+        <button class="icon-btn" type="button" data-action="signout" aria-label="Sign out"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#logout"/></svg></button>
       </div>
     </div>
   </aside>
@@ -180,13 +180,13 @@
   <div class="main">
     <header class="topbar">
       <a class="brand" href="#home" aria-label="Family hub home">
-        <svg class="brand-mark" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#logo"/></svg>
+        <svg class="brand-mark" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#logo"/></svg>
         <span class="brand-word"><span class="brand-name">Agraz</span></span>
       </a>
       <div class="topbar-actions">
         <button class="icon-btn theme-toggle" type="button" data-action="toggle-theme" aria-label="Switch color theme">
-          <svg class="i i-moon" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#moon"/></svg>
-          <svg class="i i-sun" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#sun"/></svg>
+          <svg class="i i-moon" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#moon"/></svg>
+          <svg class="i i-sun" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#sun"/></svg>
         </button>
         <a href="#profile" class="av av-36" data-me-avatar aria-label="My profile"></a>
       </div>
@@ -205,9 +205,9 @@
           </div>
           <div class="welcome-moments" id="home-moments" aria-hidden="true"></div>
           <div class="welcome-actions">
-            <button class="btn btn-light" type="button" data-action="new-event"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#plus"/></svg>New event</button>
-            <a class="btn btn-outline-light" href="#photos"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#upload"/></svg>Add photos</a>
-            <a class="btn btn-outline-light" href="#updates"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#chat"/></svg>Post an update</a>
+            <button class="btn btn-light" type="button" data-action="new-event"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#plus"/></svg>New event</button>
+            <a class="btn btn-outline-light" href="#photos"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#upload"/></svg>Add photos</a>
+            <a class="btn btn-outline-light" href="#updates"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#chat"/></svg>Post an update</a>
           </div>
           <div class="welcome-ribbon" aria-hidden="true"><div class="wr-track" id="home-ribbon"></div></div>
         </div>
@@ -215,39 +215,39 @@
         <div id="home-capsule" hidden></div>
         <div class="dash">
           <article class="card span-2">
-            <header class="card-head"><h2 class="card-title">Coming up</h2><a class="card-link" href="#calendar">Calendar <svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#arrow-r"/></svg></a></header>
+            <header class="card-head"><h2 class="card-title">Coming up</h2><a class="card-link" href="#calendar">Calendar <svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#arrow-r"/></svg></a></header>
             <div id="home-upcoming" class="agenda"></div>
           </article>
           <article class="card">
-            <header class="card-head"><h2 class="card-title">The family</h2><a class="card-link" href="#directory">Directory <svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#arrow-r"/></svg></a></header>
+            <header class="card-head"><h2 class="card-title">The family</h2><a class="card-link" href="#directory">Directory <svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#arrow-r"/></svg></a></header>
             <div id="home-family"></div>
           </article>
           <article class="card span-2 dash-photos">
-            <header class="card-head"><h2 class="card-title">Recent photos</h2><a class="card-link" href="#photos">All photos <svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#arrow-r"/></svg></a></header>
+            <header class="card-head"><h2 class="card-title">Recent photos</h2><a class="card-link" href="#photos">All photos <svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#arrow-r"/></svg></a></header>
             <div id="home-photos"></div>
           </article>
           <article class="card">
-            <header class="card-head"><h2 class="card-title">Latest updates</h2><a class="card-link" href="#updates">All <svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#arrow-r"/></svg></a></header>
+            <header class="card-head"><h2 class="card-title">Latest updates</h2><a class="card-link" href="#updates">All <svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#arrow-r"/></svg></a></header>
             <div id="home-updates"></div>
           </article>
           <article class="card span-3 otd" id="home-otd" hidden>
-            <header class="card-head"><div><h2 class="card-title">On this day</h2><p class="muted otd-sub" id="home-otd-sub"></p></div><a class="card-link" href="#photos">All photos <svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#arrow-r"/></svg></a></header>
+            <header class="card-head"><div><h2 class="card-title">On this day</h2><p class="muted otd-sub" id="home-otd-sub"></p></div><a class="card-link" href="#photos">All photos <svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#arrow-r"/></svg></a></header>
             <div class="otd-strip" id="home-otd-strip"></div>
           </article>
           <article class="card span-3 install-card" id="home-install" hidden>
-            <span class="sc-icon sc-sea"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#smartphone"/></svg></span>
+            <span class="sc-icon sc-sea"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#smartphone"/></svg></span>
             <div class="install-text"><strong>Put the Family Hub on your home screen</strong><p class="muted" id="install-how"></p></div>
             <div class="install-actions">
               <button class="btn btn-sm" type="button" data-action="install-app" id="install-btn" hidden>Install app</button>
-              <button class="icon-btn" type="button" data-action="dismiss-install" aria-label="Dismiss"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#x"/></svg></button>
+              <button class="icon-btn" type="button" data-action="dismiss-install" aria-label="Dismiss"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#x"/></svg></button>
             </div>
           </article>
           <nav class="shortcuts span-3" aria-label="Shortcuts">
-            <a class="shortcut" href="#tree"><span class="sc-icon sc-sea"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#pedigree"/></svg></span><span><strong>Family Tree</strong><small>Where we come from</small></span><svg class="i sc-arrow" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#arrow-r"/></svg></a>
-            <button class="shortcut" type="button" data-action="jarvis"><span class="sc-icon sc-violet"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#cpu"/></svg></span><span><strong>JARVIS</strong><small>Our private home AI</small></span><svg class="i sc-arrow" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#external"/></svg></button>
-            <a class="shortcut" href="#vault"><span class="sc-icon sc-gold"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#key"/></svg></span><span><strong>Family Vault</strong><small>Important info, kept safe</small></span><svg class="i sc-arrow" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#arrow-r"/></svg></a>
-            <a class="shortcut" href="#games"><span class="sc-icon sc-sea"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#game"/></svg></span><span><strong>Game Night</strong><small>Gaviota &amp; La Nevería</small></span><svg class="i sc-arrow" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#arrow-r"/></svg></a>
-            <a class="shortcut" href="#memorial"><span class="sc-icon sc-accent"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#candle"/></svg></span><span><strong>In Memory</strong><small>Remembering Hector</small></span><svg class="i sc-arrow" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#arrow-r"/></svg></a>
+            <a class="shortcut" href="#tree"><span class="sc-icon sc-sea"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#pedigree"/></svg></span><span><strong>Family Tree</strong><small>Where we come from</small></span><svg class="i sc-arrow" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#arrow-r"/></svg></a>
+            <button class="shortcut" type="button" data-action="jarvis"><span class="sc-icon sc-violet"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#cpu"/></svg></span><span><strong>JARVIS</strong><small>Our private home AI</small></span><svg class="i sc-arrow" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#external"/></svg></button>
+            <a class="shortcut" href="#vault"><span class="sc-icon sc-gold"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#key"/></svg></span><span><strong>Family Vault</strong><small>Important info, kept safe</small></span><svg class="i sc-arrow" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#arrow-r"/></svg></a>
+            <a class="shortcut" href="#games"><span class="sc-icon sc-sea"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#game"/></svg></span><span><strong>Game Night</strong><small>Gaviota &amp; La Nevería</small></span><svg class="i sc-arrow" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#arrow-r"/></svg></a>
+            <a class="shortcut" href="#memorial"><span class="sc-icon sc-accent"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#candle"/></svg></span><span><strong>In Memory</strong><small>Remembering Hector</small></span><svg class="i sc-arrow" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#arrow-r"/></svg></a>
           </nav>
         </div>
       </section>
@@ -256,10 +256,10 @@
       <section class="view" id="view-photos" data-view="photos" aria-labelledby="photos-title" hidden>
         <header class="view-head">
           <div><p class="eyebrow plain">Shared album</p><h1 class="view-title" id="photos-title">Photos</h1></div>
-          <label class="btn" for="photo-input"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#upload"/></svg>Upload photos</label>
+          <label class="btn" for="photo-input"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#upload"/></svg>Upload photos</label>
         </header>
         <label class="dropzone" for="photo-input" data-drop="photos">
-          <span class="dz-icon"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#image"/></svg></span>
+          <span class="dz-icon"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#image"/></svg></span>
           <span><strong>Drop photos here</strong> or <u>browse</u> — you can pick many at once</span>
           <input type="file" id="photo-input" accept="image/*" multiple class="sr-only">
         </label>
@@ -280,7 +280,7 @@
       <section class="view" id="view-calendar" data-view="calendar" aria-labelledby="calendar-title" hidden>
         <header class="view-head">
           <div><p class="eyebrow plain">Plans &amp; celebrations</p><h1 class="view-title" id="calendar-title">Calendar</h1></div>
-          <button class="btn" type="button" data-action="new-event"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#plus"/></svg>New event</button>
+          <button class="btn" type="button" data-action="new-event"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#plus"/></svg>New event</button>
         </header>
         <div class="cal-layout">
           <div class="card cal-card">
@@ -288,8 +288,8 @@
               <h2 class="cal-title" id="cal-title"></h2>
               <div class="cal-nav">
                 <button class="btn btn-ghost btn-sm" type="button" data-action="cal-today">Today</button>
-                <button class="icon-btn" type="button" data-action="cal-prev" aria-label="Previous month"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#chev-l"/></svg></button>
-                <button class="icon-btn" type="button" data-action="cal-next" aria-label="Next month"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#chev-r"/></svg></button>
+                <button class="icon-btn" type="button" data-action="cal-prev" aria-label="Previous month"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#chev-l"/></svg></button>
+                <button class="icon-btn" type="button" data-action="cal-next" aria-label="Next month"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#chev-r"/></svg></button>
               </div>
             </div>
             <div class="cal-dow" aria-hidden="true"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div>
@@ -329,13 +329,13 @@
           <div class="head-actions tree-head" id="tree-head" hidden>
             <div class="tree-find">
               <label class="search">
-                <svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#search"/></svg>
+                <svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#search"/></svg>
                 <span class="sr-only">Find someone in the tree</span>
                 <input type="search" id="tree-search" placeholder="Find anyone in the tree…" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="tree-results">
               </label>
               <ul class="tree-results" id="tree-results" role="listbox" aria-label="People found" hidden></ul>
             </div>
-            <button class="btn btn-ghost" type="button" data-action="tree-photos" id="tree-photos-btn" hidden><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#image"/></svg>Add photos</button>
+            <button class="btn btn-ghost" type="button" data-action="tree-photos" id="tree-photos-btn" hidden><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#image"/></svg>Add photos</button>
           </div>
         </header>
         <div id="tree-body"></div>
@@ -350,11 +350,11 @@
         <div class="games-lobby" id="games-lobby"></div>
         <div class="game-play" id="game-play" hidden>
           <div class="game-bar">
-            <button class="btn btn-sm btn-ghost" type="button" data-action="game-exit"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#arrow-l"/></svg><span>All games</span></button>
+            <button class="btn btn-sm btn-ghost" type="button" data-action="game-exit"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#arrow-l"/></svg><span>All games</span></button>
             <h2 class="game-name" id="game-name"></h2>
             <span class="game-tools">
-              <button class="icon-btn" type="button" data-action="game-sound" id="game-sound" aria-pressed="true" aria-label="Sound on"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#volume"/></svg></button>
-              <button class="icon-btn" type="button" data-action="game-full" id="game-full" aria-label="Full screen"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#expand"/></svg></button>
+              <button class="icon-btn" type="button" data-action="game-sound" id="game-sound" aria-pressed="true" aria-label="Sound on"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#volume"/></svg></button>
+              <button class="icon-btn" type="button" data-action="game-full" id="game-full" aria-label="Full screen"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#expand"/></svg></button>
             </span>
           </div>
           <div class="game-host" id="game-host"></div>
@@ -365,7 +365,7 @@
       <section class="view view-wide" id="view-globe" data-view="globe" aria-labelledby="globe-title" hidden>
         <header class="view-head">
           <div><p class="eyebrow plain">Wherever we are</p><h1 class="view-title" id="globe-title">Family Globe</h1></div>
-          <button class="btn" type="button" data-action="globe-place" id="globe-place-btn"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#locate"/></svg><span>Put me on the globe</span></button>
+          <button class="btn" type="button" data-action="globe-place" id="globe-place-btn"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#locate"/></svg><span>Put me on the globe</span></button>
         </header>
         <div class="globe-wrap">
           <div class="globe-stage" id="globe-stage">
@@ -373,15 +373,15 @@
             <div class="globe-pins" id="globe-pins"></div>
             <div class="globe-hud">
               <span class="globe-live" id="globe-live"><span class="live-dot" aria-hidden="true"></span><span id="globe-live-text">Live daylight</span></span>
-              <button class="icon-btn globe-spin" type="button" data-action="globe-spin" id="globe-spin" aria-label="Pause spinning" aria-pressed="true"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#pause"/></svg></button>
+              <button class="icon-btn globe-spin" type="button" data-action="globe-spin" id="globe-spin" aria-label="Pause spinning" aria-pressed="true"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#pause"/></svg></button>
             </div>
             <p class="globe-status" id="globe-status" hidden></p>
             <form class="globe-pick" id="globe-pick" novalidate hidden>
               <p class="globe-pick-title" id="globe-pick-title">Tap the globe where you live</p>
-              <button class="btn btn-sm btn-outline-light" type="button" data-action="globe-locate" id="globe-locate"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#locate"/></svg>Use my location</button>
+              <button class="btn btn-sm btn-outline-light" type="button" data-action="globe-locate" id="globe-locate"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#locate"/></svg>Use my location</button>
               <label class="sr-only" for="globe-label">Place name</label>
               <input class="input" id="globe-label" maxlength="60" placeholder="What should we call it? e.g. Miami, FL" autocomplete="off">
-              <p class="globe-pick-note"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#shield"/></svg>Rounded to about 7 miles — never your street. Only family can see it.</p>
+              <p class="globe-pick-note"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#shield"/></svg>Rounded to about 7 miles — never your street. Only family can see it.</p>
               <div class="globe-pick-actions">
                 <button class="link-btn" type="button" data-action="globe-remove" id="globe-remove" hidden>Take me off the globe</button>
                 <button class="btn btn-sm btn-ghost-light" type="button" data-action="globe-cancel">Cancel</button>
@@ -392,7 +392,7 @@
           <aside class="globe-side" aria-label="Family clocks">
             <div class="card gt">
               <div class="gt-head">
-                <h2 class="card-title"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#clock"/></svg>Family clocks</h2>
+                <h2 class="card-title"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#clock"/></svg>Family clocks</h2>
                 <button class="link-btn" type="button" data-action="globe-now" id="globe-now" hidden>Back to now</button>
               </div>
               <label class="gt-label" for="globe-time">Slide through the next day <output id="globe-time-label" for="globe-time">Now</output></label>
@@ -410,7 +410,7 @@
       <section class="view" id="view-stories" data-view="stories" aria-labelledby="stories-title" hidden>
         <header class="view-head">
           <div><p class="eyebrow plain">In our own voices</p><h1 class="view-title" id="stories-title">Voice Stories</h1></div>
-          <button class="btn" type="button" data-action="new-story"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#mic"/></svg>Record a story</button>
+          <button class="btn" type="button" data-action="new-story"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#mic"/></svg>Record a story</button>
         </header>
         <div class="story-intro">
           <div class="si-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
@@ -426,7 +426,7 @@
       <section class="view" id="view-capsules" data-view="capsules" aria-labelledby="capsules-title" hidden>
         <header class="view-head">
           <div><p class="eyebrow plain">Letters to the future</p><h1 class="view-title" id="capsules-title">Time Capsules</h1></div>
-          <button class="btn" type="button" data-action="new-capsule"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#letter"/></svg>Seal a time capsule</button>
+          <button class="btn" type="button" data-action="new-capsule"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#letter"/></svg>Seal a time capsule</button>
         </header>
         <div class="capsule-intro">
           <span class="seal seal-lg" aria-hidden="true">A</span>
@@ -442,11 +442,11 @@
       <section class="view" id="view-recipes" data-view="recipes" aria-labelledby="recipes-title" hidden>
         <header class="view-head">
           <div><p class="eyebrow plain">From our kitchen</p><h1 class="view-title" id="recipes-title">Family Recipes</h1></div>
-          <button class="btn" type="button" data-action="new-recipe"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#plus"/></svg>Add a recipe</button>
+          <button class="btn" type="button" data-action="new-recipe"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#plus"/></svg>Add a recipe</button>
         </header>
         <div class="toolbar">
           <label class="search">
-            <svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#search"/></svg>
+            <svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#search"/></svg>
             <span class="sr-only">Search recipes</span>
             <input type="search" id="recipe-search" placeholder="Search recipes or ingredients…" autocomplete="off">
           </label>
@@ -460,14 +460,14 @@
         <header class="view-head">
           <div><p class="eyebrow plain">Members only</p><h1 class="view-title" id="directory-title">Family Directory</h1></div>
           <div class="head-actions">
-            <a class="btn btn-ghost" href="#profile"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#pencil"/></svg>Edit my details</a>
-            <a class="btn" href="#invite"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#user-plus"/></svg>Invite family</a>
+            <a class="btn btn-ghost" href="#profile"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#pencil"/></svg>Edit my details</a>
+            <a class="btn" href="#invite"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#user-plus"/></svg>Invite family</a>
           </div>
         </header>
         <div class="pending card" id="pending-panel" hidden></div>
         <div class="toolbar">
           <label class="search">
-            <svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#search"/></svg>
+            <svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#search"/></svg>
             <span class="sr-only">Search the family</span>
             <input type="search" id="dir-search" placeholder="Search by name, city, phone…" autocomplete="off">
           </label>
@@ -489,21 +489,21 @@
         <header class="view-head">
           <div><p class="eyebrow plain">Private &amp; important</p><h1 class="view-title" id="vault-title">Family Vault</h1></div>
           <div class="head-actions" id="vault-actions" hidden>
-            <button class="btn btn-ghost" type="button" data-action="lock-vault"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#lock"/></svg>Lock</button>
-            <button class="btn" type="button" data-action="new-note"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#plus"/></svg>New note</button>
+            <button class="btn btn-ghost" type="button" data-action="lock-vault"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#lock"/></svg>Lock</button>
+            <button class="btn" type="button" data-action="new-note"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#plus"/></svg>New note</button>
           </div>
         </header>
         <form class="card vault-lock" id="vault-lock" novalidate>
-          <div class="vault-lock-icon"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#lock"/></svg></div>
+          <div class="vault-lock-icon"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#lock"/></svg></div>
           <h2>The vault is locked</h2>
           <p class="muted">Enter your password to open it. For safety it locks itself again after 5 minutes without activity.</p>
-          <button class="btn btn-lg btn-block btn-accent vault-bio" type="button" data-action="vault-bio" id="vault-bio" hidden><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#fingerprint"/></svg><span id="vault-bio-label">Unlock with Face ID</span></button>
+          <button class="btn btn-lg btn-block btn-accent vault-bio" type="button" data-action="vault-bio" id="vault-bio" hidden><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#fingerprint"/></svg><span id="vault-bio-label">Unlock with Face ID</span></button>
           <p class="or-line" id="vault-or" hidden><span>or use your password</span></p>
           <input type="text" class="sr-only" id="vault-user" autocomplete="username" tabindex="-1" aria-hidden="true">
           <label class="sr-only" for="vault-pass">Your password</label>
           <div class="pass-wrap">
             <input class="input" type="password" id="vault-pass" autocomplete="current-password" placeholder="Your password">
-            <button type="button" class="pass-toggle" data-action="toggle-pass" aria-label="Show password"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#eye"/></svg></button>
+            <button type="button" class="pass-toggle" data-action="toggle-pass" aria-label="Show password"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#eye"/></svg></button>
           </div>
           <button class="btn btn-lg btn-block" type="submit" id="vault-unlock">Unlock the vault</button>
           <p class="form-msg" id="vault-msg" role="alert"></p>
@@ -511,7 +511,7 @@
         <div id="vault-content" hidden>
         <div class="bio-offer" id="vault-bio-offer" hidden></div>
         <div class="notice">
-          <svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#shield"/></svg>
+          <svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#shield"/></svg>
           <p><strong>Only signed-in family members can see the vault.</strong> Notes stay hidden until you tap them. Please don’t store bank passwords or full Social Security numbers here.</p>
         </div>
         <div class="chips" id="vault-filters" role="toolbar" aria-label="Filter notes"></div>
@@ -523,7 +523,7 @@
       <section class="view" id="view-memorial" data-view="memorial" aria-labelledby="memorial-title" hidden>
         <div class="memorial-hero">
           <div class="memorial-portrait" id="memorial-cover">
-            <svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#candle"/></svg>
+            <svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#candle"/></svg>
           </div>
           <div class="memorial-words">
             <p class="memorial-eyebrow">In loving memory</p>
@@ -542,11 +542,11 @@
         </section>
         <header class="section-row">
           <h2 class="card-title">Photos of Hector</h2>
-          <label class="btn btn-ghost btn-sm" for="memorial-input"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#upload"/></svg>Add photos</label>
+          <label class="btn btn-ghost btn-sm" for="memorial-input"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#upload"/></svg>Add photos</label>
         </header>
         <div class="tiles" id="memorial-grid"></div>
         <label class="dropzone" for="memorial-input" data-drop="memorial">
-          <span class="dz-icon"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#heart"/></svg></span>
+          <span class="dz-icon"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#heart"/></svg></span>
           <span><strong>Add photos of Hector</strong> — drop them here or <u>browse</u></span>
           <input type="file" id="memorial-input" accept="image/*" multiple class="sr-only">
         </label>
@@ -583,7 +583,7 @@
           <div class="avatar-edit">
             <span class="av av-96" id="profile-avatar"></span>
             <div class="avatar-edit-actions">
-              <label class="btn btn-ghost btn-sm" for="avatar-input"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#image"/></svg>Change photo</label>
+              <label class="btn btn-ghost btn-sm" for="avatar-input"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#image"/></svg>Change photo</label>
               <button class="btn btn-ghost btn-sm" type="button" data-action="remove-avatar" id="avatar-remove">Remove</button>
               <input type="file" id="avatar-input" accept="image/*" class="sr-only">
               <p class="hint">Shown to family in the directory and on your posts.</p>
@@ -627,7 +627,7 @@
           </div>
           <div class="pref-row">
             <div><strong>Sign out</strong><p class="muted">Sign out of the family hub on this device.</p></div>
-            <button class="btn btn-danger" type="button" data-action="signout"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#logout"/></svg>Sign out</button>
+            <button class="btn btn-danger" type="button" data-action="signout"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#logout"/></svg>Sign out</button>
           </div>
         </div>
       </section>
@@ -636,11 +636,11 @@
 
   <!-- mobile tab bar -->
   <nav class="tabbar" aria-label="Sections">
-    <a href="#home" data-nav="home"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#home"/></svg><span>Home</span></a>
-    <a href="#photos" data-nav="photos"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#image"/></svg><span>Photos</span></a>
-    <a href="#calendar" data-nav="calendar"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#calendar"/></svg><span>Calendar</span></a>
-    <a href="#updates" data-nav="updates"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#chat"/></svg><span>Updates</span></a>
-    <button type="button" data-action="more" data-nav="more" aria-haspopup="dialog"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#grid"/></svg><span>More</span></button>
+    <a href="#home" data-nav="home"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#home"/></svg><span>Home</span></a>
+    <a href="#photos" data-nav="photos"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#image"/></svg><span>Photos</span></a>
+    <a href="#calendar" data-nav="calendar"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#calendar"/></svg><span>Calendar</span></a>
+    <a href="#updates" data-nav="updates"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#chat"/></svg><span>Updates</span></a>
+    <button type="button" data-action="more" data-nav="more" aria-haspopup="dialog"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#grid"/></svg><span>More</span></button>
   </nav>
 </div>
 
@@ -648,26 +648,26 @@
 <dialog class="sheet" id="more-sheet" aria-label="More">
   <div class="sheet-grip" aria-hidden="true"></div>
   <nav class="sheet-nav">
-    <a href="#tree"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#pedigree"/></svg>Family Tree</a>
-    <a href="#globe"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#earth"/></svg>Family Globe</a>
-    <a href="#games"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#game"/></svg>Games</a>
-    <a href="#stories"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#mic"/></svg>Voice Stories</a>
-    <a href="#capsules"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#letter"/></svg>Time Capsules<span class="badge" data-capsule-badge hidden></span></a>
-    <a href="#recipes"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#book"/></svg>Recipes</a>
-    <a href="#directory"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#users"/></svg>Directory</a>
-    <a href="#invite"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#user-plus"/></svg>Invite family<span class="badge" data-pending-badge hidden></span></a>
-    <a href="#vault"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#key"/></svg>Family Vault</a>
-    <a href="#memorial"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#candle"/></svg>In Memory</a>
-    <a href="#profile"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#user"/></svg>My Profile</a>
-    <button type="button" data-action="jarvis"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#cpu"/></svg>JARVIS<svg class="i ext" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#external"/></svg></button>
-    <a href="/"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#globe"/></svg>Public site</a>
-    <button type="button" data-action="signout" class="danger"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#logout"/></svg>Sign out</button>
+    <a href="#tree"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#pedigree"/></svg>Family Tree</a>
+    <a href="#globe"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#earth"/></svg>Family Globe</a>
+    <a href="#games"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#game"/></svg>Games</a>
+    <a href="#stories"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#mic"/></svg>Voice Stories</a>
+    <a href="#capsules"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#letter"/></svg>Time Capsules<span class="badge" data-capsule-badge hidden></span></a>
+    <a href="#recipes"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#book"/></svg>Recipes</a>
+    <a href="#directory"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#users"/></svg>Directory</a>
+    <a href="#invite"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#user-plus"/></svg>Invite family<span class="badge" data-pending-badge hidden></span></a>
+    <a href="#vault"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#key"/></svg>Family Vault</a>
+    <a href="#memorial"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#candle"/></svg>In Memory</a>
+    <a href="#profile"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#user"/></svg>My Profile</a>
+    <button type="button" data-action="jarvis"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#cpu"/></svg>JARVIS<svg class="i ext" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#external"/></svg></button>
+    <a href="/"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#globe"/></svg>Public site</a>
+    <button type="button" data-action="signout" class="danger"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#logout"/></svg>Sign out</button>
   </nav>
 </dialog>
 
 <dialog class="modal" id="event-dialog" aria-labelledby="event-dialog-title">
   <form method="dialog" id="event-form" novalidate>
-    <header class="modal-head"><h2 id="event-dialog-title">New event</h2><button class="icon-btn" type="button" data-close aria-label="Close"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#x"/></svg></button></header>
+    <header class="modal-head"><h2 id="event-dialog-title">New event</h2><button class="icon-btn" type="button" data-close aria-label="Close"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#x"/></svg></button></header>
     <div class="field"><label class="label" for="ev-title">What’s happening?</label><input class="input" id="ev-title" maxlength="190" placeholder="e.g. Sunday dinner at Grandma’s" required></div>
     <div class="form-grid">
       <div class="field"><label class="label" for="ev-date">Date</label><input class="input" type="date" id="ev-date" required></div>
@@ -681,7 +681,7 @@
 
 <dialog class="modal" id="note-dialog" aria-labelledby="note-dialog-title">
   <form method="dialog" id="note-form" novalidate>
-    <header class="modal-head"><h2 id="note-dialog-title">New vault note</h2><button class="icon-btn" type="button" data-close aria-label="Close"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#x"/></svg></button></header>
+    <header class="modal-head"><h2 id="note-dialog-title">New vault note</h2><button class="icon-btn" type="button" data-close aria-label="Close"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#x"/></svg></button></header>
     <div class="form-grid">
       <div class="field"><label class="label" for="note-title">Title</label><input class="input" id="note-title" maxlength="120" placeholder="e.g. Family doctor" required></div>
       <div class="field"><label class="label" for="note-cat">Category</label>
@@ -701,11 +701,11 @@
 
 <dialog class="modal modal-sm" id="addcal-dialog" aria-labelledby="addcal-title">
   <div class="modal-body">
-    <header class="modal-head"><h2 id="addcal-title">Add to your calendar</h2><button class="icon-btn" type="button" data-close aria-label="Close"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#x"/></svg></button></header>
+    <header class="modal-head"><h2 id="addcal-title">Add to your calendar</h2><button class="icon-btn" type="button" data-close aria-label="Close"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#x"/></svg></button></header>
     <p class="muted" id="addcal-event"></p>
     <div class="addcal-options">
-      <button class="addcal-opt" type="button" data-action="addcal-ics"><span class="sc-icon sc-sea"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#download"/></svg></span><span><strong>Apple Calendar or Outlook</strong><small>Downloads an invite you can open</small></span></button>
-      <a class="addcal-opt" id="addcal-google" href="#" target="_blank" rel="noopener noreferrer"><span class="sc-icon sc-accent"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#google"/></svg></span><span><strong>Google Calendar</strong><small>Opens in a new tab</small></span></a>
+      <button class="addcal-opt" type="button" data-action="addcal-ics"><span class="sc-icon sc-sea"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#download"/></svg></span><span><strong>Apple Calendar or Outlook</strong><small>Downloads an invite you can open</small></span></button>
+      <a class="addcal-opt" id="addcal-google" href="#" target="_blank" rel="noopener noreferrer"><span class="sc-icon sc-accent"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#google"/></svg></span><span><strong>Google Calendar</strong><small>Opens in a new tab</small></span></a>
     </div>
   </div>
 </dialog>
@@ -716,7 +716,7 @@
     <div class="rv-body">
       <header class="modal-head">
         <div><p class="eyebrow plain" id="rv-cat"></p><h2 id="rv-title"></h2><p class="muted" id="rv-meta"></p></div>
-        <button class="icon-btn" type="button" data-close aria-label="Close"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#x"/></svg></button>
+        <button class="icon-btn" type="button" data-close aria-label="Close"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#x"/></svg></button>
       </header>
       <div class="rv-cols">
         <div><h3>Ingredients</h3><ul class="rv-ingredients" id="rv-ingredients"></ul></div>
@@ -726,8 +726,8 @@
       <footer class="modal-foot rv-foot">
         <button class="btn btn-danger btn-sm" type="button" data-action="delete-recipe">Delete</button>
         <span class="spacer"></span>
-        <button class="btn btn-ghost btn-sm" type="button" data-action="print-recipe"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#printer"/></svg>Print</button>
-        <button class="btn btn-sm" type="button" data-action="edit-recipe"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#pencil"/></svg>Edit</button>
+        <button class="btn btn-ghost btn-sm" type="button" data-action="print-recipe"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#printer"/></svg>Print</button>
+        <button class="btn btn-sm" type="button" data-action="edit-recipe"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#pencil"/></svg>Edit</button>
       </footer>
     </div>
   </div>
@@ -735,7 +735,7 @@
 
 <dialog class="modal" id="recipe-form-dialog" aria-labelledby="rf-title">
   <form method="dialog" id="recipe-form" novalidate>
-    <header class="modal-head"><h2 id="rf-title">Add a recipe</h2><button class="icon-btn" type="button" data-close aria-label="Close"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#x"/></svg></button></header>
+    <header class="modal-head"><h2 id="rf-title">Add a recipe</h2><button class="icon-btn" type="button" data-close aria-label="Close"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#x"/></svg></button></header>
     <div class="field"><label class="label" for="rf-name">Recipe name</label><input class="input" id="rf-name" maxlength="120" placeholder="e.g. Grandma’s flan" required></div>
     <div class="form-grid">
       <div class="field"><label class="label" for="rf-by">Whose recipe? <span class="opt">optional</span></label><input class="input" id="rf-by" maxlength="80" placeholder="e.g. Grandma Maria"></div>
@@ -753,8 +753,8 @@
     <div class="field">
       <span class="label">Photo <span class="opt">optional</span></span>
       <div class="rf-photo">
-        <div class="rf-photo-preview" id="rf-photo-preview"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#utensils"/></svg></div>
-        <label class="btn btn-ghost btn-sm" for="rf-photo-input"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#image"/></svg>Choose photo</label>
+        <div class="rf-photo-preview" id="rf-photo-preview"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#utensils"/></svg></div>
+        <label class="btn btn-ghost btn-sm" for="rf-photo-input"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#image"/></svg>Choose photo</label>
         <button class="btn btn-ghost btn-sm" type="button" data-action="remove-recipe-photo" id="rf-photo-remove" hidden>Remove</button>
         <input type="file" id="rf-photo-input" accept="image/*" class="sr-only">
       </div>
@@ -767,7 +767,7 @@
   <form method="dialog" id="member-form" novalidate>
     <header class="modal-head">
       <div class="md-who"><span class="av av-44" id="md-avatar"></span><div><h2 id="md-title">Manage member</h2><p class="muted" id="md-email"></p></div></div>
-      <button class="icon-btn" type="button" data-close aria-label="Close"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#x"/></svg></button>
+      <button class="icon-btn" type="button" data-close aria-label="Close"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#x"/></svg></button>
     </header>
     <div class="form-grid">
       <div class="field span-full"><label class="label" for="md-name">Name</label><input class="input" id="md-name" maxlength="80" required></div>
@@ -792,21 +792,21 @@
 
 <dialog class="modal modal-lg match-dialog" id="match-dialog" aria-labelledby="match-title">
   <div class="match-wrap">
-    <header class="modal-head"><h2 id="match-title">Add photos to the tree</h2><button class="icon-btn" type="button" data-close aria-label="Close"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#x"/></svg></button></header>
+    <header class="modal-head"><h2 id="match-title">Add photos to the tree</h2><button class="icon-btn" type="button" data-close aria-label="Close"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#x"/></svg></button></header>
     <p class="muted">Drop in your family’s photos — the ones you downloaded from Ancestry, or the originals on your computer. Each one is matched to the right person automatically, using the exact file size, dimensions and title Ancestry keeps for every photo. You can fix any match before saving.</p>
     <label class="match-drop" for="match-input" data-drop-match>
-      <svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#upload"/></svg><strong>Choose photos</strong><span>or drag them here — as many as you like</span>
+      <svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#upload"/></svg><strong>Choose photos</strong><span>or drag them here — as many as you like</span>
     </label>
     <input type="file" id="match-input" accept="image/*" multiple class="sr-only">
     <details class="match-todo" id="match-todo" hidden></details>
     <div class="match-list" id="match-list"></div>
-    <footer class="modal-foot match-foot"><p class="muted" id="match-summary"></p><button class="btn btn-ghost" type="button" data-close>Cancel</button><button class="btn btn-accent" type="button" data-action="match-save" id="match-save" disabled><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#check"/></svg>Save photos</button></footer>
+    <footer class="modal-foot match-foot"><p class="muted" id="match-summary"></p><button class="btn btn-ghost" type="button" data-close>Cancel</button><button class="btn btn-accent" type="button" data-action="match-save" id="match-save" disabled><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#check"/></svg>Save photos</button></footer>
   </div>
 </dialog>
 
 <dialog class="modal recorder" id="story-dialog" aria-labelledby="story-dialog-title">
   <form method="dialog" id="story-form" novalidate>
-    <header class="modal-head"><h2 id="story-dialog-title">Record a story</h2><button class="icon-btn" type="button" data-close aria-label="Close"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#x"/></svg></button></header>
+    <header class="modal-head"><h2 id="story-dialog-title">Record a story</h2><button class="icon-btn" type="button" data-close aria-label="Close"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#x"/></svg></button></header>
     <div class="field">
       <span class="label">Need a place to start?</span>
       <div class="chips rec-chips" id="rec-prompts" role="group" aria-label="Story starters"></div>
@@ -815,29 +815,29 @@
       <p class="rec-prompt" id="rec-prompt">Tap the button and start talking.</p>
       <canvas class="rec-wave" id="rec-wave" aria-hidden="true"></canvas>
       <p class="rec-time" id="rec-time">0:00</p>
-      <button class="rec-btn" type="button" data-action="rec-toggle" id="rec-btn" aria-label="Start recording"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#mic"/></svg></button>
+      <button class="rec-btn" type="button" data-action="rec-toggle" id="rec-btn" aria-label="Start recording"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#mic"/></svg></button>
       <p class="rec-hint" id="rec-hint">Up to 10 minutes. Find a quiet spot and hold the phone close.</p>
       <div class="rec-review" id="rec-review" hidden>
-        <button class="btn btn-ghost btn-sm" type="button" data-action="rec-play" id="rec-play"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#play"/></svg>Listen back</button>
-        <button class="btn btn-ghost btn-sm" type="button" data-action="rec-redo"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#refresh"/></svg>Record again</button>
+        <button class="btn btn-ghost btn-sm" type="button" data-action="rec-play" id="rec-play"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#play"/></svg>Listen back</button>
+        <button class="btn btn-ghost btn-sm" type="button" data-action="rec-redo"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#refresh"/></svg>Record again</button>
       </div>
     </div>
     <div class="field"><label class="label" for="story-title">Give it a title</label><input class="input" id="story-title" maxlength="120" placeholder="e.g. How Grandma and Grandpa met" required></div>
-    <footer class="modal-foot"><button class="btn btn-ghost" type="button" data-close>Cancel</button><button class="btn btn-accent" type="submit" id="story-save" disabled><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#upload"/></svg>Save story</button></footer>
+    <footer class="modal-foot"><button class="btn btn-ghost" type="button" data-close>Cancel</button><button class="btn btn-accent" type="submit" id="story-save" disabled><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#upload"/></svg>Save story</button></footer>
   </form>
 </dialog>
 
 <dialog class="modal capsule-write" id="capsule-dialog" aria-labelledby="capsule-dialog-title">
   <form method="dialog" id="capsule-form" novalidate>
-    <header class="modal-head"><h2 id="capsule-dialog-title">Seal a time capsule</h2><button class="icon-btn" type="button" data-close aria-label="Close"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#x"/></svg></button></header>
+    <header class="modal-head"><h2 id="capsule-dialog-title">Seal a time capsule</h2><button class="icon-btn" type="button" data-close aria-label="Close"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#x"/></svg></button></header>
     <div class="field"><label class="label" for="cap-title">Name it</label><input class="input" id="cap-title" maxlength="120" placeholder="e.g. For Sofia on her 18th birthday" required></div>
     <div class="field"><label class="label" for="cap-to">Who’s it for? <span class="opt">optional</span></label><input class="input" id="cap-to" maxlength="120" placeholder="e.g. Sofia — or the whole family"></div>
     <div class="field"><label class="label" for="cap-text">Your letter <span class="opt" id="cap-count"></span></label><textarea class="textarea letter-paper" id="cap-text" maxlength="20000" rows="7" placeholder="Dear future us…" required></textarea></div>
     <div class="field">
       <span class="label">A photo to tuck inside <span class="opt">optional</span></span>
       <div class="rf-photo">
-        <div class="rf-photo-preview" id="cap-photo-preview"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#image"/></svg></div>
-        <label class="btn btn-ghost btn-sm" for="cap-photo-input"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#image"/></svg>Choose photo</label>
+        <div class="rf-photo-preview" id="cap-photo-preview"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#image"/></svg></div>
+        <label class="btn btn-ghost btn-sm" for="cap-photo-input"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#image"/></svg>Choose photo</label>
         <button class="btn btn-ghost btn-sm" type="button" data-action="cap-photo-remove" id="cap-photo-remove" hidden>Remove</button>
         <input type="file" id="cap-photo-input" accept="image/*" class="sr-only">
       </div>
@@ -848,12 +848,12 @@
       <div class="chips cap-presets" id="cap-presets" role="group" aria-label="Quick picks"></div>
       <p class="hint" id="cap-hint">Pick any day from tomorrow up to 100 years from now.</p>
     </div>
-    <footer class="modal-foot"><button class="btn btn-ghost" type="button" data-close>Cancel</button><button class="btn btn-accent" type="submit" id="cap-save"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#lock"/></svg>Seal it</button></footer>
+    <footer class="modal-foot"><button class="btn btn-ghost" type="button" data-close>Cancel</button><button class="btn btn-accent" type="submit" id="cap-save"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#lock"/></svg>Seal it</button></footer>
   </form>
 </dialog>
 
 <dialog class="capsule-open" id="capsule-open" aria-labelledby="co-title">
-  <button class="icon-btn co-close" type="button" data-close aria-label="Close"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#x"/></svg></button>
+  <button class="icon-btn co-close" type="button" data-close aria-label="Close"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#x"/></svg></button>
   <div class="co-stage" id="co-stage">
     <div class="envelope" id="co-envelope" aria-hidden="true">
       <div class="env-back"></div>
@@ -885,14 +885,14 @@
 </dialog>
 
 <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Photo viewer" hidden>
-  <button class="icon-btn lb-close" type="button" data-action="lb-close" aria-label="Close"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#x"/></svg></button>
-  <button class="icon-btn lb-nav lb-prev" type="button" data-action="lb-prev" aria-label="Previous photo"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#chev-l"/></svg></button>
+  <button class="icon-btn lb-close" type="button" data-action="lb-close" aria-label="Close"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#x"/></svg></button>
+  <button class="icon-btn lb-nav lb-prev" type="button" data-action="lb-prev" aria-label="Previous photo"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#chev-l"/></svg></button>
   <figure class="lb-figure">
     <img id="lb-img" alt="">
-    <figcaption class="lb-caption"><span class="lb-actions" id="lb-actions"></span><span id="lb-text"></span><span class="lb-meta" id="lb-meta"></span><button class="btn btn-sm btn-outline-light" type="button" data-action="lb-delete" id="lb-delete"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#trash"/></svg>Delete</button></figcaption>
+    <figcaption class="lb-caption"><span class="lb-actions" id="lb-actions"></span><span id="lb-text"></span><span class="lb-meta" id="lb-meta"></span><button class="btn btn-sm btn-outline-light" type="button" data-action="lb-delete" id="lb-delete"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#trash"/></svg>Delete</button></figcaption>
   </figure>
   <aside class="lb-thread" id="lb-thread" aria-label="Comments" hidden></aside>
-  <button class="icon-btn lb-nav lb-next" type="button" data-action="lb-next" aria-label="Next photo"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041338#chev-r"/></svg></button>
+  <button class="icon-btn lb-nav lb-next" type="button" data-action="lb-next" aria-label="Next photo"><svg class="i" aria-hidden="true"><use href="/assets/icons.svg?v=202610041353#chev-r"/></svg></button>
 </div>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -900,8 +900,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js" defer></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js" defer></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js" defer></script>
-<script src="/assets/js/portal.js?v=202610041338" defer></script>
-<script src="/assets/js/signature.js?v=202610041338" defer></script>
-<script src="/assets/js/seasons.js?v=202610041338" defer></script>
+<script src="/assets/js/portal.js?v=202610041353" defer></script>
+<script src="/assets/js/signature.js?v=202610041353" defer></script>
+<script src="/assets/js/seasons.js?v=202610041353" defer></script>
 </body>
 </html>

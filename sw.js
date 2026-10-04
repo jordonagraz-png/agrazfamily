@@ -1,8 +1,9 @@
 /* Agraz Family — service worker
-   Same-origin files: network-first (updates always show), cached copy when offline.
+   Same-origin files: network-first (updates always show; pages are revalidated past the
+   browser cache), cached copy when offline.
    Google Fonts: cache-first. Everything else (Firebase, Firestore, photos) goes
    straight to the network untouched — private data is never cached here. */
-const CACHE = 'agraz-202610041338';
+const CACHE = 'agraz-202610041353';
 const SHELL = [
   '/', '/family/', '/404.html',
   '/assets/css/base.css', '/assets/css/public.css', '/assets/css/portal.css', '/assets/css/signature.css', '/assets/css/seasons.css',
@@ -30,8 +31,12 @@ self.addEventListener('fetch', (e) => {
 
   if (url.origin === self.location.origin) {
     if (url.pathname === '/assets/data/tree-import.bin') return; // the locked tree is never cached
+    // Pages are checked with the server every time: its 10-minute browser cache could otherwise
+    // hold on to an old page (and the old scripts it names) right after an update.
+    let fresh = req;
+    if (req.mode === 'navigate') { try { fresh = new Request(req, { cache: 'no-cache' }); } catch (err) { fresh = req; } }
     e.respondWith(
-      fetch(req)
+      fetch(fresh)
         .then((res) => {
           if (res.ok && res.type === 'basic') { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
           return res;
