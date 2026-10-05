@@ -9,7 +9,7 @@
    returning ({ email, uid, name } — an account that already exists but has no member doc, e.g. someone removed;
    its old join is kept unless joined: false). Reset emails are recorded in window.__resets.
    treeTrouble ({ fail: n, hang: n } — the first n reads of tree docs fail as "unavailable", or never answer).
-   Reads of tree docs are counted in window.__treeReads.
+   Reads of tree docs are counted in window.__treeReads. extraPhotos (n more album photos, for paging).
    The test owner key is 'test-owner-key'.
    Optional window.__IMG = { photos: [...dataUrls], memorial: [...], av1 } to use real photos. */
 (function () {
@@ -135,6 +135,7 @@
   IMG.photos.forEach((src, i) => { store.memories['m' + i] = { imageData: src, caption: caps[i % caps.length], uploadedBy: ['Maria Agraz', 'Daniel Agraz', 'Jordon Agraz'][i % 3], uid: 'u' + (1 + i % 3), createdAt: ago(5 + i * 20), hearts: i === 0 ? { u2: true, u3: true } : undefined }; });
   // "On this day": photos from this week last year
   const lastYear = d => { const x = new Date(); x.setFullYear(x.getFullYear() - 1); x.setDate(x.getDate() + d); return x.toISOString(); };
+  for (let i = 0; i < (M.extraPhotos || 0); i++) store.memories['x' + i] = { imageData: IMG.photos[i % IMG.photos.length], caption: 'Album photo ' + (i + 1), uploadedBy: 'Maria Agraz', uid: 'u2', createdAt: ago(900 + i * 30) };
   store.memories.ly1 = { imageData: IMG.photos[5], caption: 'Last year at the beach', uploadedBy: 'Maria Agraz', uid: 'u2', createdAt: lastYear(0) };
   store.memories.ly2 = { imageData: IMG.photos[7], caption: '', uploadedBy: 'Daniel Agraz', uid: 'u3', createdAt: lastYear(-1) };
   IMG.memorial.forEach((src, i) => { store.memorial['h' + i] = { imageData: src, uploadedBy: 'Maria Agraz', uid: 'u2', order: 1000 + i, createdAt: ago(1000 + i) }; });
@@ -217,7 +218,7 @@
         if (!member() || c === 'capsuleLetters') return fail('permission-denied');
         if (M.oldRules && ['capsules', 'stories', 'storyAudio', 'tree', 'treePhotos', 'scores'].includes(c)) return fail('permission-denied');
         let ids = Object.keys(store[c]).filter(id => o.wheres.every(w => matches(store[c][id], w)));
-        if (o.f) ids.sort((a, b) => { const x = store[c][a][o.f], y = store[c][b][o.f]; return (x > y ? 1 : x < y ? -1 : 0) * (o.dir === 'desc' ? -1 : 1); });
+        if (o.f) ids.sort((a, b) => { const x = o.f === '__name__' ? a : store[c][a][o.f], y = o.f === '__name__' ? b : store[c][b][o.f]; return (x > y ? 1 : x < y ? -1 : 0) * (o.dir === 'desc' ? -1 : 1); });
         if (o.after) ids = ids.slice(ids.indexOf(o.after) + 1);
         if (o.n) ids = ids.slice(0, o.n);
         const docs = ids.map(id => snapDoc(c, id));
@@ -295,6 +296,7 @@
   authFn.EmailAuthProvider = { credential: (email, password) => ({ email, password }) };
   const fsFn = () => db;
   fsFn.Blob = MockBlob;
+  fsFn.FieldPath = { documentId: () => '__name__' };
   window.firebase = { initializeApp() {}, auth: authFn, firestore: fsFn };
   window.__store = store;
 })();

@@ -225,7 +225,9 @@ later, export again and tap **Update** on the Family Tree page.
 **Opening it, quickly and reliably:** the first visit downloads the tree; after
 that it opens straight from a copy kept on the device (IndexedDB) and only
 downloads again when an admin has updated it. Research and photos are checked
-quietly in the background. The copy is kept only for "Keep me signed in" and is
+quietly in the background; photos arrive a dozen at a time and show as they land,
+so a big collection of portraits never has to come down in one go (the Photos
+page works the same way, loading the next dozen as you scroll). The copy is kept only for "Keep me signed in" and is
 deleted on sign-out. Each read has a time limit and is retried if it's dropped
 or stalls. If the database still can't be reached, the page says so and keeps
 trying by itself (and right away when the connection or the tab comes back), so

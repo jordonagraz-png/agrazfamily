@@ -11,6 +11,7 @@ import { zipOf } from './zip.mjs';
 
 const SLOW = Number(process.env.SLOW) || 1; // CI runners can be slower: SLOW=2 doubles every wait
 const MOCK = readFileSync(new URL('./mock-firebase.js', import.meta.url), 'utf8');
+const IMG_SMALL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 const server = await start(0);
 const BASE = `http://127.0.0.1:${server.address().port}`;
 // Fake microphone for the Voice Stories recorder.
@@ -289,6 +290,18 @@ try {
     await p.waitForTimeout(SLOW * 500);
     ok((await p.textContent('[data-action=toggle-thread][data-parent="updates/p1"]')).includes('2 comments'), 'own comment deleted');
     await done(p, 'updates');
+  }
+
+  console.log('— photos: a big album arrives a dozen at a time');
+  {
+    const p = await open('/family/#photos', { signedIn: true, extraPhotos: 30 });
+    await p.waitForTimeout(SLOW * 900);
+    const first = await p.$$eval('#photo-grid .photo', e => e.length);
+    ok(first >= 12 && first < 42 && first % 12 === 0, 'the album shows photos a dozen at a time, without waiting for the whole album');
+    for (let k = 0; k < 6; k++) { await p.mouse.wheel(0, 4000); await p.waitForTimeout(SLOW * 500); }
+    ok(await p.$$eval('#photo-grid .photo', e => e.length) === 42 && await p.isHidden('#photo-more'), 'scrolling down brings in the rest by itself, until every photo is there');
+    ok(await p.$$eval('#photo-grid .photo img', imgs => imgs.every(i => i.complete && i.naturalWidth > 0)), 'and every one of them has loaded');
+    await done(p, 'photos (big album)');
   }
 
   console.log('— photos: lightbox hearts + comments');
@@ -948,6 +961,15 @@ try {
     await shaky.waitForTimeout(SLOW * 800);
     ok(!!(await shaky.$('.tcard')), 'and it’s still there after hopping to another page and back');
     await done(shaky, 'family tree (shaky connection)');
+
+    // Lots of photos on the tree (town photos + portraits) arrive a dozen at a time, and all of them land.
+    const many = {};
+    TR.parse(readFileSync(new URL('./fixtures/sample-tree.ged', import.meta.url), 'utf8')).people.forEach(x => { many[x.id] = { img: IMG_SMALL, uid: 'u1' }; });
+    for (let i = 0; i < 25; i++) many['place-town-' + i] = { img: IMG_SMALL, uid: 'u1' };
+    const pics = await open('/family/#tree', { signedIn: true, admin: false, treeDocs, treePhotos: many });
+    await pics.waitForTimeout(SLOW * 2500);
+    ok(await pics.textContent('#ts-photos') === String(Object.keys(many).length - 25), 'every photo on the tree arrives, a dozen at a time (41 here), and every person shows theirs');
+    await done(pics, 'family tree (many photos)');
 
     // A longer outage: it says so, then keeps trying by itself and opens once the connection is back.
     // (The app's retry pauses are real time, so watch for each moment rather than sleeping past it.)

@@ -28,7 +28,7 @@
   // JARVIS runs on the family network. Its address is saved per device (My Profile →
   // Preferences) so a private hostname is never published in this public file.
   const JARVIS_DEFAULT = 'http://localhost:8765/index.html';
-  const PAGE = 24;
+  const PAGE = 12; // photos are up to ~1 MB each: a dozen at a time shows them sooner
 
   const FIRST_YEAR = 2024; // the hub's first photos
   const VAULT_IDLE_MS = 5 * 60e3; // vault relocks after this long without activity…
@@ -823,7 +823,7 @@
 
   /* ===================== Data ===================== */
   async function loadMembers() {
-    const snap = await col('users').get();
+    const snap = await sturdy(() => col('users').get(), 4, 60000);
     const all = snap.docs.map(d => Object.assign({}, d.data(), { uid: d.id }))
       .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
     S.members = all.filter(m => m.approved !== false);
@@ -857,7 +857,7 @@
   async function loadRecent(force) {
     if (S.recent && !force) return S.recent;
     if (!force && S.photos.items.length >= 6) return (S.recent = S.photos.items.slice(0, 6));
-    const snap = await col('memories').orderBy('createdAt', 'desc').limit(6).get();
+    const snap = await sturdy(() => col('memories').orderBy('createdAt', 'desc').limit(6).get(), 4, 120000);
     S.recent = snap.docs.map(d => Object.assign({ id: d.id }, d.data())).filter(m => okImg(m.imageData));
     return S.recent;
   }
@@ -870,7 +870,7 @@
     try {
       let q = col('memories').orderBy('createdAt', 'desc').limit(PAGE);
       if (P.last) q = q.startAfter(P.last);
-      const snap = await q.get();
+      const snap = await sturdy(() => q.get(), 4, 120000);
       if (snap.docs.length) P.last = snap.docs[snap.docs.length - 1];
       P.done = snap.docs.length < PAGE;
       P.items.push(...snap.docs.map(d => Object.assign({ id: d.id }, d.data())).filter(m => okImg(m.imageData)));
@@ -887,7 +887,7 @@
   }
   async function loadMemorial(force) {
     if (S.memorial && !force) return S.memorial;
-    const snap = await col('memorial').orderBy('order', 'asc').get();
+    const snap = await sturdy(() => col('memorial').orderBy('order', 'asc').get(), 4, 120000);
     S.memorial = snap.docs.map(d => Object.assign({ id: d.id }, d.data())).filter(m => okImg(m.imageData));
     return S.memorial;
   }
@@ -1135,7 +1135,14 @@
       P.rendered = P.items.length;
     }
     $('#photo-more').hidden = P.done;
+    if (moreIO && !P.done) moreIO.observe($('#photo-more'));
   }
+  // The next dozen loads by itself as you scroll near the end ("Load more" still works too).
+  const moreIO = 'IntersectionObserver' in window ? new IntersectionObserver(es => {
+    if (!es.some(e => e.isIntersecting) || S.view !== 'photos' || S.photos.loading || S.photos.done) return;
+    const btn = $('#photo-more');
+    if (btn && !btn.hidden && !btn.disabled) morePhotos(btn);
+  }, { rootMargin: '600px 0px' }) : null;
   async function morePhotos(btn) {
     busy(btn, true, 'Loading…');
     try { await loadPhotos(false); renderPhotos(false); }
@@ -3822,6 +3829,7 @@
   // database: tree/meta + tree/part0…, read by /assets/js/tree.js (loaded on demand).
   // The tree's home person — Hector, whom the In Memory page honours — gets the memorial photo.
   const HOME_PERSON = 'I' + HOME_PID;
+  const TREE_PHOTO_PAGE = 12;
   let treeLib = null;
   function loadTreeLib() {
     if (window.AgrazTree) return Promise.resolve();
@@ -3935,14 +3943,24 @@
     const saved = keepOnDevice() && !Object.keys(t.photos).length ? await deviceStore.get('treePhotos') : null;
     const kept = saved && S.user && saved.uid === S.user.uid && saved.photos && S.tree === t ? Object.keys(saved.photos) : [];
     if (kept.length) { Object.assign(t.photos, saved.photos); repaint(); }
+    // Then the latest from the database, a few at a time, so the first ones show while the rest
+    // arrive, and a slow connection never has to fetch them all in one go.
+    const fresh = {};
+    let complete = false, last = null, shown = 0;
     try {
-      const snap = await sturdy(() => col('treePhotos').get(), 3, 45000);
-      const fresh = {};
-      snap.docs.forEach(d => { const v = d.data(); if (okImg(v.img)) fresh[d.id] = { img: v.img, uid: v.uid }; });
-      kept.forEach(k => { if (!fresh[k]) delete t.photos[k]; }); // removed since this device last looked
-      Object.assign(t.photos, fresh);
-      keepTreePhotosOnDevice();
-    } catch (e) { /* photos are a bonus */ }
+      for (;;) {
+        let q = col('treePhotos').orderBy(firebase.firestore.FieldPath.documentId()).limit(TREE_PHOTO_PAGE);
+        if (last) q = q.startAfter(last);
+        const snap = await sturdy(() => q.get(), 4, 90000);
+        if (S.tree !== t) return;
+        snap.docs.forEach(d => { const v = d.data(); if (okImg(v.img)) t.photos[d.id] = fresh[d.id] = { img: v.img, uid: v.uid }; });
+        if (snap.docs.length < TREE_PHOTO_PAGE) { complete = true; break; }
+        last = snap.docs[snap.docs.length - 1];
+        if (Date.now() - shown > 800) { shown = Date.now(); repaint(); }
+      }
+    } catch (e) { /* photos are a bonus: keep what arrived */ }
+    if (complete) kept.forEach(k => { if (!fresh[k]) delete t.photos[k]; }); // removed since this device last looked
+    keepTreePhotosOnDevice();
     // The memorial's first photo stands in for the home person, if they have no photo yet.
     if (!t.memorialThumb && t.ix && t.ix.get(HOME_PERSON)) {
       try {
